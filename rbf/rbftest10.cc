@@ -96,18 +96,14 @@ int RBFTest_10(RecordBasedFileManager *rbfm) {
         rc = rbfm->readRecord(fileHandle, recordDescriptor, rids[i], returnedData);
         assert(rc == success && "Opening the file should not fail.");
         
-     //   cout << "Returned Data:" << endl;
-    //    rbfm->printRecord(recordDescriptor, returnedData);
+        cout << "Returned Data:" << endl;
+        rbfm->printRecord(recordDescriptor, returnedData);
 
-            cout << i <<" "<<rids[i].pageNum<< endl << endl;
         int size = 0;
         prepareLargeRecord(recordDescriptor.size(), nullsIndicator, i, record, &size);
-	//printf("fuck\n");
-        //rbfm->printRecord(recordDescriptor, record);
-
         if(memcmp(returnedData, record, sizes[i]) != 0)
         {
-            cout << "[FAIL] Test Case 10 Failed! "<< i <<" "<<rids[i].pageNum<< endl << endl;
+            cout << "[FAIL] Test Case 10 Failed!" << endl << endl;
             free(record);
             free(returnedData);
             return -1;

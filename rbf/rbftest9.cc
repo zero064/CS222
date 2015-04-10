@@ -65,19 +65,7 @@ int RBFTest_9(RecordBasedFileManager *rbfm, vector<RID> &rids, vector<int> &size
 
         rc = rbfm->insertRecord(fileHandle, recordDescriptor, record, rid);
         assert(rc == success && "Inserting the file should not fail.");
-	void *returnData = malloc(1000);
-	rc = rbfm->readRecord(fileHandle, recordDescriptor, rid, returnData);
 
-	if(memcmp(returnData, record, size) != 0){
-	    cout << "\n\nreturned data \n";
-	    rbfm->printRecord(recordDescriptor, returnData);
-	    cout << "\n\nreal data \n";
-	    rbfm->printRecord(recordDescriptor, record); 
-	    cout << "something wrong in inserting" << endl;
-	    free(returnData);
-	    return -1;
-	}
-	
         rids.push_back(rid);
         sizes.push_back(size);        
     }
