@@ -123,7 +123,6 @@ int RBFTest_7(PagedFileManager *pfm)
 
 	rc = destroyFileShouldSucceed(fileName);
     assert(rc == success  && "Destroying the file should not fail.");
-
     free(data);
     free(buffer);
 

@@ -84,14 +84,12 @@ int RBFTest_6(PagedFileManager *pfm)
 
     free(data);
     free(buffer);
-
     // Destroy File
     rc = pfm->destroyFile(fileName);
     assert(rc == success && "Destroying the file should not fail.");
 
 	rc = destroyFileShouldSucceed(fileName);
     assert(rc == success  && "Destroying the file should not fail.");
-
 	cout << "[PASS] Test Case 6 Passed!" << endl << endl;
     
     return 0;

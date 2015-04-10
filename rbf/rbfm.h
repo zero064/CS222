@@ -16,6 +16,12 @@ typedef struct
   unsigned pageNum;	// page number
   unsigned slotNum; // slot number in the page
 } RID;
+// Record offset in page
+typedef struct 
+{
+  short int offset;
+  short int length;
+} RecordOffset;
 
 
 // Attribute
@@ -128,6 +134,16 @@ protected:
 
 private:
   static RecordBasedFileManager *_rbf_manager;
+  PagedFileManager *pagedFileManager;
+
+// custom private variable
+  
+
+// custom private function
+  PageNum findFreePage(FileHandle &fileHandle,int recordSize);
+  size_t getDataSize(const vector<Attribute> &recordDescriptor, const void *data, bool printFlag);  
+  size_t writeDataToBuffer(const vector<Attribute> &recordDescriptor, const void *data, void * &formattedData);
+  RC readDataFromBuffer(const vector<Attribute> &recordDescriptor, void *data, const void * formattedData);
 };
 
 #endif
