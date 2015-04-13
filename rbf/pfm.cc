@@ -106,11 +106,11 @@ FileHandle::~FileHandle()
 
 RC FileHandle::readPage(PageNum pageNum, void *data)
 {
-    //printf("r%d\n",pageNum * PAGE_SIZE );
+//    printf("r%d\n",pageNum );
     fseek( filePointer , pageNum * PAGE_SIZE ,SEEK_SET );
     int result = fread(data, sizeof(char), PAGE_SIZE, filePointer);
     if( result != PAGE_SIZE ){
-	printf("page hasn't been opened yet\n");
+	//printf("page hasn't been opened yet\n");
 	return FAILURE;
     }
 

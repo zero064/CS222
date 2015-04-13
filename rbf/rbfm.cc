@@ -58,7 +58,7 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
     */
     if( fileHandle.readPage(rid.pageNum,pageData) == FAILURE ){
 	char size = 1;  // number of records in page, since it's new, we put our one in it
-	printf("it's fresh %d\n",rid.pageNum);
+	//printf("it's fresh %d\n",rid.pageNum);
 	memcpy( (char*)pageData+PAGE_SIZE-sizeof(char), &size ,sizeof(char));
 	memcpy( pageData, formattedData, dataSize ); 
 	RecordOffset rOffset;
@@ -78,7 +78,7 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 	
 	// put new record, increase and update index
 	index++;  rid.slotNum = index-1;
-	printf("slot %d\n",rid.slotNum);
+	//printf("slot %d\n",rid.slotNum);
 	// new offset 
 	rOffset.offset = rOffset.offset + rOffset.length;
 	rOffset.length = dataSize;
@@ -110,7 +110,7 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
 
     // read slot info 
     char index = rid.slotNum+1;
-    printf("slot %d\n",rid.slotNum);
+    //printf("slot %d\n",rid.slotNum);
     RecordOffset rOffset;
     //printf("~~~~%d\n",rid.slotNum);//sizeof(RecordOffset)*index);
     memcpy( &rOffset, (char*)page+PAGE_SIZE-sizeof(char)-sizeof(RecordOffset)*index, sizeof(RecordOffset) );
@@ -118,7 +118,7 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
     // we have the offset, read data from page
     void *formattedData = malloc(rOffset.length);
     memcpy( formattedData, (char*)page+rOffset.offset, rOffset.length );
-    printf("offset %d length %d\n",rOffset.offset,rOffset.length);
+    //printf("offset %d length %d\n",rOffset.offset,rOffset.length);
     readDataFromBuffer(recordDescriptor,data,formattedData);
     free(page);    
     free(formattedData);
@@ -170,34 +170,39 @@ PageNum RecordBasedFileManager::findFreePage(FileHandle &fileHandle,int recordSi
 		PageNum num = ((Directory *)dir)->pagenum;
 		((Directory *)dir)->freespace -= recordSize + sizeof(char) + sizeof(RecordOffset); 
 		memcpy((char*)data+(i*DIRECTORY_SIZE),dir, DIRECTORY_SIZE);
-		fileHandle.writePage(currentDir,data); // update current 
+		fileHandle.writePage(currentDir*512,data); // update current directory 
 		free(dir);
 		free(data);
-		printf("free space left %d\n",((Directory *)dir)->freespace);
+//		printf("free space left %d on page %d\n",((Directory *)dir)->freespace,num);
 		return num;
 	    }
 	    free(dir);
 	} 
-	printf("directory full\n");
+
+	currentDir++;
+//	printf("directory full move current Dir to %d\n",currentDir);
 	// last directory used to store the next directory if this one has not enough space 
-	if( fileHandle.readPage(nextDir*512,data) == FAILURE ){
+	if( fileHandle.readPage(currentDir*512,data) == FAILURE ){
+	    printf("creating new directory, numpage %d\n",fileHandle.getNumberOfPages());
 	    DirectoryDesc descriptor;
 	    nextDir++;  // point this new directory to a pseudo new directory
 	    descriptor.nextDir = nextDir ; 
 	    descriptor.size = 0;
 	    nextDir = descriptor.nextDir;
-	    currentDir++;
+
 	    memcpy( (char*)data , &descriptor , sizeof(DirectoryDesc) );
 
 	    for(int i=1; i< 512; i++){
 		Directory directory;
-		directory.pagenum = i;
+		directory.pagenum = i + currentDir*512;
 		directory.freespace = PAGE_SIZE;
 		memcpy( (char*)data + sizeof(Directory)*i , &directory , sizeof(Directory) );
 	    }
 	
 	    fileHandle.appendPage(data);
+	    printf("numpage %d\n",fileHandle.getNumberOfPages());
 	}
+
 
 
 
@@ -314,12 +319,13 @@ size_t RecordBasedFileManager::writeDataToBuffer(const vector<Attribute> &record
 	}
     }	
 
+/*
     printf("descriptor ");
     for( int i=0; i< recordDescriptor.size(); i++){
 	printf("%i ",fieldOffsetDescriptor[i]);
     }
     printf("\n");
-
+*/
     // malloc for our custom data
     size_t oldDataSize = getDataSize( recordDescriptor,data,false);
     formattedData = malloc( descriptorLength + oldDataSize ) ; 
