@@ -10,4 +10,10 @@
 ./rbftest9
 ./rbftest10
 ./rbftest11
+./rbftest11a
+./rbftest11b
 ./rbftest12
+./rbftest13
+./rbftest14
+./rbftest15
+./rbftest16

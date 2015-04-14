@@ -1,6 +1,6 @@
 include ../makefile.inc
 
-all: librbf.a rbftest1 rbftest2 rbftest3 rbftest4 rbftest5 rbftest6 rbftest7 rbftest8 rbftest8b rbftest9 rbftest10 rbftest11 rbftest12
+all: librbf.a rbftest1 rbftest2 rbftest3 rbftest4 rbftest5 rbftest6 rbftest7 rbftest8 rbftest8b rbftest9 rbftest10 rbftest11 rbftest12 rbftest11a rbftest11b rbftest13 rbftest14 rbftest15 rbftest16
 
 # c file dependencies
 pfm.o: pfm.h
@@ -22,7 +22,13 @@ rbftest8b.o: pfm.h rbfm.h
 rbftest9.o: pfm.h rbfm.h
 rbftest10.o: pfm.h rbfm.h
 rbftest11.o: pfm.h rbfm.h
+rbftest11a.o: pfm.h rbfm.h
+rbftest11b.o: pfm.h rbfm.h
 rbftest12.o: pfm.h rbfm.h
+rbftest13.o: pfm.h rbfm.h
+rbftest14.o: pfm.h rbfm.h
+rbftest15.o: pfm.h rbfm.h
+rbftest16.o: pfm.h rbfm.h
 
 # binary dependencies
 rbftest1: rbftest1.o librbf.a $(CODEROOT)/rbf/librbf.a
@@ -37,7 +43,13 @@ rbftest8b: rbftest8b.o librbf.a $(CODEROOT)/rbf/librbf.a
 rbftest9: rbftest9.o librbf.a $(CODEROOT)/rbf/librbf.a
 rbftest10: rbftest10.o librbf.a $(CODEROOT)/rbf/librbf.a
 rbftest11: rbftest11.o librbf.a $(CODEROOT)/rbf/librbf.a
+rbftest11a: rbftest11a.o librbf.a $(CODEROOT)/rbf/librbf.a
+rbftest11b: rbftest11b.o librbf.a $(CODEROOT)/rbf/librbf.a
 rbftest12: rbftest12.o librbf.a $(CODEROOT)/rbf/librbf.a
+rbftest13: rbftest13.o librbf.a $(CODEROOT)/rbf/librbf.a
+rbftest14: rbftest14.o librbf.a $(CODEROOT)/rbf/librbf.a
+rbftest15: rbftest15.o librbf.a $(CODEROOT)/rbf/librbf.a
+rbftest16: rbftest16.o librbf.a $(CODEROOT)/rbf/librbf.a
 
 # dependencies to compile used libraries
 .PHONY: $(CODEROOT)/rbf/librbf.a
@@ -46,4 +58,4 @@ $(CODEROOT)/rbf/librbf.a:
 
 .PHONY: clean
 clean:
-	-rm rbftest1 rbftest2 rbftest3 rbftest4 rbftest5 rbftest6 rbftest7 rbftest8 rbftest8b rbftest9 rbftest10 rbftest11 rbftest12 rbftest1.o *.a *.o *~
+	-rm rbftest1 rbftest2 rbftest3 rbftest4 rbftest5 rbftest6 rbftest7 rbftest8 rbftest8b rbftest9 rbftest10 rbftest11 rbftest12 rbftest1.o *.a *.o *~rbftest11a rbftest11b rbftest13 rbftest14 rbftest15 rbftest16

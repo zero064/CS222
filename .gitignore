@@ -1,1 +1,6 @@
-*.o
+!*.cc
+!Makefile
+!*.txt
+!*.inc
+!*.h
+!*.sh
