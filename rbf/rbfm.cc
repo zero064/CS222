@@ -57,23 +57,23 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 	Insert record into data
     */
     if( fileHandle.readPage(rid.pageNum,pageData) == FAILURE ){
-	char size = 1;  // number of records in page, since it's new, we put our one in it
+	short int size = 1;  // number of records in page, since it's new, we put our one in it
 	//printf("it's fresh %d\n",rid.pageNum);
-	memcpy( (char*)pageData+PAGE_SIZE-sizeof(char), &size ,sizeof(char));
+	memcpy( (char*)pageData+PAGE_SIZE-sizeof(short int), &size ,sizeof(short int));
 	memcpy( pageData, formattedData, dataSize ); 
 	RecordOffset rOffset;
 	rOffset.offset = 0;
 	rOffset.length = dataSize;
-	memcpy( (char*)pageData+PAGE_SIZE-sizeof(char)-sizeof(RecordOffset), &rOffset, sizeof(RecordOffset) );
+	memcpy( (char*)pageData+PAGE_SIZE-sizeof(short int)-sizeof(RecordOffset), &rOffset, sizeof(RecordOffset) );
 	rid.slotNum = 0;
 	fileHandle.appendPage(pageData);
     }else{
-	char index = 0;
-	memcpy(&index, (char*)pageData+PAGE_SIZE-sizeof(char) ,sizeof(char));
+	short int index = 0;
+	memcpy(&index, (char*)pageData+PAGE_SIZE-sizeof(short int) ,sizeof(short int));
 	//int offset = 0;
 
         RecordOffset rOffset;
-        memcpy(&rOffset, (char*)pageData+PAGE_SIZE-sizeof(char)-sizeof(RecordOffset)*index ,sizeof(RecordOffset));
+        memcpy(&rOffset, (char*)pageData+PAGE_SIZE-sizeof(short int)-sizeof(RecordOffset)*index ,sizeof(RecordOffset));
 	//printf("offset %d , length %d\n", rOffset.offset, rOffset.length); 
 	
 	// put new record, increase and update index
@@ -85,9 +85,9 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 	// put new record
 	memcpy( (char*)pageData+rOffset.offset, formattedData, dataSize ); 
 	// update index
-	memcpy( (char*)pageData+PAGE_SIZE-sizeof(char), &index ,sizeof(char));
+	memcpy( (char*)pageData+PAGE_SIZE-sizeof(short int), &index ,sizeof(short int));
 	// add new record index at bottom
-	memcpy( (char*)pageData+PAGE_SIZE-sizeof(char)-sizeof(RecordOffset)*index, &rOffset ,sizeof(RecordOffset));
+	memcpy( (char*)pageData+PAGE_SIZE-sizeof(short int)-sizeof(RecordOffset)*index, &rOffset ,sizeof(RecordOffset));
 	// write it to file
 	fileHandle.writePage(rid.pageNum,pageData);
 	
@@ -106,14 +106,15 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
     void *page = malloc(PAGE_SIZE);
     if( fileHandle.readPage(rid.pageNum,page) == FAILURE ){
 	printf("Yo readRecord failed dude\n");
+	return FAILURE;
     }
 
     // read slot info 
-    char index = rid.slotNum+1;
+    short int index = rid.slotNum+1;
     //printf("slot %d\n",rid.slotNum);
     RecordOffset rOffset;
     //printf("~~~~%d\n",rid.slotNum);//sizeof(RecordOffset)*index);
-    memcpy( &rOffset, (char*)page+PAGE_SIZE-sizeof(char)-sizeof(RecordOffset)*index, sizeof(RecordOffset) );
+    memcpy( &rOffset, (char*)page+PAGE_SIZE-sizeof(short int)-sizeof(RecordOffset)*index, sizeof(RecordOffset) );
 
     // we have the offset, read data from page
     void *formattedData = malloc(rOffset.length);
@@ -284,9 +285,9 @@ size_t RecordBasedFileManager::writeDataToBuffer(const vector<Attribute> &record
     unsigned short int *fieldOffsetDescriptor = (unsigned short int *)malloc( sizeof(unsigned short int) * recordDescriptor.size() );
     int fieldOffsetDescriptorSize = sizeof(unsigned short int) * recordDescriptor.size();
     // number of field (1 byte )
-    unsigned char fieldSize = (unsigned char) recordDescriptor.size();
+    short int fieldSize = (short int) recordDescriptor.size();
     // get descriptor length 
-    int descriptorLength = sizeof(unsigned char) + fieldOffsetDescriptorSize;  //getDataSize( recordDescriptor,data,false) 
+    int descriptorLength = sizeof(short int) + fieldOffsetDescriptorSize;  //getDataSize( recordDescriptor,data,false) 
   
 
     // copy null indicator from data 
@@ -330,8 +331,8 @@ size_t RecordBasedFileManager::writeDataToBuffer(const vector<Attribute> &record
     size_t oldDataSize = getDataSize( recordDescriptor,data,false);
     formattedData = malloc( descriptorLength + oldDataSize ) ; 
    
-    memcpy( formattedData , &fieldSize , sizeof(unsigned char));  // size
-    memcpy( (char*)formattedData+sizeof(unsigned char) ,fieldOffsetDescriptor  , fieldOffsetDescriptorSize );
+    memcpy( formattedData , &fieldSize , sizeof(short int));  // size of field
+    memcpy( (char*)formattedData+sizeof(short int) ,fieldOffsetDescriptor  , fieldOffsetDescriptorSize );
     memcpy( (char*)formattedData+descriptorLength , data , oldDataSize );
  /* 
     printf("\n\ninternal test\n"); 
@@ -354,10 +355,10 @@ RC RecordBasedFileManager::readDataFromBuffer(const vector<Attribute> &recordDes
     offset += nullFieldsIndicatorActualSize;
     // get field offset descriptor array length
     int fieldOffsetDescriptorSize = sizeof(unsigned short int) * recordDescriptor.size();
-    // number of field (1 byte )
-    unsigned char fieldSize = (unsigned char) recordDescriptor.size();
+    // number of field (2 byte )
+    short int fieldSize = (short int) recordDescriptor.size();
     // get descriptor length 
-    int descriptorLength = sizeof(unsigned char) + fieldOffsetDescriptorSize;  //getDataSize( recordDescriptor,data,false)
+    int descriptorLength = sizeof(short int) + fieldOffsetDescriptorSize;  //getDataSize( recordDescriptor,data,false)
     // get old data's length 
     size_t oldDataSize = getDataSize( recordDescriptor,(char *)formattedData+descriptorLength,false);
     memcpy(data,(char*)formattedData+descriptorLength,oldDataSize);
