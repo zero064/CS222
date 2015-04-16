@@ -13,16 +13,23 @@ using namespace std;
 // Record ID
 typedef struct
 {
-  unsigned pageNum;	// page number
-  unsigned slotNum; // slot number in the page
+    unsigned pageNum;	// page number
+    unsigned slotNum; // slot number in the page
 } RID;
 // Record offset in page
 typedef struct 
 {
-  short int offset;
-  short int length;
-} RecordOffset;
+    short int offset;
+    short int length;
+}   RecordOffset;
 
+typedef struct
+{
+    short int numOfSlot;  // record number of slot in the page
+    short int recordSize; // total record size
+}   PageDesc;
+
+const short int DeletedSlotMark = -1; 
 
 // Attribute
 typedef enum { TypeInt = 0, TypeReal, TypeVarChar } AttrType;
@@ -132,7 +139,7 @@ protected:
   RecordBasedFileManager();
   ~RecordBasedFileManager();
 
-private:
+private: 
   static RecordBasedFileManager *_rbf_manager;
   PagedFileManager *pagedFileManager;
 

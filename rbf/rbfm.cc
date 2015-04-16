@@ -24,6 +24,13 @@ RecordBasedFileManager::~RecordBasedFileManager()
 {
 }
 
+
+RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor, const void *data) {
+    getDataSize( recordDescriptor, data, true );
+    return -1;
+}
+
+
 RC RecordBasedFileManager::createFile(const string &fileName) {
     return pagedFileManager->createFile(fileName);
     //return -1;
@@ -50,32 +57,81 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 	Get directory to look for free page
     */
     void *formattedData;
-    short int dataSize = writeDataToBuffer(recordDescriptor,data,formattedData);
+    short int dataSize = writeDataToBuffer(recordDescriptor,data,formattedData); // formattedData will be malloc in this function
     rid.pageNum = findFreePage(fileHandle, dataSize );    
 
     /*
 	Insert record into data
     */
     if( fileHandle.readPage(rid.pageNum,pageData) == FAILURE ){
-	short int size = 1;  // number of records in page, since it's new, we put our one in it
-	//printf("it's fresh %d\n",rid.pageNum);
-	memcpy( (char*)pageData+PAGE_SIZE-sizeof(short int), &size ,sizeof(short int));
-	memcpy( pageData, formattedData, dataSize ); 
+	//short int size = 1;  // number of records in page, since it's new, we put our one in it
+	rid.slotNum = 0;
+	//memcpy( (char*)pageData+PAGE_SIZE-sizeof(short int), &size ,sizeof(short int));
+	// setting first record in page , put
 	RecordOffset rOffset;
 	rOffset.offset = 0;
 	rOffset.length = dataSize;
-	memcpy( (char*)pageData+PAGE_SIZE-sizeof(short int)-sizeof(RecordOffset), &rOffset, sizeof(RecordOffset) );
-	rid.slotNum = 0;
+	memcpy( pageData, formattedData, dataSize ); 
+	memcpy( (char*)pageData+PAGE_SIZE-sizeof(PageDesc)-sizeof(RecordOffset), &rOffset, sizeof(RecordOffset) );
+	// setting first page/slot descriptor 
+	PageDesc pageDesc;
+	pageDesc.numOfSlot = 1;
+	pageDesc.recordSize = rOffset.offset + rOffset.length;
+	memcpy( (char*)pageData+PAGE_SIZE-sizeof(PageDesc) , &pageDesc, sizeof(PageDesc));
+	// write it yo
 	fileHandle.appendPage(pageData);
+
+        // remember to release memory from our custom record 
+	free(formattedData);
+	free(pageData);
+	return SUCCESS;
+
     }else{
-	short int index = 0;
-	memcpy(&index, (char*)pageData+PAGE_SIZE-sizeof(short int) ,sizeof(short int));
+	//short int index = 0;
+	//memcpy(&index, (char*)pageData+PAGE_SIZE-sizeof(short int) ,sizeof(short int));
 	//int offset = 0;
 
-        RecordOffset rOffset;
-        memcpy(&rOffset, (char*)pageData+PAGE_SIZE-sizeof(short int)-sizeof(RecordOffset)*index ,sizeof(RecordOffset));
+	// read page descriptor for slot and record information
+	PageDesc pageDesc;
+	memcpy( &pageDesc, (char*)pageData+PAGE_SIZE-sizeof(PageDesc) , sizeof(PageDesc) );
+
+	// read all slots from memory	
+        RecordOffset *rOffset = (RecordOffset*)malloc( sizeof(RecordOffset) * pageDesc.numOfSlot );
+        memcpy(rOffset, (char*)pageData+PAGE_SIZE-sizeof(PageDesc)-sizeof(RecordOffset)*pageDesc.numOfSlot ,sizeof(RecordOffset)*pageDesc.numOfSlot );
 	//printf("offset %d , length %d\n", rOffset.offset, rOffset.length); 
+
+	for( int i=0; i< pageDesc.numOfSlot; i++) {
+	    // found previous deleted slot to use
+	    if( rOffset[i].offset == DeletedSlotMark ){
+		rid.slotNum = i;
+		rOffset[i].offset = pageDesc.recordSize;
+		rOffset[i].length = dataSize;
+		pageDesc.recordSize += dataSize;
+		memcpy( (char*)pageData+rOffset[i].offset, formattedData, dataSize );
+		fileHandle.writePage(rid.pageNum,pageData);
+		
+		// remember to release memory from our custom record 
+	    	free(formattedData);
+		free(pageData);
+		return SUCCESS;
+
+	    } 
+	}
 	
+	// no previous deleted record found, insert a new one
+	RecordOffset newSlotOffset;
+	newSlotOffset.offset = pageDesc.recordSize;
+	newSlotOffset.length = dataSize;
+	memcpy( (char*)pageData+PAGE_SIZE-sizeof(PageDesc)-sizeof(RecordOffset)*(pageDesc.numOfSlot+1), &newSlotOffset, sizeof(RecordOffset) );
+	memcpy( (char*)pageData+newSlotOffset.offset, formattedData, dataSize ); 
+
+    	// update PageDesc 
+	pageDesc.numOfSlot++;
+	pageDesc.recordSize += dataSize;
+	memcpy( (char*)pageData+PAGE_SIZE-sizeof(PageDesc), &pageDesc , sizeof(PageDesc) );
+	rid.slotNum = pageDesc.numOfSlot;
+
+/*
 	// put new record, increase and update index
 	index++;  rid.slotNum = index-1;
 	//printf("slot %d\n",rid.slotNum);
@@ -88,9 +144,14 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 	memcpy( (char*)pageData+PAGE_SIZE-sizeof(short int), &index ,sizeof(short int));
 	// add new record index at bottom
 	memcpy( (char*)pageData+PAGE_SIZE-sizeof(short int)-sizeof(RecordOffset)*index, &rOffset ,sizeof(RecordOffset));
+*/
+
+	// remember to release memory from our custom record 
+        free(formattedData);
+	free(pageData);
 	// write it to file
 	fileHandle.writePage(rid.pageNum,pageData);
-	
+	return SUCCESS;
     }
 
     
@@ -98,7 +159,7 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
     // remember to release memory from our custom record 
     free(formattedData);
     free(pageData);
-    return SUCCESS;
+    return FAILURE;
 }
 
 
@@ -114,7 +175,12 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
     //printf("slot %d\n",rid.slotNum);
     RecordOffset rOffset;
     //printf("~~~~%d\n",rid.slotNum);//sizeof(RecordOffset)*index);
-    memcpy( &rOffset, (char*)page+PAGE_SIZE-sizeof(short int)-sizeof(RecordOffset)*index, sizeof(RecordOffset) );
+    memcpy( &rOffset, (char*)page+PAGE_SIZE-sizeof(PageDesc)-sizeof(RecordOffset)*index, sizeof(RecordOffset) );
+
+    if( rOffset.offset == DeletedSlotMark ){
+	printf("Yo readRecord failed dude\n");
+	return FAILURE;
+    }
 
     // we have the offset, read data from page
     void *formattedData = malloc(rOffset.length);
@@ -181,7 +247,6 @@ PageNum RecordBasedFileManager::findFreePage(FileHandle &fileHandle,int recordSi
 	} 
 
 	currentDir++;
-//	printf("directory full move current Dir to %d\n",currentDir);
 	// last directory used to store the next directory if this one has not enough space 
 	if( fileHandle.readPage(currentDir*512,data) == FAILURE ){
 	    printf("creating new directory, numpage %d\n",fileHandle.getNumberOfPages());
@@ -405,66 +470,85 @@ RC RecordBasedFileManager::readDataFromBuffer(const vector<Attribute> &recordDes
     return SUCCESS;
 }
 
-
-RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor, const void *data) {
-    getDataSize( recordDescriptor, data, true );
-    return -1;
-/*
-    int size = recordDescriptor.size();
-    int offset = 0;
-    int nullFieldsIndicatorActualSize = ceil((double) size / CHAR_BIT);
-    unsigned char *nullFieldsIndicator = (unsigned char *) malloc(nullFieldsIndicatorActualSize);
-    memcpy(nullFieldsIndicator, data, nullFieldsIndicatorActualSize);
-    offset += nullFieldsIndicatorActualSize;
-    //memcpy((char *)buffer + offset, (char *)data+offset, nullFieldsIndicatorActualSize);
-    for(int i=0; i<size; i++){
-	Attribute attribute = recordDescriptor[i];
-	string name = attribute.name;
-	AttrLength length = attribute.length;
-	AttrType type = attribute.type;
-	printf("%d %s %d ",i,name.c_str(),length);
-	
-	if( nullFieldsIndicator[i/8] & (1 << (7-(i%8)) ) ){
-	    printf("null\n");
-	    continue;
-	}
-
-	void *buffer;
-	if( type == TypeVarChar ){
-	    buffer = malloc(sizeof(int));
-	    memcpy( buffer , (char*)data+offset, sizeof(int));
-	    offset += sizeof(int);
-	    int len = *(int*)buffer;
-	    printf("%i ",len);
-	    free(buffer);
-	    buffer = malloc(len);
-	    memcpy( buffer, (char*)data+offset, len);
-	    offset += len; 
-	    printf("%s\n",buffer);
-	    free(buffer);
-	    continue; 
-	}
-	std::size_t size;
-	if( type == TypeReal ){
-	    size = sizeof(float);
-	    buffer = malloc(size);
-	    memcpy( buffer , (char*)data+offset, size);
-	    offset += size;
-	    printf("%f \n",*(float*)buffer);
-	} else{
-	    size = sizeof(int);
-	    buffer = malloc(size);
-	    memcpy( buffer , (char*)data+offset, size);
-	    offset += size;
-	    printf("%i \n",*(int*)buffer);
-	}
-	free(buffer);
-	
+RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid)
+{
+    void *page = malloc(PAGE_SIZE);
+    if( fileHandle.readPage(rid.pageNum,page) == FAILURE ){
+	printf("Yo detele an invalid record dude\n");
+	return FAILURE;
     }
-    printf("given size %d\n",offset);
-    return -1;
+
+    // read number of slot in this page
+    short int numOfSlot = 0;
+    memcpy( &numOfSlot, (char*)page+PAGE_SIZE-sizeof(PageDesc), sizeof(short int) );
+
+    //printf("slot %d\n",rid.slotNum);
+    // read slot info 
+    //short int index = rid.slotNum+1;
+
+    RecordOffset *rOffset = (RecordOffset*)malloc(sizeof(RecordOffset)*numOfSlot);
+    for( int i=0; i<numOfSlot; i++){
+	// i+1 is because we count the offset reversely
+	memcpy( &rOffset[i], (char*)page+PAGE_SIZE-sizeof(PageDesc)-sizeof(RecordOffset)*(i+1), sizeof(RecordOffset) );
+    } 
+
+    // check if the slot has already been marked as deleted
+    RecordOffset recordToDelete = rOffset[rid.slotNum];
+    if( recordToDelete.offset == DeletedSlotMark ){
+	printf("Yo detele an invalid record dude\n");
+	return FAILURE;
+    }else{
+    // else mark it as deleted, write it back to page
+	recordToDelete.offset = DeletedSlotMark;
+        memcpy( (char*)page+PAGE_SIZE-sizeof(PageDesc)-sizeof(RecordOffset)*(rid.slotNum+1), &recordToDelete , sizeof(RecordOffset) );
+    }
+    
+
+    // update the rest records and slots behind it
+    for( int i=rid.slotNum+1; i<numOfSlot; i++){
+
+	void *temp = malloc( rOffset[i].length );
+	memcpy( temp , (char*) page+rOffset[i].offset ,rOffset[i].length );
+
+	// update the descriptor of slot
+	rOffset[i].offset -= recordToDelete.length;
+	memcpy( (char*)page+PAGE_SIZE-sizeof(PageDesc)-sizeof(RecordOffset)*(i+1), &rOffset[i] , sizeof(RecordOffset) );
+	// pack the actual data 
+	memcpy( (char*)page+rOffset[i].offset, temp , rOffset[i].length );
+
+	free(temp);
+    }
+
+/*
+    numOfSlot--; // decrease the size total slot by 1
+    memcpy( (char*)page+PAGE_SIZE-sizeof(short int), &numOfSlot , sizeof(short int) );
 */
+
+    fileHandle.writePage(rid.pageNum,page);
+    free(page);    
+
+    return SUCCESS;
+
+
 }
 
 
+RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, const RID &rid)
+{
 
+
+}
+
+RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, const string &attributeName, void *data)
+{
+
+
+}
+
+RC RecordBasedFileManager::scan(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const string &conditionAttribute,
+			        const CompOp compOp, const void *value, const vector<string> &attributeNames, RBFM_ScanIterator &rbfm_ScanIterator)
+{
+
+
+
+}
