@@ -166,7 +166,7 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, void *data) {
     void *page = malloc(PAGE_SIZE);
     if( fileHandle.readPage(rid.pageNum,page) == FAILURE ){
-	printf("Yo readRecord failed dude\n");
+//	printf("Yo readRecord failed dude\n");
 	return FAILURE;
     }
 
@@ -178,7 +178,7 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
     memcpy( &rOffset, (char*)page+PAGE_SIZE-sizeof(PageDesc)-sizeof(RecordOffset)*index, sizeof(RecordOffset) );
 
     if( rOffset.offset == DeletedSlotMark ){
-	printf("Yo readRecord failed dude\n");
+//	printf("Yo readRecord failed dude\n");
 	return FAILURE;
     }
 
@@ -474,7 +474,7 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
 {
     void *page = malloc(PAGE_SIZE);
     if( fileHandle.readPage(rid.pageNum,page) == FAILURE ){
-	printf("Yo detele an invalid record dude\n");
+//	printf("Yo detele an invalid record dude\n");
 	return FAILURE;
     }
 
@@ -495,7 +495,7 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
     // check if the slot has already been marked as deleted
     RecordOffset recordToDelete = rOffset[rid.slotNum];
     if( recordToDelete.offset == DeletedSlotMark ){
-	printf("Yo detele an invalid record dude\n");
+//	printf("Yo detele an invalid record dude\n");
 	return FAILURE;
     }else{
     // else mark it as deleted, write it back to page

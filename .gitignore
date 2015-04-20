@@ -1,6 +1,9 @@
+*
 !*.cc
-!Makefile
+!makefile.inc
+!makefile
 !*.txt
 !*.inc
 !*.h
 !*.sh
+!.gitignore
