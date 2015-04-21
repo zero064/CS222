@@ -26,6 +26,8 @@ typedef struct
 typedef struct
 {
     short int numOfSlot;  // record number of slot in the page
+			  // if the value is negative, the slot list is discontinous
+			  // need to perform a linear search to find empty slot
     short int recordSize; // total record size
 }   PageDesc;
 
@@ -148,6 +150,7 @@ private:
 
 // custom private function
   PageNum findFreePage(FileHandle &fileHandle,int recordSize);
+  RC updateFreePage(FileHandle &fileHandle,int deletedSize,int pageNum);
   size_t getDataSize(const vector<Attribute> &recordDescriptor, const void *data, bool printFlag);  
   size_t writeDataToBuffer(const vector<Attribute> &recordDescriptor, const void *data, void * &formattedData);
   RC readDataFromBuffer(const vector<Attribute> &recordDescriptor, void *data, const void * formattedData);
