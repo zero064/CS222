@@ -38,6 +38,9 @@ typedef enum { TypeInt = 0, TypeReal, TypeVarChar } AttrType;
 
 typedef unsigned AttrLength;
 
+typedef short int FieldSize;
+typedef unsigned short int FieldOffset;
+
 struct Attribute {
     string   name;     // attribute name
     AttrType type;     // attribute type
@@ -154,6 +157,7 @@ private:
   size_t getDataSize(const vector<Attribute> &recordDescriptor, const void *data, bool printFlag);  
   size_t writeDataToBuffer(const vector<Attribute> &recordDescriptor, const void *data, void * &formattedData);
   RC readDataFromBuffer(const vector<Attribute> &recordDescriptor, void *data, const void * formattedData);
+  size_t getRecordFromPage(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, void * &returnedData);
 };
 
 #endif

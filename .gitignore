@@ -1,10 +1,4 @@
 *
-!*.cc
-!p1testcase/rbftest17c.cc
-!makefile.inc
+!*.*
 !makefile
-!*.txt
-!*.inc
-!*.h
-!*.sh
-!.gitignore
+!*.cc

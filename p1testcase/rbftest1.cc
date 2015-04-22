@@ -25,7 +25,6 @@ int RBFTest_1(PagedFileManager *pfm)
 
     int recordSize = 0;
     void *record = malloc(100);
-    void *returnedData = malloc(100);
 
     vector<Attribute> recordDescriptor;
     createRecordDescriptor(recordDescriptor);
