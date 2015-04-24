@@ -18,8 +18,11 @@ int RBFTest_19a(RecordBasedFileManager *rbfm) {
     // Functions tested
     // 1. Create Record-Based File
     // 2. Open Record-Based File
-    // 7. Close Record-Based File
-    // 8. Destroy Record-Based File
+    // 3. Insert Multiple Records
+    // 4. Increase Record's size and Update it
+    // 5. Test Update Records / Deletion on Updated Records
+    // 6. Close Record-Based File
+    // 7. Destroy Record-Based File
     cout << endl << "***** In RBF Test Case 19a *****" << endl;
    
     RC rc;
@@ -105,37 +108,6 @@ int RBFTest_19a(RecordBasedFileManager *rbfm) {
     }
 
 
-
-    // Remove updated rid 
-   
-
-/*
-    // Given the rid, read the record from file
-    rc = rbfm->readRecord(fileHandle, recordDescriptor, rid, returnedData);
-    assert(rc == success && "Reading a record should not fail.");
-
-    cout << "Returned Data:" << endl;
-    rbfm->printRecord(recordDescriptor, returnedData);
-
-    // Compare whether the two memory blocks are the same
-    if(memcmp(record, returnedData, recordSize) != 0)
-    {
-        cout << "[FAIL] Test Case 19a Failed!" << endl << endl;
-        free(record);
-        free(returnedData);
-        return -1;
-    }
-    
-    // delete a record
-    cout<< "delete a record " << endl;
-    rc = rbfm->deleteRecord(fileHandle, recordDescriptor, rid);
-    assert( rc == success && "delete the record should not fail.");
-
-    // read the record again, it should fail
-    cout<< "revisit the record " << endl;
-    rc = rbfm->readRecord(fileHandle, recordDescriptor, rid, returnedData);
-    assert( rc != success && "read deleted record should fail.");
-*/
     // Close the file "test19a"
     rc = rbfm->closeFile(fileHandle);
     assert(rc == success && "Closing the file should not fail.");
