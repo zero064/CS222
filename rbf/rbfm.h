@@ -32,6 +32,7 @@ typedef struct
 }   PageDesc;
 
 const short int DeletedSlotMark = -1; 
+const short int TombStoneMark = -1; 
 
 // Attribute
 typedef enum { TypeInt = 0, TypeReal, TypeVarChar } AttrType;
