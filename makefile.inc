@@ -1,6 +1,6 @@
 ## For students: change this path to the root of your code
 CODEROOT = ..
-
+BIN = bin/
 #CC = gcc
 CC = g++
 
