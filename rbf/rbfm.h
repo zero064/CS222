@@ -26,15 +26,21 @@ typedef struct
 typedef struct
 {
     short int numOfSlot;  // record number of slot in the page
+			  // if the value is negative, the slot list is discontinous
+			  // need to perform a linear search to find empty slot
     short int recordSize; // total record size
 }   PageDesc;
 
 const short int DeletedSlotMark = -1; 
+const short int TombStoneMark = -1; 
 
 // Attribute
 typedef enum { TypeInt = 0, TypeReal, TypeVarChar } AttrType;
 
 typedef unsigned AttrLength;
+
+typedef short int FieldSize;
+typedef unsigned short int FieldOffset;
 
 struct Attribute {
     string   name;     // attribute name
@@ -148,9 +154,11 @@ private:
 
 // custom private function
   PageNum findFreePage(FileHandle &fileHandle,int recordSize);
+  RC updateFreePage(FileHandle &fileHandle,int deletedSize,int pageNum);
   size_t getDataSize(const vector<Attribute> &recordDescriptor, const void *data, bool printFlag);  
   size_t writeDataToBuffer(const vector<Attribute> &recordDescriptor, const void *data, void * &formattedData);
   RC readDataFromBuffer(const vector<Attribute> &recordDescriptor, void *data, const void * formattedData);
+  size_t getRecordFromPage(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, void * &returnedData);
 };
 
 #endif

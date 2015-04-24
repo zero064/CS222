@@ -1,6 +1,9 @@
 #ifndef _pfm_h_
 #define _pfm_h_
 
+#include <string>
+#include <climits>
+
 typedef int RC;
 typedef char byte;
 typedef unsigned PageNum;
@@ -16,11 +19,17 @@ struct DirectoryDesc{
     short int size;
 };
 
+
 #define PAGE_SIZE 4096
 #define SUCCESS 0
 #define FAILURE -1
-#include <string>
-#include <climits>
+
+#ifdef NDEBUG
+#define debug_print(fmt, ...) fprintf(stderr, fmt, __VA_ARGS__)
+#else
+#define debug_print(fmt, ...) do {} while (0)
+#endif
+
 using namespace std;
 
 class FileHandle;
