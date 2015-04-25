@@ -1,7 +1,8 @@
 
 #include "rm.h"
+#define DEBUG 1
 
-RC PrepareCatalogDescriptor(string tablename,vector<Attribute> attributes){
+RC PrepareCatalogDescriptor(string tablename,vector<Attribute> &attributes){
 	string tables="Tables";
 	string columns="Columns";
 	Attribute attr;
@@ -84,27 +85,34 @@ RC PrepareCatalogDescriptor(string tablename,vector<Attribute> attributes){
 RC CreateTablesRecord(void *data,int tableid,string tablename,int systemtable){
 	int offset=0;
 	int size=tablename.size();
+	char nullind=0;
 
-	memcpy(data+offset,&tableid,sizeof(int));
+	//copy null indicator
+	memcpy((char *)data+offset,&nullind,1);
+	offset=offset+1;
+
+	memcpy((char *)data+offset,&tableid,sizeof(int));
 	offset=offset+sizeof(int);
 	//copy table name
-	memcpy(data+offset,&size,sizeof(int));
+	memcpy((char *)data+offset,&size,sizeof(int));
 	offset=offset+sizeof(int);
 
-	memcpy(data+offset,tablename.c_str(),size);
+	memcpy((char *)data+offset,tablename.c_str(),size);
 	offset=offset+size;
 
 	//copy file name
-	memcpy(data+offset,&size,sizeof(int));
+	memcpy((char *)data+offset,&size,sizeof(int));
 	offset=offset+sizeof(int);
 
-	memcpy(data+offset,tablename.c_str(),size);
+	memcpy((char *)data+offset,tablename.c_str(),size);
 	offset=offset+size;
 
 	//copyt SystemTable
-	memcpy(data+offset,&systemtable,sizeof(int));
+	memcpy((char *)data+offset,&systemtable,sizeof(int));
 	offset=offset+sizeof(int);
-
+	#ifdef DEBUG
+	cout<<endl<<"create table record "<<"offset is "<<offset<<endl;
+	#endif
 	return 0;
 
 }
@@ -112,47 +120,65 @@ RC CreateTablesRecord(void *data,int tableid,string tablename,int systemtable){
 RC CreateColumnsRecord(void * data,int tableid, Attribute attr, int position, int nullflag){
 	int offset=0;
 	int size=attr.name.size();
-	memcpy(data+offset,&tableid,sizeof(int));
+	char null[1];
+	null[0]=0;
+
+
+	//null indicator
+	memcpy((char *)data+offset,null,1);
+	offset+=1;
+
+	memcpy((char *)data+offset,&tableid,sizeof(int));
 	offset=offset+sizeof(int);
 
 	//copy VarChar
-	memcpy(data+offset,&size,sizeof(int));
+	memcpy((char *)data+offset,&size,sizeof(int));
 	offset=offset+sizeof(int);
-	memcpy(data+offset,attr.name.c_str();size);
+	memcpy((char *)data+offset,attr.name.c_str(),size);
 	offset=offset+size;
 
 	//copy  type
-	memcpy(data+offset,&(attr.type),sizeof(int));
+	memcpy((char *)data+offset,&(attr.type),sizeof(int));
 	offset=offset+sizeof(int);
 
-	//copy column length
-	memcpy(data+offset,&(attr.length),sizeof(int));
+	//copy attribute length
+	memcpy((char *)data+offset,&(attr.length),sizeof(int));
 	offset=offset+sizeof(int);
 
 	//copy position
-	memcpy(data+offset,&position,sizeof(int));
+	memcpy((char *)data+offset,&position,sizeof(int));
 	offset=offset+sizeof(int);
 
 	//copy nullflag
-	memcpy(data+offset,&nullflag,sizeof(int));
+	memcpy((char *)data+offset,&nullflag,sizeof(int));
 	offset=offset+sizeof(int);
+	#ifdef DEBUG
+	cout<<endl<<"create column record "<<"offset is "<<offset<<endl;
+	#endif
 	return 0;
 
 }
 RC UpdataColumns(int tableid,vector<Attribute> attributes){
 	int size=attributes.size();
 	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
-	FileHndle table_filehandle;
+	FileHandle table_filehandle;
+	char *data=(char *)malloc(PAGE_SIZE);
+	vector<Attribute> columndescriptor;
+	RID rid;
 
+	PrepareCatalogDescriptor("Columns",columndescriptor);
 	rbfm->openFile("Columns", table_filehandle);
 	for(int i=0;i<size;i++){
-		C
+		CreateColumnsRecord(data,tableid,attributes[i],i+1,0);
+		rbfm->insertRecord(table_filehandle,columndescriptor,data,rid);
 	}
-
-
+	rbfm->closeFile(table_filehandle);
+	free(data);
+	return 0;
 }
-RC CreateVarChar(string str){
+RC CreateVarChar(string &str){
 	int size=str.size();
+	return -1;
 }
 
 
@@ -180,12 +206,12 @@ RC RelationManager::createCatalog()
 	vector<Attribute> columnsdescriptor;
 
 	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
-	FileHndle table_filehandle;
+	FileHandle table_filehandle;
 	RID rid;
 
 
 	//creat Tables
-	if(rbfm->createFile("Tables")==0){
+	if((rbfm->createFile("Tables"))==0){
 
 		void *data=malloc(PAGE_SIZE);
 		int tableid=1;
@@ -202,23 +228,26 @@ RC RelationManager::createCatalog()
 		rbfm->insertRecord(table_filehandle,tablesdescriptor,data,rid);
 
 		rbfm->closeFile(table_filehandle);
+		//create Columns
+		if((rbfm->createFile("Columns"))==0){
 
-		if(rbfm->createFile("Columns")==0){
-
-			rbfm->openFile("Columns",table_filehandle);
+			UpdataColumns(1,tablesdescriptor);
 
 			PrepareCatalogDescriptor("Columns",columnsdescriptor);
-			UpdateColumns();
-
-			rbfm->insertRecord(table_filehandle,tablesdescriptor,data,rid);
-			rbfm->closeFile(table_filehandle);
+			UpdataColumns(tableid,columnsdescriptor);
 
 
 
 			free(data);
+			#ifdef DEBUG
+			cout<<"successfully create catalog"<<endl;
+			#endif
 			return 0;
 		}
 	}
+	#ifdef DEBUG
+	cout<<"Fail to create catalog"<<endl;
+	#endif
     return -1;
 }
 

@@ -5,6 +5,16 @@
 #include <string>
 #include <vector>
 
+#include <climits>
+#include <math.h>
+#include <stdlib.h>
+#include <algorithm>
+#include <sstream>
+#include <iostream>
+#include <cstdio>
+#include <cstring>
+#include <bitset>
+
 #include "../rbf/rbfm.h"
 
 using namespace std;
