@@ -111,7 +111,7 @@ RC CreateTablesRecord(void *data,int tableid,string tablename,int systemtable){
 	memcpy((char *)data+offset,&systemtable,sizeof(int));
 	offset=offset+sizeof(int);
 	#ifdef DEBUG
-	cout<<endl<<"create table record "<<"offset is "<<offset<<endl;
+		cout<<endl<<"create table record "<<"offset is "<<offset<<endl;
 	#endif
 	return 0;
 
@@ -153,12 +153,12 @@ RC CreateColumnsRecord(void * data,int tableid, Attribute attr, int position, in
 	memcpy((char *)data+offset,&nullflag,sizeof(int));
 	offset=offset+sizeof(int);
 	#ifdef DEBUG
-	cout<<endl<<"create column record "<<"offset is "<<offset<<endl;
+		cout<<endl<<"create column record "<<"offset is "<<offset<<endl;
 	#endif
 	return 0;
 
 }
-RC UpdataColumns(int tableid,vector<Attribute> attributes){
+RC UpdateColumns(int tableid,vector<Attribute> attributes){
 	int size=attributes.size();
 	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
 	FileHandle table_filehandle;
@@ -167,18 +167,74 @@ RC UpdataColumns(int tableid,vector<Attribute> attributes){
 	RID rid;
 
 	PrepareCatalogDescriptor("Columns",columndescriptor);
-	rbfm->openFile("Columns", table_filehandle);
-	for(int i=0;i<size;i++){
-		CreateColumnsRecord(data,tableid,attributes[i],i+1,0);
-		rbfm->insertRecord(table_filehandle,columndescriptor,data,rid);
+	if(rbfm->openFile("Columns", table_filehandle)==0){
+		for(int i=0;i<size;i++){
+			CreateColumnsRecord(data,tableid,attributes[i],i+1,0);
+			rbfm->insertRecord(table_filehandle,columndescriptor,data,rid);
+		}
+		rbfm->closeFile(table_filehandle);
+		free(data);
+		return 0;
 	}
-	rbfm->closeFile(table_filehandle);
-	free(data);
-	return 0;
-}
-RC CreateVarChar(string &str){
-	int size=str.size();
+	#ifdef DEBUG
+		cout<<"There is bug on UpdateColumns"<<endl;
+	#endif
 	return -1;
+}
+
+int GetFreeTableid(){
+
+	RM_ScanIterator rm_ScanIterator;
+	RID rid;
+	char *data=(char *)malloc(PAGE_SIZE);
+
+	vector<string> attrname;
+	attrname.push_back("table-id");
+	int tableID;
+	int foundID;
+	bool scanID[TABLE_SIZE];
+	std::fill_n(scanID,TABLE_SIZE,0);
+
+
+	if(RelationManager::scan("Tables","",NO_OP,NULL,attrname,rm_ScanIterator)==0){
+		while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
+			//!!!! skip null indicator
+			memcpy(&foundID,(char *)data+1,sizeof(int));
+			scanID[foundID-1]=true;
+
+		}
+		for(int i=0;i<TABLE_SIZE;i++){
+			if(!scanID[i]){
+				tableID=i+1;
+				break;
+			}
+		}
+
+		free(data);
+		rm_ScanIterator.close(rm_ScanIterator.get);
+		#ifdef DEBUG
+			cout<<"GET free table id: "<<tableID<<endl;
+		#endif
+		return tableID;
+	}
+
+
+	#ifdef DEBUG
+		cout<<"There is bug on GetFreeTableid"<<endl;
+	#endif
+	return -1;
+
+}
+RC CreateVarChar(void *data,string &str){
+	int size=str.size();
+	int offset=0;
+	memcpy((char *)data+offset,&size,sizeof(int));
+	offset+=sizeof(int);
+	memcpy((char *)data+offset,str.c_str,size);
+	offset+=size;
+
+
+	return 0;
 }
 
 
@@ -231,38 +287,128 @@ RC RelationManager::createCatalog()
 		//create Columns
 		if((rbfm->createFile("Columns"))==0){
 
-			UpdataColumns(1,tablesdescriptor);
+			UpdateColumns(1,tablesdescriptor);
 
 			PrepareCatalogDescriptor("Columns",columnsdescriptor);
-			UpdataColumns(tableid,columnsdescriptor);
+			UpdateColumns(tableid,columnsdescriptor);
 
 
 
 			free(data);
 			#ifdef DEBUG
-			cout<<"successfully create catalog"<<endl;
+				cout<<"successfully create catalog"<<endl;
 			#endif
 			return 0;
 		}
 	}
 	#ifdef DEBUG
-	cout<<"Fail to create catalog"<<endl;
+		cout<<"Fail to create catalog"<<endl;
 	#endif
     return -1;
 }
 
 RC RelationManager::deleteCatalog()
 {
+	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
+
+	if(rbfm->destroyFile("Tables")==0){
+		if(rbfm->destroyFile("Columns")==0){
+			#ifdef DEBUG
+				cout<<"successfully delete Tables and Columns "<<endl;
+			#endif
+			return 0;
+		}
+	}
     return -1;
 }
 
 RC RelationManager::createTable(const string &tableName, const vector<Attribute> &attrs)
 {
+	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
+	FileHandle filehandle;
+	FileHandle nullhandle;
+	vector<Attribute> tablesdescriptor;
+	char *data=(char *)malloc(PAGE_SIZE);
+	RID rid;
+	int tableid;
+	if(rbfm->createFile(tableName)==0){
+
+
+		if(rbfm->openFile("Tables",filehandle)==0){
+			tableid=GetFreeTableid();
+			PrepareCatalogDescriptor("Tables",tablesdescriptor);
+			CreateTablesRecord(data,tableid,tableName,0);
+			rbfm->insertRecord(filehandle,tablesdescriptor,data,rid);
+			#ifdef DEBUG
+				cout<<"In createTable"<<endl;
+				rbfm->printRecord(tablesdescriptor,data);
+			#endif
+			if(UpdateColumns(tableid,attrs)==0){
+				free(data);
+				return 0;
+			}
+		}
+
+	}
+	#ifdef DEBUG
+		cout<<"There is bug on createTable "<<endl;
+	#endif
     return -1;
+}
+int getTableId(const string &tableName){
+	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
+	FileHandle filehandle;
+	RM_ScanIterator rm_ScanIterator;
+	RID rid;
+	char *VarChardata=(char *)malloc(PAGE_SIZE);
+	vector<string> attrname;
+	attrname.push_back("table-id");
+
+	if(RelationManager::scan("Tables","",NO_EQ,data,attrname,rm_ScanIterator)==0){
+				while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
+					//!!!! skip null indicator
+					memcpy(&foundID,(char *)data+1,sizeof(int));
+					scanID[foundID-1]=true;
+
+				}
+				for(int i=0;i<TABLE_SIZE;i++){
+					if(!scanID[i]){
+						tableID=i+1;
+						break;
+					}
+				}
+
 }
 
 RC RelationManager::deleteTable(const string &tableName)
 {
+	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
+	FileHandle filehandle;
+	RM_ScanIterator rm_ScanIterator;
+	RID rid;
+	char *VarChardata=(char *)malloc(PAGE_SIZE);
+	vector<string> attrname;
+	attrname.push_back(tableName);
+
+	if(rbfm->destroyFile(tableName)==0){
+		if(RelationManager::scan("Tables","",NO_EQ,data,attrname,rm_ScanIterator)==0){
+			while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
+				//!!!! skip null indicator
+				memcpy(&foundID,(char *)data+1,sizeof(int));
+				scanID[foundID-1]=true;
+
+			}
+			for(int i=0;i<TABLE_SIZE;i++){
+				if(!scanID[i]){
+					tableID=i+1;
+					break;
+				}
+			}
+
+			free(data);
+			rm_ScanIterator.close(rm_ScanIterator.get);
+
+	}
     return -1;
 }
 
