@@ -211,7 +211,7 @@ int GetFreeTableid(){
 		}
 
 		free(data);
-		rm_ScanIterator.close(rm_ScanIterator.get);
+		rm_ScanIterator.close();
 		#ifdef DEBUG
 			cout<<"GET free table id: "<<tableID<<endl;
 		#endif
@@ -230,7 +230,7 @@ RC CreateVarChar(void *data,string &str){
 	int offset=0;
 	memcpy((char *)data+offset,&size,sizeof(int));
 	offset+=sizeof(int);
-	memcpy((char *)data+offset,str.c_str,size);
+	memcpy((char *)data+offset,str.c_str(),size);
 	offset+=size;
 
 
@@ -356,27 +356,31 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
     return -1;
 }
 int getTableId(const string &tableName){
-	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
-	FileHandle filehandle;
+
 	RM_ScanIterator rm_ScanIterator;
 	RID rid;
+	int tableid;
 	char *VarChardata=(char *)malloc(PAGE_SIZE);
+	char *data=(char *)malloc(PAGE_SIZE);
 	vector<string> attrname;
 	attrname.push_back("table-id");
+	int count=0;
 
-	if(RelationManager::scan("Tables","",NO_EQ,data,attrname,rm_ScanIterator)==0){
-				while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
-					//!!!! skip null indicator
-					memcpy(&foundID,(char *)data+1,sizeof(int));
-					scanID[foundID-1]=true;
+	CreateVarChar(VarChardata,tableName);
 
-				}
-				for(int i=0;i<TABLE_SIZE;i++){
-					if(!scanID[i]){
-						tableID=i+1;
-						break;
-					}
-				}
+	if(RelationManager::scan("Tables","table-name",EQ_OP,VarChardata,attrname,rm_ScanIterator)==0){
+		while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
+			//!!!! skip null indicator
+			memcpy(&tableid,(char *)data+1,sizeof(int));
+			count++;
+			if(count>=2){
+				cout<<"There are tow record in Tables with same table name "<<endl;
+			}
+		}
+		rm_ScanIterator.close();
+		free(VarChardata);
+		free(data);
+		return tableid;
 
 }
 
@@ -385,30 +389,53 @@ RC RelationManager::deleteTable(const string &tableName)
 	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
 	FileHandle filehandle;
 	RM_ScanIterator rm_ScanIterator;
+	RM_ScanIterator rm_ScanIterator2;
 	RID rid;
+	int tableid;
 	char *VarChardata=(char *)malloc(PAGE_SIZE);
+	char *data=(char *)malloc(PAGE_SIZE);
 	vector<string> attrname;
-	attrname.push_back(tableName);
+	attrname.push_back("table-id");
+
+	vector<Attribute> tablesdescriptor;
+	PrepareCatalogDescriptor("Tables",tablesdescriptor);
+	vector<Attribute> columnsdescriptor;
+	PrepareCatalogDescriptor("Columns",columnsdescriptor);
 
 	if(rbfm->destroyFile(tableName)==0){
-		if(RelationManager::scan("Tables","",NO_EQ,data,attrname,rm_ScanIterator)==0){
+
+		tableid=getTableId(tableName);
+		rbfm->openFile("Tables",filehandle);
+		if(RelationManager::scan("Tables","table-id",EQ_OP,&tableid,attrname,rm_ScanIterator)==0){
 			while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
-				//!!!! skip null indicator
-				memcpy(&foundID,(char *)data+1,sizeof(int));
-				scanID[foundID-1]=true;
-
+				rbfm->deleteRecord(filehandle,tablesdescriptor,rid);
 			}
-			for(int i=0;i<TABLE_SIZE;i++){
-				if(!scanID[i]){
-					tableID=i+1;
-					break;
+			rbfm->closeFile(filehandle);
+			rm_ScanIterator.close();
+
+			rbfm->openFile("Columns",filehandle);
+			if(RelationManager::scan("Columns","table-id",EQ_OP,&tableid,attrname,rm_ScanIterator2)==0){
+				while(rm_ScanIterator2.getNextTuple(rid,data)!=RM_EOF){
+					rbfm->deleteRecord(filehandle,columnsdescriptor,rid);
 				}
+				rm_ScanIterator2.close();
+				rbfm->closeFile(filehandle);
+				free(VarChardata);
+				free(data);
+				#ifdef DEBUG
+					cout<<"Successfully delete "<<tableName<<endl;
+				#endif
+				return 0;
+
 			}
 
-			free(data);
-			rm_ScanIterator.close(rm_ScanIterator.get);
+
+		}
 
 	}
+	#ifdef DEBUG
+		cout<<"There is bug on deleteTable "<<endl;
+	#endif
     return -1;
 }
 
