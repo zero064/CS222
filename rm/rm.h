@@ -5,10 +5,20 @@
 #include <string>
 #include <vector>
 
+#include <climits>
+#include <math.h>
+#include <stdlib.h>
+#include <algorithm>
+#include <sstream>
+#include <iostream>
+#include <cstdio>
+#include <cstring>
+#include <bitset>
+
 #include "../rbf/rbfm.h"
 
 using namespace std;
-
+# define TABLE_SIZE 4096
 # define RM_EOF (-1)  // end of a scan operator
 
 // RM_ScanIterator is an iteratr to go through tuples
