@@ -237,6 +237,28 @@ RC CreateVarChar(void *data,string &str){
 	return 0;
 }
 
+int VarCharToString(void *data,string &str){
+	int size;
+	int offset=0;
+	char * VarCharData=(char *) malloc(PAGE_SIZE);
+
+	memcpy(&size,(char *)data+offset,sizeof(int));
+	offset+=sizeof(int);
+
+	memcpy(VarCharData,(char *)data+offset,size);
+	offset+=size;
+
+	VarCharData[size]='\0';
+	string tempstring(VarCharData);
+	str=tempstring;
+
+
+	free(VarCharData);
+
+	return 0;
+
+
+}
 
 RelationManager* RelationManager::_rm = 0;
 
@@ -374,7 +396,7 @@ int getTableId(const string &tableName){
 			memcpy(&tableid,(char *)data+1,sizeof(int));
 			count++;
 			if(count>=2){
-				cout<<"There are tow record in Tables with same table name "<<endl;
+				cout<<"There are two record in Tables with same table name "<<endl;
 			}
 		}
 		rm_ScanIterator.close();
@@ -392,7 +414,7 @@ RC RelationManager::deleteTable(const string &tableName)
 	RM_ScanIterator rm_ScanIterator2;
 	RID rid;
 	int tableid;
-	char *VarChardata=(char *)malloc(PAGE_SIZE);
+
 	char *data=(char *)malloc(PAGE_SIZE);
 	vector<string> attrname;
 	attrname.push_back("table-id");
@@ -420,7 +442,7 @@ RC RelationManager::deleteTable(const string &tableName)
 				}
 				rm_ScanIterator2.close();
 				rbfm->closeFile(filehandle);
-				free(VarChardata);
+
 				free(data);
 				#ifdef DEBUG
 					cout<<"Successfully delete "<<tableName<<endl;
@@ -441,37 +463,251 @@ RC RelationManager::deleteTable(const string &tableName)
 
 RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &attrs)
 {
-    return -1;
+
+	RM_ScanIterator rm_ScanIterator;
+	RID rid;
+	int tableid;
+	char *data=(char *)malloc(PAGE_SIZE);
+	vector<string> attrname;
+	attrname.push_back("column-name");
+	attrname.push_back("column-type");
+	attrname.push_back("column-length");
+	attrname.push_back("column-position");
+	attrname.push_back("NullFlag");
+	Attribute attr;
+	string tempstr;
+	int nullflag;
+
+
+
+
+	tableid=getTableId(tableName);
+	if(RelationManager::scan("Columns","table-id",EQ_OP,&tableid,attrname,rm_ScanIterator)==0){
+		while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
+			//skip null indicatior
+			offset=1;
+			VarCharToString(data+offset,tempstr);
+			attr.name=tempstr;
+			offset+=(sizeof(int)+tempstr.size());
+			memcpy(&(attr.type),data+offset,sizeof(int));
+			offset+=sizeof(int);
+			memcpy(&(attr.length),data+offset,sizeof(int));
+			offset+=sizeof(int);
+			memcpy(&(attr.position),data+offset,sizeof(int));
+			offset+=sizeof(int);
+			memcpy(&(nullflag),data+offset,sizeof(int));
+			offset+=sizeof(int);
+			if(nullflag==1){
+				attr.length=-1;
+			}
+			attrs.push_back(attr);
+
+		}
+		rm_ScanIterator.close();
+		free(data);
+		#ifdef DEBUG
+			cout<<"Successfully getAttribute "<<endl;
+			cout<<"the first attriubt name: "<<attrs[0].name<<endl;
+			cout<<"the last attriubt name: "<<attrs[attrs.size()-1].name<<endl;
+		#endif
+		return 0;
+	}
+	#ifdef DEBUG
+		cout<<"There is bug on getAttribute "<<endl;
+	#endif
+	return -1;
+
+}
+int IsSystemTable(const string &tableName){
+	RM_ScanIterator rm_ScanIterator;
+	RID rid;
+	int systemtable;
+	char *VarChardata=(char *)malloc(PAGE_SIZE);
+	char *data=(char *)malloc(PAGE_SIZE);
+	vector<string> attrname;
+	attrname.push_back("SystemTable");
+	int count=0;
+
+	CreateVarChar(VarChardata,tableName);
+
+	if(RelationManager::scan("Tables","table-name",EQ_OP,VarChardata,attrname,rm_ScanIterator)==0){
+		while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
+			//!!!! skip null indicator
+			memcpy(&systemtable,(char *)data+1,sizeof(int));
+			count++;
+			if(count>=2){
+				cout<<"There are two record in Tables with same table name "<<endl;
+			}
+		}
+		rm_ScanIterator.close();
+		free(VarChardata);
+		free(data);
+		return systemtable;
+
+
 }
 
 RC RelationManager::insertTuple(const string &tableName, const void *data, RID &rid)
 {
-    return -1;
+	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
+	FileHandle filehandle;
+	vector<Attribute> descriptor;
+
+
+
+	if(IsSystemTable(tableName)==0){
+		RelationManager::getAttributes(tableName,descriptor);
+		if(rbfm->openFile(tableName,filehandle)==0){
+			if(rbfm->insertRecord(filehandle,descriptor,data,rid)==0){
+
+				#ifdef DEBUG
+					cout<<"Successfully intsert tuple "<<endl;
+				#endif
+				return 0;
+			}
+		}
+
+
+    }
+
+    #ifdef DEBUG
+		cout<<"There is bug on insertTuple "<<endl;
+	#endif
+	return -1;
 }
 
 RC RelationManager::deleteTuple(const string &tableName, const RID &rid)
 {
-    return -1;
+	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
+	FileHandle filehandle;
+	vector<Attribute> descriptor;
+
+
+
+	if(IsSystemTable(tableName)==0){
+		RelationManager::getAttributes(tableName,descriptor);
+		if(rbfm->openFile(tableName,filehandle)==0){
+			if(rbfm->deleteRecord(filehandle,descriptor,rid)==0){
+
+				#ifdef DEBUG
+					cout<<"Successfully delete tuple "<<endl;
+				#endif
+				return 0;
+			}
+		}
+
+
+	 }
+
+	#ifdef DEBUG
+		cout<<"There is bug on delete Tuple "<<endl;
+	#endif
+	return -1;
+
 }
 
 RC RelationManager::updateTuple(const string &tableName, const void *data, const RID &rid)
 {
-    return -1;
+	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
+	FileHandle filehandle;
+	vector<Attribute> descriptor;
+
+
+
+	if(IsSystemTable(tableName)==0){
+		RelationManager::getAttributes(tableName,descriptor);
+		if(rbfm->openFile(tableName,filehandle)==0){
+			if(rbfm->updateRecord(filehandle,descriptor,data,rid)==0){
+
+				#ifdef DEBUG
+					cout<<"Successfully update tuple "<<endl;
+				#endif
+				return 0;
+			}
+		}
+
+
+	 }
+
+	#ifdef DEBUG
+		cout<<"There is bug on update Tuple "<<endl;
+	#endif
+	return -1;
 }
 
 RC RelationManager::readTuple(const string &tableName, const RID &rid, void *data)
 {
-    return -1;
+	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
+	FileHandle filehandle;
+	vector<Attribute> descriptor;
+
+
+
+		RelationManager::getAttributes(tableName,descriptor);
+		if(rbfm->openFile(tableName,filehandle)==0){
+			if(rbfm->readRecord(filehandle,descriptor,rid,data)==0){
+
+				#ifdef DEBUG
+					cout<<"Successfully read tuple "<<endl;
+				#endif
+				return 0;
+			}
+		}
+
+
+
+	#ifdef DEBUG
+		cout<<"There is bug on read Tuple "<<endl;
+	#endif
+	return -1;
 }
 
 RC RelationManager::printTuple(const vector<Attribute> &attrs, const void *data)
 {
+	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
+
+
+	if(rbfm->printRecord(attrs,data)==0){
+
+		#ifdef DEBUG
+			cout<<"Successfully print tuple "<<endl;
+		#endif
+		return 0;
+	}
+
+
+
+	#ifdef DEBUG
+		cout<<"There is bug on print Tuple "<<endl;
+	#endif
 	return -1;
 }
 
 RC RelationManager::readAttribute(const string &tableName, const RID &rid, const string &attributeName, void *data)
 {
-    return -1;
+	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
+	FileHandle filehandle;
+	vector<Attribute> descriptor;
+
+
+
+		RelationManager::getAttributes(tableName,descriptor);
+		if(rbfm->openFile(tableName,filehandle)==0){
+			if(rbfm->readAttribute(filehandle,descriptor,rid,attributeName,data)==0){
+
+				#ifdef DEBUG
+					cout<<"Successfully read attribute "<<endl;
+				#endif
+				return 0;
+			}
+		}
+
+
+
+	#ifdef DEBUG
+		cout<<"There is bug on read attribute "<<endl;
+	#endif
+	return -1;
 }
 
 RC RelationManager::scan(const string &tableName,
@@ -481,13 +717,63 @@ RC RelationManager::scan(const string &tableName,
       const vector<string> &attributeNames,
       RM_ScanIterator &rm_ScanIterator)
 {
-    return -1;
+	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
+	FileHandle filehandle;
+	vector<Attribute> descriptor;
+	if(tableName.compare("Tables")==0){
+
+		PrepareCatalogDescriptor("Tables",descriptor);
+	}
+	else if(tableName.compare("Columns")==0){
+		PrepareCatalogDescriptor("Columns",descriptor);
+
+	}
+	else{
+		RelationManager::getAttributes(tableName,descriptor);
+	}
+	if(rbfm->openFile(tableName,filehandle)==0){
+		if(rbfm->scan(filehandle,descriptor,conditionAttribute,compOp,value,attributeNames,rm_ScanIterator.rbfm_ScanIterator)==0){
+
+			#ifdef DEBUG
+				cout<<"Successfully doing RelationManager scan "<<endl;
+			#endif
+			return 0;
+		}
+	}
+
+
+
+	#ifdef DEBUG
+		cout<<"There is bug on doing RelationManager scan "<<endl;
+	#endif
+	return -1;
 }
 
 // Extra credit work
 RC RelationManager::addAttribute(const string &tableName, const Attribute &attr)
 {
-    return -1;
+	vector<Attribute> descriptor;
+	int position;
+	int tableid;
+	vector<Attribute> tempattr;
+	tempattr.push_back(attr);
+
+
+	tableid=getTableId(tableName);
+	RelationManager::getAttributes(tableName,descriptor);
+	position=(descriptor.back()).position +1;
+	tempattr[0].position=position;
+	if(UpdateColumns(tableid,tempattr)==0){
+
+		#ifdef DEBUG
+			cout<<"Successfully doing addAttribute "<<endl;
+		#endif
+		return 0;
+	}
+	#ifdef DEBUG
+		cout<<"There is bug on  addAttribute "<<endl;
+	#endif
+	return -1;
 }
 
 // Extra credit work
