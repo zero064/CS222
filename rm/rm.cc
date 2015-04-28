@@ -169,7 +169,7 @@ RC UpdateColumns(int tableid,vector<Attribute> attributes){
 	PrepareCatalogDescriptor("Columns",columndescriptor);
 	if(rbfm->openFile("Columns", table_filehandle)==0){
 		for(int i=0;i<size;i++){
-			CreateColumnsRecord(data,tableid,attributes[i],i+1,0);
+			CreateColumnsRecord(data,tableid,attributes[i],attributes[i].position,0);
 			rbfm->insertRecord(table_filehandle,columndescriptor,data,rid);
 		}
 		rbfm->closeFile(table_filehandle);
@@ -353,6 +353,10 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
 	char *data=(char *)malloc(PAGE_SIZE);
 	RID rid;
 	int tableid;
+	vector<Attribute> tempattrs=attrs;
+	for(int i=0;i< tempattrs.size();i++){
+		tempattrs[i].position=i+1;
+	}
 	if(rbfm->createFile(tableName)==0){
 
 
@@ -365,7 +369,7 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
 				cout<<"In createTable"<<endl;
 				rbfm->printRecord(tablesdescriptor,data);
 			#endif
-			if(UpdateColumns(tableid,attrs)==0){
+			if(UpdateColumns(tableid,tempattrs)==0){
 				free(data);
 				return 0;
 			}
@@ -779,5 +783,56 @@ RC RelationManager::addAttribute(const string &tableName, const Attribute &attr)
 // Extra credit work
 RC RelationManager::dropAttribute(const string &tableName, const string &attributeName)
 {
-    return -1;
+	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
+	FileHandle filehandle;
+	vector<Attribute> descriptor;
+	RM_ScanIterator rm_ScanIterator;
+	RID rid;
+	int tableid;
+	char *data=(char *)malloc(PAGE_SIZE);
+	vector<string> attrname;
+	attrname.push_back("table-id");
+	attrname.push_back("column-name");
+	attrname.push_back("column-type");
+	attrname.push_back("column-length");
+	attrname.push_back("column-position");
+	attrname.push_back("NullFlag");
+	char *VarChardata=(char *) malloc(PAGE_SIZE);
+
+	string tempstr;
+	int nullflag;
+
+
+
+
+	tableid=getTableId(tableName);
+	if(RelationManager::scan("Columns","table-id",EQ_OP,&tableid,attrname,rm_ScanIterator)==0){
+		while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
+			//skip null indicator and tableid
+			memcpy(VarChardata,(char *)data+1+sizeof(int),50);
+			VarCharToString(data,tempstr);
+			if(tempstr.compare(attributeName)==0){
+			//skip null indicatior
+				nullflag=1;
+				offset=1+2*sizeof(int)+tempstr.size()+3*sizeof(int);
+				memcpy((char *)data+offset,&nullflag,sizeof(int));
+				rbfm->openFile("Columns",filehandle);
+				PrepareCatalogDescriptor("Columns",descriptor);
+				if(rbfm->updateRecord(filehandle,descriptor,data,rid)==0){
+					rm_ScanIterator.close();
+					free(data);
+					free(VarChardata);
+					#ifdef DEBUG
+						cout<<"Successfully dropAttribute "<<endl;
+					#endif
+					return 0;
+				}
+			}
+		}
+
+	}
+	#ifdef DEBUG
+		cout<<"There is bug on dropAttribute "<<endl;
+	#endif
+	return -1;
 }
