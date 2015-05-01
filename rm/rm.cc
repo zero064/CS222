@@ -1,6 +1,7 @@
 
 #include "rm.h"
 #define DEBUG 1
+#define DEBUG1 1
 
 RC RelationManager::PrepareCatalogDescriptor(string tablename,vector<Attribute> &attributes){
 	string tables="Tables";
@@ -196,10 +197,16 @@ int RelationManager::GetFreeTableid(){
 	std::fill_n(scanID,TABLE_SIZE,0);
 
 
-	if(RelationManager::scan("Tables","",NO_OP,NULL,attrname,rm_ScanIterator)==0){
+	if(scan("Tables","",NO_OP,NULL,attrname,rm_ScanIterator)==0){
 		while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
 			//!!!! skip null indicator
+			#ifdef DEBUG1
+				cout<<"before 	memcpy(&foundID,(char *)data+1,sizeof(int));"<<endl;
+			#endif
 			memcpy(&foundID,(char *)data+1,sizeof(int));
+			#ifdef DEBUG1
+				cout<<"foundID is "<<foundID<<endl;
+			#endif
 			scanID[foundID-1]=true;
 
 		}
@@ -361,7 +368,13 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
 
 
 		if(rbfm->openFile("Tables",filehandle)==0){
+			#ifdef DEBUG1
+				cout<<"before get free table id "<<endl;
+			#endif
 			tableid=GetFreeTableid();
+			#ifdef DEBUG1
+				cout<<"table id is"<<tableid<<endl;
+			#endif
 			PrepareCatalogDescriptor("Tables",tablesdescriptor);
 			CreateTablesRecord(data,tableid,tableName,0);
 			rbfm->insertRecord(filehandle,tablesdescriptor,data,rid);
@@ -728,15 +741,24 @@ RC RelationManager::scan(const string &tableName,
 	if(tableName.compare("Tables")==0){
 
 		PrepareCatalogDescriptor("Tables",descriptor);
+		#ifdef DEBUG1
+			cout<<"In scan	prepareCatalogDescriptor(Tables,descriptor);"<<endl<<descriptor[0].name<<endl<<(descriptor.back()).name<<endl;
+		#endif
 	}
 	else if(tableName.compare("Columns")==0){
 		PrepareCatalogDescriptor("Columns",descriptor);
+		#ifdef DEBUG1
+			cout<<"In scan	PrepareCatalogDescriptor(Columns,descriptor);"<<endl<<descriptor[0].name<<endl<<(descriptor.back()).name<<endl;
+		#endif
 
 	}
 	else{
 		RelationManager::getAttributes(tableName,descriptor);
 	}
 	if(rbfm->openFile(tableName,filehandle)==0){
+		#ifdef DEBUG1
+			cout<<"In scan	before rbfm->scan"<<endl;
+		#endif
 		if(rbfm->scan(filehandle,descriptor,conditionAttribute,compOp,value,attributeNames,rm_ScanIterator.rbfm_ScanIterator)==0){
 
 			#ifdef DEBUG
@@ -744,6 +766,7 @@ RC RelationManager::scan(const string &tableName,
 			#endif
 			return 0;
 		}
+
 	}
 
 
