@@ -2,7 +2,7 @@
 #include "rm.h"
 #define DEBUG 1
 
-RC PrepareCatalogDescriptor(string tablename,vector<Attribute> &attributes){
+RC RelationManager::PrepareCatalogDescriptor(string tablename,vector<Attribute> &attributes){
 	string tables="Tables";
 	string columns="Columns";
 	Attribute attr;
@@ -82,7 +82,7 @@ RC PrepareCatalogDescriptor(string tablename,vector<Attribute> &attributes){
 
 }
 
-RC CreateTablesRecord(void *data,int tableid,string tablename,int systemtable){
+RC RelationManager::CreateTablesRecord(void *data,int tableid,string tablename,int systemtable){
 	int offset=0;
 	int size=tablename.size();
 	char nullind=0;
@@ -117,7 +117,7 @@ RC CreateTablesRecord(void *data,int tableid,string tablename,int systemtable){
 
 }
 
-RC CreateColumnsRecord(void * data,int tableid, Attribute attr, int position, int nullflag){
+RC RelationManager::CreateColumnsRecord(void * data,int tableid, Attribute attr, int position, int nullflag){
 	int offset=0;
 	int size=attr.name.size();
 	char null[1];
@@ -158,7 +158,7 @@ RC CreateColumnsRecord(void * data,int tableid, Attribute attr, int position, in
 	return 0;
 
 }
-RC UpdateColumns(int tableid,vector<Attribute> attributes){
+RC RelationManager::UpdateColumns(int tableid,vector<Attribute> attributes){
 	int size=attributes.size();
 	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
 	FileHandle table_filehandle;
@@ -182,7 +182,7 @@ RC UpdateColumns(int tableid,vector<Attribute> attributes){
 	return -1;
 }
 
-int GetFreeTableid(){
+int RelationManager::GetFreeTableid(){
 
 	RM_ScanIterator rm_ScanIterator;
 	RID rid;
@@ -225,7 +225,7 @@ int GetFreeTableid(){
 	return -1;
 
 }
-RC CreateVarChar(void *data,string &str){
+RC RelationManager::CreateVarChar(void *data,const string &str){
 	int size=str.size();
 	int offset=0;
 	memcpy((char *)data+offset,&size,sizeof(int));
@@ -237,7 +237,7 @@ RC CreateVarChar(void *data,string &str){
 	return 0;
 }
 
-int VarCharToString(void *data,string &str){
+int RelationManager::VarCharToString(void *data,string &str){
 	int size;
 	int offset=0;
 	char * VarCharData=(char *) malloc(PAGE_SIZE);
@@ -381,7 +381,8 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
 	#endif
     return -1;
 }
-int getTableId(const string &tableName){
+
+int RelationManager::getTableId(const string &tableName){
 
 	RM_ScanIterator rm_ScanIterator;
 	RID rid;
@@ -394,7 +395,7 @@ int getTableId(const string &tableName){
 
 	CreateVarChar(VarChardata,tableName);
 
-	if(RelationManager::scan("Tables","table-name",EQ_OP,VarChardata,attrname,rm_ScanIterator)==0){
+	if( scan("Tables","table-name",EQ_OP,VarChardata,attrname,rm_ScanIterator) == 0 ){
 		while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
 			//!!!! skip null indicator
 			memcpy(&tableid,(char *)data+1,sizeof(int));
@@ -407,7 +408,7 @@ int getTableId(const string &tableName){
 		free(VarChardata);
 		free(data);
 		return tableid;
-
+	}
 }
 
 RC RelationManager::deleteTable(const string &tableName)
@@ -481,12 +482,12 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
 	Attribute attr;
 	string tempstr;
 	int nullflag;
-
+	int offset = 0;
 
 
 
 	tableid=getTableId(tableName);
-	if(RelationManager::scan("Columns","table-id",EQ_OP,&tableid,attrname,rm_ScanIterator)==0){
+	if( scan("Columns","table-id",EQ_OP,&tableid,attrname,rm_ScanIterator) == 0 ){
 		while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
 			//skip null indicatior
 			offset=1;
@@ -522,7 +523,7 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
 	return -1;
 
 }
-int IsSystemTable(const string &tableName){
+int RelationManager::IsSystemTable(const string &tableName){
 	RM_ScanIterator rm_ScanIterator;
 	RID rid;
 	int systemtable;
@@ -534,7 +535,7 @@ int IsSystemTable(const string &tableName){
 
 	CreateVarChar(VarChardata,tableName);
 
-	if(RelationManager::scan("Tables","table-name",EQ_OP,VarChardata,attrname,rm_ScanIterator)==0){
+	if( scan("Tables","table-name",EQ_OP,VarChardata,attrname,rm_ScanIterator) == 0 ){
 		while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
 			//!!!! skip null indicator
 			memcpy(&systemtable,(char *)data+1,sizeof(int));
@@ -548,7 +549,7 @@ int IsSystemTable(const string &tableName){
 		free(data);
 		return systemtable;
 
-
+	}
 }
 
 RC RelationManager::insertTuple(const string &tableName, const void *data, RID &rid)
@@ -801,7 +802,7 @@ RC RelationManager::dropAttribute(const string &tableName, const string &attribu
 
 	string tempstr;
 	int nullflag;
-
+	int offset = 0;
 
 
 

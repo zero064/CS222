@@ -86,6 +86,19 @@ protected:
 
 private:
   static RelationManager *_rm;
+  int VarCharToString(void *data, string &str);
+  int GetFreeTableid();
+  int getTableId(const string &tableName);
+  int IsSystemTable(const string &tableName);
+  RC UpdateColumns(int tableid,vector<Attribute> attributes);
+  RC CreateVarChar(void *data,const string &str);
+
+
+
+  RC PrepareCatalogDescriptor(string tablename,vector<Attribute> &attributes);
+  RC CreateTablesRecord(void *data,int tableid,string tablename,int systemtable);
+  RC CreateColumnsRecord(void * data,int tableid, Attribute attr, int position, int nullflag);
+ 
 };
 
 #endif
