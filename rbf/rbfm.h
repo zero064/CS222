@@ -38,6 +38,7 @@ const short int TombStoneMark = -1;
 typedef enum { TypeInt = 0, TypeReal, TypeVarChar } AttrType;
 
 typedef unsigned AttrLength;
+typedef unsigned AttrPosition;
 
 typedef short int FieldSize;
 typedef unsigned short int FieldOffset;
@@ -46,6 +47,7 @@ struct Attribute {
     string   name;     // attribute name
     AttrType type;     // attribute type
     AttrLength length; // attribute length
+    AttrPosition position; // attribute position
 };
 
 // Comparison Operator (NOT needed for part 1 of the project)
