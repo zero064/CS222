@@ -92,7 +92,8 @@ public:
       const vector<string> &attributeNames); // a list of projected attributes
   // "data" follows the same format as RecordBasedFileManager::insertRecord()
   RC getNextRecord(RID &rid, void *data); //{ return RBFM_EOF; };
-  RC close(); // { return -1; };
+  RC close() {	c_rid.pageNum = 40000000;
+		return SUCCESS; };
 
 private:
      RecordBasedFileManager *rbfm;
