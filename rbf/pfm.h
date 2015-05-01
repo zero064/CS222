@@ -24,6 +24,7 @@ struct DirectoryDesc{
 #define SUCCESS 0
 #define FAILURE -1
 
+
 #ifdef NDEBUG
 #define debug_print(fmt, ...) fprintf(stderr, fmt, __VA_ARGS__)
 #else
