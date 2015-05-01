@@ -295,6 +295,7 @@ PageNum RecordBasedFileManager::findFreePage(FileHandle &fileHandle,int recordSi
 	} 
 
 	currentDir++;
+	// if can't find a free space from directory, create a new directory
 	// last directory used to store the next directory if this one has not enough space 
 	if( fileHandle.readPage(currentDir*512,data) == FAILURE ){
 	    printf("creating new directory, numpage %d\n",fileHandle.getNumberOfPages());
@@ -322,7 +323,7 @@ PageNum RecordBasedFileManager::findFreePage(FileHandle &fileHandle,int recordSi
 
     }
 
-    // if can't find a free space from directory, create a new directory
+
     free(data);
 }
 
@@ -741,6 +742,217 @@ RC RecordBasedFileManager::scan(FileHandle &fileHandle, const vector<Attribute> 
 			        const CompOp compOp, const void *value, const vector<string> &attributeNames, RBFM_ScanIterator &rbfm_ScanIterator)
 {
 
+    return rbfm_ScanIterator.initScanIterator(fileHandle,recordDescriptor,conditionAttribute,compOp,value,attributeNames);
+}
 
-    return FAILURE;
+
+RC RBFM_ScanIterator::initScanIterator(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const string &conditionAttribute,
+				       const CompOp compOp, const void *value, const vector<string> &attributeNames)
+{
+    this->rbfm = RecordBasedFileManager::instance();
+    this->fileHandle = fileHandle;
+    this->recordDescriptor = recordDescriptor;
+    this->conditionAttribute = conditionAttribute;
+    this->attributeNames = attributeNames;
+    this->compOp = compOp;
+    this->value = (char*)value;
+    int v, v2 = 20;
+    memcpy( &v, this->value, sizeof(int) );
+    printf("%d\n",v); 
+    printf("%d\n",memcmp( &v, &v2 ,sizeof(int)) );
+    // init, start from 1st record, <1,0>
+    this->c_rid.pageNum = 0;
+    this->c_rid.slotNum = 0;
+    pageDesc.numOfSlot = -1;
+    return SUCCESS;
+}
+
+RC RBFM_ScanIterator::getFormattedRecord(void *returnedData, void *data)
+{
+     // get field offset descriptor array length
+    int fieldOffsetDescriptorSize = sizeof(unsigned short int) * recordDescriptor.size();
+    // get descriptor length 
+    int descriptorLength = sizeof(short int) + fieldOffsetDescriptorSize;  
+
+
+    unsigned int nullFieldsIndicatorActualSize = ceil((double)attributeNames.size() / CHAR_BIT );
+    unsigned char *nullIndicator = (unsigned char*)malloc( nullFieldsIndicatorActualSize );
+    memset( nullIndicator, 0 , nullFieldsIndicatorActualSize );
+
+    int offset = nullFieldsIndicatorActualSize ; // offset starts from real data ( behind null indicator )
+    for(int i=0; i<attributeNames.size(); i++){
+	for(int j=0; j<recordDescriptor.size(); j++){
+	    if( attributeNames[i].compare( recordDescriptor[j].name ) == 0 ){
+		AttrType type = recordDescriptor[j].type;
+		
+		int o_nullIndicatorOffet = ( j / CHAR_BIT );  // null indicator position in original data
+		//printf("sup j %d\n",o_nullIndicatorOffet);
+		char o_nullIndicator; // null indicator in oringinal data
+		// copy original data's null indicator byte set
+		memcpy( &o_nullIndicator, (char*)returnedData + descriptorLength + o_nullIndicatorOffet , sizeof(char));
+	    	// if it's null 
+		if( o_nullIndicator & (1 << (7-(j%8)))  ){
+		    nullIndicator[ i / 8 ] = ( 1 << (7 - (i%8))  ) ;
+		    break;
+		}
+
+		FieldOffset f_offset = 0;
+		memcpy(&f_offset, (char*)returnedData + sizeof(FieldSize) + sizeof(FieldOffset) * i, sizeof(FieldOffset));
+		int t_len = 0;
+		if( type == TypeVarChar ){
+		    memcpy( &t_len, (char*)returnedData+f_offset, sizeof(int) );
+		    t_len += sizeof(int);
+		}else if(type == TypeReal){
+		    t_len = sizeof(float);
+		}else if(type == TypeInt){
+		    t_len = sizeof(int);
+		}
+		
+		memcpy( (char*)data+offset, (char*)returnedData+f_offset , t_len);
+		offset += t_len;
+		break;
+	    }
+	}
+    }
+    memcpy( data, nullIndicator, nullFieldsIndicatorActualSize);
+    free(nullIndicator);
+    //free(returnedData);
+}
+
+RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
+{
+    bool found = false;
+    RecordOffset rOffset;
+    // get field offset descriptor array length
+    int fieldOffsetDescriptorSize = sizeof(unsigned short int) * recordDescriptor.size();
+    // get descriptor length 
+    int descriptorLength = sizeof(short int) + fieldOffsetDescriptorSize;  
+    void *returnedData = malloc(1000);
+
+    while( !found ){
+	rid = c_rid;
+
+
+    	// finish reading all records in a page
+	if( (int)c_rid.slotNum+1 > (int)pageDesc.numOfSlot){
+
+	    c_rid.slotNum = 0;
+	    c_rid.pageNum++;
+	    if( c_rid.pageNum % 512 == 0 ) c_rid.pageNum++;
+
+	    if( fileHandle.readPage( c_rid.pageNum, page ) == FAILURE) return RBFM_EOF;
+	    memcpy( &pageDesc, (char*)page+PAGE_SIZE-sizeof(PageDesc), sizeof(PageDesc) );
+	} 
+
+
+	// read slot
+	memcpy( &rOffset, (char*)page+PAGE_SIZE-sizeof(PageDesc)-sizeof(RecordOffset)*(c_rid.slotNum+1), sizeof(RecordOffset) );
+	// tombstone case
+	FieldSize fieldSize;
+	memcpy( &fieldSize, (char*)page+rOffset.offset, sizeof(FieldSize) );
+	if( fieldSize == TombStoneMark ){
+	    RID trid;
+	    memcpy( &trid, (char*)page+rOffset.offset+sizeof(FieldSize), sizeof(RID) );
+	    void *t_page = malloc(PAGE_SIZE);
+	    fileHandle.readPage(trid.pageNum,t_page);
+	    memcpy( &rOffset, (char*)t_page+PAGE_SIZE-sizeof(PageDesc)-sizeof(RecordOffset)*(trid.slotNum+1), sizeof(RecordOffset) );
+	    memcpy( returnedData, (char*)t_page+rOffset.offset, rOffset.length);
+	    free(t_page); 
+	}else{
+	    memcpy( returnedData, (char*)page+rOffset.offset, rOffset.length );
+	}
+
+
+   
+    
+	for( int i=0 ; i<recordDescriptor.size(); i++ ){
+	    // get the condtional attribute index 
+	    if( conditionAttribute.compare( recordDescriptor[i].name ) == 0 ){
+		AttrType type = recordDescriptor[i].type;
+		int nullIndicatorOffet = ( i / CHAR_BIT );
+		char nullIndicator;
+		memcpy( &nullIndicator, (char*)returnedData+descriptorLength+nullIndicatorOffet , sizeof(char));
+	    	
+		// if it's null & it's not NO_OP
+		if( nullIndicator & (1 << (7-(i%8))) && compOp != NO_OP) {
+		    break;
+		}
+	    
+		FieldOffset offset = 0;
+		memcpy(&offset, (char*)returnedData + sizeof(FieldSize) + sizeof(FieldOffset) * i, sizeof(FieldOffset));
+		int t_len = 0;
+		float cmpValue = 0; 
+		if( type == TypeVarChar ){
+		    memcpy( &t_len, (char*)value, sizeof(int) );
+		    t_len += sizeof(int);
+		}else if(type == TypeReal){
+		    t_len = sizeof(float);
+		    float a;
+		    memcpy( &a, (char*)returnedData+offset, t_len);
+		    memcpy( &cmpValue, value, sizeof(float));
+		    cmpValue = a - cmpValue;
+		}else if(type == TypeInt){
+		    t_len = sizeof(int);
+		    int a;
+		    memcpy( &a, (char*)returnedData+offset, t_len);
+		    int b;
+		    memcpy( &b, value, t_len);
+		    cmpValue = a - b;
+		   // printf("age %d \n",a);
+		}
+
+		//cmpValue = memcmp( (char*)returnedData+offset, value, t_len);
+		switch( compOp ){
+		    case NO_OP:
+			// no op, call function directly
+			getFormattedRecord(returnedData,data);
+			found=true;
+			break;
+		    case EQ_OP:
+			if( cmpValue == 0 ){ // function call
+			    getFormattedRecord(returnedData,data);
+			    found=true;
+			}
+			break;
+		    case LT_OP:
+			if( cmpValue < 0 ){
+			    getFormattedRecord(returnedData,data);
+			    found=true;
+			}
+			break;
+		    case GT_OP:
+			if( cmpValue > 0 ){
+			    getFormattedRecord(returnedData,data);
+			    found=true;
+			}
+			break;
+		    case LE_OP:
+			if( cmpValue <= 0 ){
+			    getFormattedRecord(returnedData,data);
+			    found=true;
+			}
+			break;	
+		    case GE_OP:
+			if( cmpValue >= 0 ){
+			    getFormattedRecord(returnedData,data);
+			    found=true;
+			}
+			break;	
+		    case NE_OP:
+			if( cmpValue != 0 ){
+			    getFormattedRecord(returnedData,data);
+			    found=true;
+			}
+			break;
+		}
+
+		break; // break for loop
+
+	    }
+	} // for loop 
+	
+	c_rid.slotNum++;
+    }
+    free(returnedData);
+    return SUCCESS;
 }

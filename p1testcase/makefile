@@ -1,6 +1,6 @@
 include ../makefile.inc
 
-all: librbf.a rbftest1 rbftest2 rbftest3 rbftest4 rbftest5 rbftest6 rbftest7 rbftest8 rbftest8b rbftest9 rbftest10 rbftest11 rbftest12 rbftest11a rbftest11b rbftest13 rbftest14 rbftest15 rbftest16 rbftest17a rbftest17b rbftest17c rbftest18 rbftest19a 
+all: librbf.a rbftest1 rbftest2 rbftest3 rbftest4 rbftest5 rbftest6 rbftest7 rbftest8 rbftest8b rbftest9 rbftest10 rbftest11 rbftest12 rbftest11a rbftest11b rbftest13 rbftest14 rbftest15 rbftest16 rbftest17a rbftest17b rbftest17c rbftest18 rbftest19a rbftest19b 
 
 
 # c file dependencies
@@ -35,6 +35,7 @@ rbftest17b.o: ../rbf/pfm.h ../rbf/rbfm.h
 rbftest17c.o: ../rbf/pfm.h ../rbf/rbfm.h
 rbftest18.o: ../rbf/pfm.h ../rbf/rbfm.h
 rbftest19a.o: ../rbf/pfm.h ../rbf/rbfm.h
+rbftest19b.o: ../rbf/pfm.h ../rbf/rbfm.h
 
 
 
@@ -63,6 +64,7 @@ rbftest17b: rbftest17b.o librbf.a $(CODEROOT)/rbf/librbf.a
 rbftest17c: rbftest17c.o librbf.a $(CODEROOT)/rbf/librbf.a
 rbftest18: rbftest18.o librbf.a $(CODEROOT)/rbf/librbf.a
 rbftest19a: rbftest19a.o librbf.a $(CODEROOT)/rbf/librbf.a
+rbftest19b: rbftest19b.o librbf.a $(CODEROOT)/rbf/librbf.a
 
 # dependencies to compile used libraries
 .PHONY: $(CODEROOT)/rbf/librbf.a

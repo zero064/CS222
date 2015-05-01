@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 #include <climits>
-
+#include <stdlib.h>
 #include "../rbf/pfm.h"
 
 using namespace std;
@@ -49,13 +49,14 @@ struct Attribute {
 };
 
 // Comparison Operator (NOT needed for part 1 of the project)
-typedef enum { NO_OP = 0,  // no condition
-		   EQ_OP,      // =
-           LT_OP,      // <
-           GT_OP,      // >
-           LE_OP,      // <=
-           GE_OP,      // >=
-           NE_OP,      // !=
+typedef enum { 
+	NO_OP = 0,  // no condition
+	EQ_OP,      // =
+	LT_OP,      // <
+        GT_OP,      // >
+        LE_OP,      // <=
+        GE_OP,      // >=
+        NE_OP,      // !=
 } CompOp;
 
 
@@ -74,16 +75,34 @@ The scan iterator is NOT required to be implemented for part 1 of the project
 //    process the data;
 //  }
 //  rbfmScanIterator.close();
-
+class RecordBasedFileManager;
 
 class RBFM_ScanIterator {
 public:
-  RBFM_ScanIterator() {};
-  ~RBFM_ScanIterator() {};
+  RBFM_ScanIterator() { page = malloc(PAGE_SIZE); };
+  ~RBFM_ScanIterator() { free(page); };
 
+  RC initScanIterator(FileHandle &fileHandle,
+      const vector<Attribute> &recordDescriptor,
+      const string &conditionAttribute,
+      const CompOp compOp,                  // comparision type such as "<" and "="
+      const void *value,                    // used in the comparison
+      const vector<string> &attributeNames); // a list of projected attributes
   // "data" follows the same format as RecordBasedFileManager::insertRecord()
-  RC getNextRecord(RID &rid, void *data) { return RBFM_EOF; };
-  RC close() { return -1; };
+  RC getNextRecord(RID &rid, void *data); //{ return RBFM_EOF; };
+  RC close(); // { return -1; };
+
+private:
+     RecordBasedFileManager *rbfm;
+     FileHandle fileHandle;
+     vector<Attribute> recordDescriptor;
+     string conditionAttribute;
+     CompOp compOp;
+     void *value, *page;
+     vector<string> attributeNames;
+     unsigned pageNum = 1; 
+     RID c_rid; PageDesc pageDesc;
+     RC getFormattedRecord(void *returnedData, void *data);
 };
 
 
@@ -148,6 +167,8 @@ protected:
 private: 
   static RecordBasedFileManager *_rbf_manager;
   PagedFileManager *pagedFileManager;
+  
+
 
 // custom private variable
   
