@@ -31,6 +31,7 @@ RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor
 
 
 RC RecordBasedFileManager::createFile(const string &fileName) {
+    printf("createFile\n");
     return pagedFileManager->createFile(fileName);
     //return -1;
 }
@@ -741,7 +742,7 @@ RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<At
 RC RecordBasedFileManager::scan(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const string &conditionAttribute,
 			        const CompOp compOp, const void *value, const vector<string> &attributeNames, RBFM_ScanIterator &rbfm_ScanIterator)
 {
-
+    printf("rbfm_scan\n");
     return rbfm_ScanIterator.initScanIterator(fileHandle,recordDescriptor,conditionAttribute,compOp,value,attributeNames);
 }
 
@@ -749,6 +750,7 @@ RC RecordBasedFileManager::scan(FileHandle &fileHandle, const vector<Attribute> 
 RC RBFM_ScanIterator::initScanIterator(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const string &conditionAttribute,
 				       const CompOp compOp, const void *value, const vector<string> &attributeNames)
 {
+    assert( value != NULL && "value pointer should not be null" );
     this->rbfm = RecordBasedFileManager::instance();
     this->fileHandle = fileHandle;
     this->recordDescriptor = recordDescriptor;
@@ -756,10 +758,12 @@ RC RBFM_ScanIterator::initScanIterator(FileHandle &fileHandle, const vector<Attr
     this->attributeNames = attributeNames;
     this->compOp = compOp;
     this->value = (char*)value;
+    /*
     int v, v2 = 20;
     memcpy( &v, this->value, sizeof(int) );
     printf("%d\n",v); 
     printf("%d\n",memcmp( &v, &v2 ,sizeof(int)) );
+    */
     // init, start from 1st record, <1,0>
     this->c_rid.pageNum = 0;
     this->c_rid.slotNum = 0;

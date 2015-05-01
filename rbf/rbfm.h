@@ -81,7 +81,7 @@ class RecordBasedFileManager;
 
 class RBFM_ScanIterator {
 public:
-  RBFM_ScanIterator() { page = malloc(PAGE_SIZE); };
+  RBFM_ScanIterator() { page = malloc(PAGE_SIZE); printf("RBFM_ITER init\n"); };
   ~RBFM_ScanIterator() { free(page); };
 
   RC initScanIterator(FileHandle &fileHandle,

@@ -195,8 +195,8 @@ int RelationManager::GetFreeTableid(){
 	bool scanID[TABLE_SIZE];
 	std::fill_n(scanID,TABLE_SIZE,0);
 
-
-	if(RelationManager::scan("Tables","",NO_OP,NULL,attrname,rm_ScanIterator)==0){
+	void *v = malloc(1);
+	if( scan("Tables","",NO_OP,v,attrname,rm_ScanIterator)==0 ){
 		while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
 			//!!!! skip null indicator
 			memcpy(&foundID,(char *)data+1,sizeof(int));
@@ -215,6 +215,7 @@ int RelationManager::GetFreeTableid(){
 		#ifdef DEBUG
 			cout<<"GET free table id: "<<tableID<<endl;
 		#endif
+		free(v);
 		return tableID;
 	}
 
@@ -489,6 +490,7 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
 	tableid=getTableId(tableName);
 	if( scan("Columns","table-id",EQ_OP,&tableid,attrname,rm_ScanIterator) == 0 ){
 		while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
+			printf("scan through attributes\n");
 			//skip null indicatior
 			offset=1;
 			VarCharToString(data+offset,tempstr);
@@ -512,6 +514,7 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
 		free(data);
 		#ifdef DEBUG
 			cout<<"Successfully getAttribute "<<endl;
+			cout<<"Size of attrs "<< attrs.size()<<endl;
 			cout<<"the first attriubt name: "<<attrs[0].name<<endl;
 			cout<<"the last attriubt name: "<<attrs[attrs.size()-1].name<<endl;
 		#endif

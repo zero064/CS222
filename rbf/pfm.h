@@ -3,7 +3,7 @@
 
 #include <string>
 #include <climits>
-
+#include <assert.h>
 typedef int RC;
 typedef char byte;
 typedef unsigned PageNum;
