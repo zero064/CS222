@@ -738,7 +738,7 @@ RC RecordBasedFileManager::scan(FileHandle &fileHandle, const vector<Attribute> 
 RC RBFM_ScanIterator::initScanIterator(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const string &conditionAttribute,
 				       const CompOp compOp, const void *value, const vector<string> &attributeNames)
 {
-    assert( value != NULL && "value pointer should not be null" );
+//    assert( value != NULL && "value pointer should not be null" );
     this->rbfm = RecordBasedFileManager::instance();
     this->fileHandle = fileHandle;
     this->recordDescriptor = recordDescriptor;
@@ -856,6 +856,10 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 	    memcpy( returnedData, (char*)page+rOffset.offset, rOffset.length );
 	}
 
+	if( compOp == NO_OP ){
+	     getFormattedRecord(returnedData,data);
+	     found = true;
+	}
 
 	for( int i=0 ; i<recordDescriptor.size(); i++ ){
 	    // get the condtional attribute index 
