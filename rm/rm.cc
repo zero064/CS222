@@ -653,6 +653,7 @@ RC RelationManager::deleteTuple(const string &tableName, const RID &rid)
 				#ifdef DEBUG
 					cout<<"Successfully delete tuple "<<endl;
 				#endif
+				rbfm->closeFile(filehandle);
 				return 0;
 			}
 		}
@@ -683,6 +684,7 @@ RC RelationManager::updateTuple(const string &tableName, const void *data, const
 				#ifdef DEBUG
 					cout<<"Successfully update tuple "<<endl;
 				#endif
+				rbfm->closeFile(filehandle);
 				return 0;
 			}
 		}
@@ -711,6 +713,7 @@ RC RelationManager::readTuple(const string &tableName, const RID &rid, void *dat
 				#ifdef DEBUG
 					cout<<"Successfully read tuple "<<endl;
 				#endif
+				rbfm->closeFile(filehandle);
 				return 0;
 			}
 		}
