@@ -17,6 +17,7 @@ RC TEST_RM_6(const string &tableName)
     RC rc = rm->getAttributes(tableName, attrs);
     assert(rc == success && "RelationManager::getAttributes() should not fail.");
 
+
     int nullAttributesIndicatorActualSize = getActualByteForNullsIndicator(attrs.size());
     unsigned char *nullsIndicator = (unsigned char *) malloc(nullAttributesIndicatorActualSize);
 	memset(nullsIndicator, 0, nullAttributesIndicatorActualSize);
@@ -32,6 +33,7 @@ RC TEST_RM_6(const string &tableName)
         int age = 20+i;
         prepareTuple(attrs.size(), nullsIndicator, 6, "Tester", age, height, 123, tuple, &tupleSize);
         ages.insert(age);
+
         rc = rm->insertTuple(tableName, tuple, rid);
         assert(rc == success && "RelationManager::insertTuple() should not fail.");
 

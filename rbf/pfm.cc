@@ -56,7 +56,7 @@ RC PagedFileManager::destroyFile(const string &fileName)
 
 RC PagedFileManager::openFile(const string &fileName, FileHandle &fileHandle)
 {
-
+    
     // file does exist, open it 
     if ( access( fileName.c_str(), F_OK ) == 0  ){
 	//printf("file does exist, open it \n");

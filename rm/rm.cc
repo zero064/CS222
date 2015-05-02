@@ -419,7 +419,7 @@ int RelationManager::getTableId(const string &tableName){
 
 	RM_ScanIterator rm_ScanIterator;
 	RID rid;
-	int tableid;
+	int tableid = -1;
 	char *VarChardata=(char *)malloc(PAGE_SIZE);
 	char *data=(char *)malloc(PAGE_SIZE);
 	vector<string> attrname;
@@ -443,8 +443,10 @@ int RelationManager::getTableId(const string &tableName){
 			}
 		}
 		rm_ScanIterator.close();
+
 		free(VarChardata);
 		free(data);
+		if( tableid == -1 ) return -1;
 		return tableid;
 	}
 	return -1;
@@ -471,6 +473,7 @@ RC RelationManager::deleteTable(const string &tableName)
 	if(rbfm->destroyFile(tableName)==0){
 
 		tableid=getTableId(tableName);
+		printf("\n\nDelete table id %d\n",tableid);
 		rbfm->openFile("Tables",filehandle);
 		if(RelationManager::scan("Tables","table-id",EQ_OP,&tableid,attrname,rm_ScanIterator)==0){
 			while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
@@ -526,6 +529,7 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
 
 
 	tableid=getTableId(tableName);
+	if( tableid == -1 ) return -1;
 	printf("tableid ========= %d\n",tableid);
 	if( scan("Columns","table-id",EQ_OP,&tableid,attrname,rm_ScanIterator) == 0 ){
 		while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
@@ -552,7 +556,7 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
 		rm_ScanIterator.close();
 		free(data);
 		#ifdef DEBUG
-			cout<<"Successfully getAttribute "<<endl;
+			cout<<"Successfully getAttribute "<<endl
 			cout<<"Size of attrs "<< attrs.size()<<endl;
 			cout<<"the first attriubt name: "<<attrs[0].name<<endl;
 			cout<<"the last attriubt name: "<<attrs[attrs.size()-1].name<<endl;
