@@ -27,7 +27,9 @@ RC TEST_RM_10(const string &tableName, vector<RID> &rids, vector<int> &sizes)
     int size = 0;
     for(int i = 0; i < 1000; i++)
     {
-        memset(tuple, 0, 2000);
+        cout<<endl<<"i  is "<<i<<endl;
+
+    	memset(tuple, 0, 2000);
         RID rid = rids[i];
 
         prepareLargeTuple(attrs.size(), nullsIndicator, i+10, tuple, &size);

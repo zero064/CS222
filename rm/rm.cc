@@ -762,6 +762,7 @@ RC RelationManager::readAttribute(const string &tableName, const RID &rid, const
 				#ifdef DEBUG
 					cout<<"Successfully read attribute "<<endl;
 				#endif
+				rbfm->closeFile(filehandle);
 				return 0;
 			}
 		}
@@ -810,6 +811,7 @@ RC RelationManager::scan(const string &tableName,
 			#ifdef DEBUG
 				cout<<"Successfully doing RelationManager scan "<<endl;
 			#endif
+
 			return 0;
 		}
 
@@ -895,6 +897,7 @@ RC RelationManager::dropAttribute(const string &tableName, const string &attribu
 					#ifdef DEBUG
 						cout<<"Successfully dropAttribute "<<endl;
 					#endif
+					rbfm->closeFile(filehandle);
 					return 0;
 				}
 			}
