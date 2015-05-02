@@ -447,7 +447,6 @@ int RelationManager::getTableId(const string &tableName){
 
 		free(VarChardata);
 		free(data);
-		if( tableid == -1 ) return -1;
 		return tableid;
 	}
 	return -1;

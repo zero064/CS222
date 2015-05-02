@@ -792,9 +792,9 @@ RC RBFM_ScanIterator::getFormattedRecord(void *returnedData, void *data)
 		int t_len = 0;
 		if( type == TypeVarChar ){
 		    memcpy( &t_len, (char*)returnedData+f_offset, sizeof(int) );
-//		    char* temp = (char*)malloc(t_len);
-//		    memcpy(temp, (char*)returnedData+f_offset+sizeof(int),t_len);
-//		    printf("%s %d %s\n",attributeNames[i].c_str(),t_len,temp);
+		    char* temp = (char*)malloc(t_len);
+		    memcpy(temp, (char*)returnedData+f_offset+sizeof(int),t_len);
+		//    printf("\n\n%s %d %s\n",attributeNames[i].c_str(),f_offset,temp);
 		    t_len += sizeof(int);
 		}else if(type == TypeReal){
 		    t_len = sizeof(float);
@@ -837,9 +837,15 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 	    if( pageDesc.numOfSlot < 0 ) pageDesc.numOfSlot*=-1; // if it's an inconsistent page
 	} 
 
-
+	
 	// read slot
 	memcpy( &rOffset, (char*)page+PAGE_SIZE-sizeof(PageDesc)-sizeof(RecordOffset)*(c_rid.slotNum+1), sizeof(RecordOffset) );
+//	printf("rOffset %d %d\n",rOffset.offset,rOffset.length);
+	if( rOffset.offset == DeletedSlotMark ){
+	    c_rid.slotNum++;
+	    continue;
+	}
+
 	// tombstone case
 	FieldSize fieldSize;
 	memcpy( &fieldSize, (char*)page+rOffset.offset, sizeof(FieldSize) );
@@ -863,6 +869,8 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 	}
 
 
+
+
 	for( int i=0 ; i<recordDescriptor.size(); i++ ){
 	    // get the condtional attribute index 
 	    if( conditionAttribute.compare( recordDescriptor[i].name ) == 0 || compOp == NO_OP ){
@@ -884,7 +892,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 		if( type == TypeVarChar ){
 		    memcpy( &t_len, (char*)value, sizeof(int) );
 		    memcpy( &t_len2, (char*)returnedData+offset, sizeof(int) );
-		    if( t_len == t_len2){
+		    if( t_len == t_len2 ){
 			//printf("t_len is %d\n",t_len);
 			cmpValue = memcmp( (char*)value+sizeof(int), (char*)returnedData+offset+sizeof(int), t_len);
 			//printf("compare %s cmpValue %d\n",conditionAttribute.c_str(),cmpValue);
@@ -911,7 +919,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 		    int b;
 		    memcpy( &b, value, t_len);
 		    cmpValue = a - b;
-		    //printf("age %d b %d cmpValue %d\n",a,b,cmpValue);
+//		    printf("data %d target %d cmpValue %d\n",a,b,cmpValue);
 		}
 		
 		//cmpValue = memcmp( (char*)returnedData+offset, value, t_len);
