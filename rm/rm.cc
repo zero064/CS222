@@ -176,6 +176,10 @@ RC RelationManager::UpdateColumns(int tableid,vector<Attribute> attributes){
 		for(int i=0;i<size;i++){
 			CreateColumnsRecord(data,tableid,attributes[i],attributes[i].position,0);
 			rbfm->insertRecord(table_filehandle,columndescriptor,data,rid);
+			#ifdef DEBUG2
+				cout<<"In UpdateColumns"<<endl;
+				rbfm->printRecord(columndescriptor,data);
+			#endif
 			//printf("\ncolumn RID %d,%d\n",rid.pageNum,rid.slotNum);
 			//rbfm->printRecord(columndescriptor,data);
 		}
