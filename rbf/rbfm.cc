@@ -730,7 +730,6 @@ RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<At
 RC RecordBasedFileManager::scan(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const string &conditionAttribute,
 			        const CompOp compOp, const void *value, const vector<string> &attributeNames, RBFM_ScanIterator &rbfm_ScanIterator)
 {
-    printf("rbfm_scan\n");
     return rbfm_ScanIterator.initScanIterator(fileHandle,recordDescriptor,conditionAttribute,compOp,value,attributeNames);
 }
 
@@ -829,13 +828,13 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 	rid = c_rid;
     	// finish reading all records in a page
 	if( (int)c_rid.slotNum+1 > (int)pageDesc.numOfSlot){
-
 	    c_rid.slotNum = 0;
 	    c_rid.pageNum++;
 	    if( c_rid.pageNum % 512 == 0 ) c_rid.pageNum++;
 
 	    if( fileHandle.readPage( c_rid.pageNum, page ) == FAILURE) return RBFM_EOF;
 	    memcpy( &pageDesc, (char*)page+PAGE_SIZE-sizeof(PageDesc), sizeof(PageDesc) );
+	    if( pageDesc.numOfSlot < 0 ) pageDesc.numOfSlot*=-1; // if it's an inconsistent page
 	} 
 
 
@@ -859,7 +858,10 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 	if( compOp == NO_OP ){
 	     getFormattedRecord(returnedData,data);
 	     found = true;
+	     c_rid.slotNum++;
+	     break;
 	}
+
 
 	for( int i=0 ; i<recordDescriptor.size(); i++ ){
 	    // get the condtional attribute index 
@@ -868,12 +870,12 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 		int nullIndicatorOffet = ( i / CHAR_BIT );
 		char nullIndicator;
 		memcpy( &nullIndicator, (char*)returnedData+descriptorLength+nullIndicatorOffet , sizeof(char));
-	    	
+		
+
 		// if it's null & it's not NO_OP
 		if( nullIndicator & (1 << (7-(i%8))) && compOp != NO_OP) {
 		    break;
 		}
-	    
 		FieldOffset offset = 0;
 		memcpy(&offset, (char*)returnedData + sizeof(FieldSize) + sizeof(FieldOffset) * i, sizeof(FieldOffset));
 		int t_len = 0;
@@ -883,11 +885,11 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 		    memcpy( &t_len, (char*)value, sizeof(int) );
 		    memcpy( &t_len2, (char*)returnedData+offset, sizeof(int) );
 		    if( t_len == t_len2){
-			printf("t_len is %d\n",t_len);
+			//printf("t_len is %d\n",t_len);
 			cmpValue = memcmp( (char*)value+sizeof(int), (char*)returnedData+offset+sizeof(int), t_len);
-			printf("compare %s cmpValue %d\n",conditionAttribute.c_str(),cmpValue);
-			printf("target string %s\n",(char*)value+sizeof(int));
-			printf("string from data %s\n\n",(char*)returnedData+offset+sizeof(int));
+			//printf("compare %s cmpValue %d\n",conditionAttribute.c_str(),cmpValue);
+			//printf("target string %s\n",(char*)value+sizeof(int));
+			//printf("string from data %s\n\n",(char*)returnedData+offset+sizeof(int));
 		    }else{
 			cmpValue = -1;
 		    }
@@ -901,7 +903,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 		    memcpy( &a, (char*)returnedData+offset, t_len);
 		    memcpy( &f_cmpValue, value, sizeof(float));
 		    f_cmpValue = a - f_cmpValue;
-		    cmpValue = (int)f_cmpValue;
+		    cmpValue = f_cmpValue*10000;  // convert to int, times 10000 to increase precision
 		}else if(type == TypeInt){
 		    t_len = sizeof(int);
 		    int a;

@@ -93,15 +93,22 @@ int RBFTest_19b(RecordBasedFileManager *rbfm) {
  
     rc = rbfm->scan(fileHandle,recordDescriptor,attr2,GT_OP,&ageVal,attributes,rmsi);
     assert( rc == success && "initalize scan should not fail");
-
+    vector<RID> deleteRID;
     i=0;
     while( rmsi.getNextRecord(rid, returnedData) != RBFM_EOF){
 	i++;
+	deleteRID.push_back(rid);
 //	rbfm->printRecord(recordDescriptor, returnedData);
     }
     // age > 49 
     printf("total %d records\n",i);
     assert( i == 140 && "Number of records where age > 49 should be 140" );
+
+    printf("delete %d records\n",deleteRID.size());
+    for(int i=0; i<deleteRID.size();i++){
+	rc = rbfm->deleteRecord(fileHandle,recordDescriptor,rid);
+	assert( rc == success && "delete in scan should not fail");
+    }
  
     // test NO_OP
     rc = rbfm->scan(fileHandle,recordDescriptor,attr2,NO_OP,&ageVal,attributes,rmsi);

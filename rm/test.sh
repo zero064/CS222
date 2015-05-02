@@ -8,7 +8,7 @@ make
 ./rmtest_05
 ./rmtest_06
 ./rmtest_07
-./rmtest_08
+#./rmtest_08
 #./rmtest_09
 #./rmtest_10
 #./rmtest_11

@@ -197,7 +197,7 @@ int RelationManager::GetFreeTableid(){
 
 	vector<string> attrname;
 	attrname.push_back("table-id");
-	int tableID;
+	int tableID = -1;
 	int foundID;
 	bool scanID[TABLE_SIZE];
 	std::fill_n(scanID,TABLE_SIZE,0);
@@ -434,6 +434,7 @@ int RelationManager::getTableId(const string &tableName){
 			memcpy(&tableid,(char *)data+1,sizeof(int));
 			printf("yoooooooooooo table id %d\n",tableid);
 			count++;
+			assert( count < 2 && "should be exact one table-id match one table name" );
 			if(count>=2){
 				cout<<"There are two record in Tables with same table name "<<endl;
 			}
@@ -524,12 +525,14 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
 
 
 
-	tableid=getTableId(tableName);
-	if( tableid == -1 ) return -1;
+	tableid=getTableId(tableName);  // scan table ID 
 	printf("tableid ========= %d\n",tableid);
+	if( tableid == -1 ) return -1;
+
 	if( scan("Columns","table-id",EQ_OP,&tableid,attrname,rm_ScanIterator) == 0 ){
+
 		while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
-			printf("scan through attributes\n");
+//			printf("scan through attributes\n");
 			//skip null indicatior
 			offset=1;
 			VarCharToString(data+offset,tempstr);
@@ -552,7 +555,7 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
 		rm_ScanIterator.close();
 		free(data);
 		#ifdef DEBUG
-			cout<<"Successfully getAttribute "<<endl
+			cout<<"Successfully getAttribute "<<endl;
 			cout<<"Size of attrs "<< attrs.size()<<endl;
 			cout<<"the first attriubt name: "<<attrs[0].name<<endl;
 			cout<<"the last attriubt name: "<<attrs[attrs.size()-1].name<<endl;
@@ -609,7 +612,7 @@ RC RelationManager::insertTuple(const string &tableName, const void *data, RID &
 			if(rbfm->insertRecord(filehandle,descriptor,data,rid)==0){
 
 				#ifdef DEBUG
-					cout<<"Successfully intsert tuple "<<endl;
+					cout<<"Successfully insert tuple \n\n\n"<<endl;
 				#endif
 				return 0;
 			}
