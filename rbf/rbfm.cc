@@ -146,27 +146,14 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 	pageDesc.recordSize += dataSize;
 	memcpy( (char*)pageData+PAGE_SIZE-sizeof(PageDesc), &pageDesc , sizeof(PageDesc) );
 	rid.slotNum = pageDesc.numOfSlot-1; // last index = size -1 ^.<
+//	printf("wwwwwwwwww %d\n",rid.slotNum);
 
-/*
-	// put new record, increase and update index
-	index++;  rid.slotNum = index-1;
-	//printf("slot %d\n",rid.slotNum);
-	// new offset 
-	rOffset.offset = rOffset.offset + rOffset.length;
-	rOffset.length = dataSize;
-	// put new record
-	memcpy( (char*)pageData+rOffset.offset, formattedData, dataSize ); 
-	// update index
-	memcpy( (char*)pageData+PAGE_SIZE-sizeof(short int), &index ,sizeof(short int));
-	// add new record index at bottom
-	memcpy( (char*)pageData+PAGE_SIZE-sizeof(short int)-sizeof(RecordOffset)*index, &rOffset ,sizeof(RecordOffset));
-*/
-
+	// write it to file
+	RC rc = fileHandle.writePage(rid.pageNum,pageData);
+	assert( rc == SUCCESS && "write page should not fail ");
 	// remember to release memory from our custom record 
         free(formattedData);
 	free(pageData);
-	// write it to file
-	fileHandle.writePage(rid.pageNum,pageData);
 	return SUCCESS;
     }
 
@@ -357,9 +344,10 @@ size_t RecordBasedFileManager::getDataSize(const vector<Attribute> &recordDescri
 	    int len = *(int*)buffer;
 	    if(printFlag) printf("%i ",len);
 	    free(buffer);
-	    buffer = malloc(len);
+	    buffer = malloc(len+1);
 	    memcpy( buffer, (char*)data+offset, len);
 	    offset += len; 
+	    ((char *)buffer)[len]='\0';
 	    if(printFlag) printf("%s\n",buffer);
 	    free(buffer);
 	    continue; 
@@ -833,9 +821,12 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
     int descriptorLength = sizeof(short int) + fieldOffsetDescriptorSize;  
     void *returnedData = malloc(1000);
 
+
     while( !found ){
 	rid = c_rid;
 
+
+    printf("numOfSlot %d\n",pageDesc.numOfSlot);
 
     	// finish reading all records in a page
 	if( (int)c_rid.slotNum+1 > (int)pageDesc.numOfSlot){
@@ -871,7 +862,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
     
 	for( int i=0 ; i<recordDescriptor.size(); i++ ){
 	    // get the condtional attribute index 
-	    if( conditionAttribute.compare( recordDescriptor[i].name ) == 0 ){
+	    if( conditionAttribute.compare( recordDescriptor[i].name ) == 0 || compOp == NO_OP ){
 		AttrType type = recordDescriptor[i].type;
 		int nullIndicatorOffet = ( i / CHAR_BIT );
 		char nullIndicator;
@@ -885,16 +876,27 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 		FieldOffset offset = 0;
 		memcpy(&offset, (char*)returnedData + sizeof(FieldSize) + sizeof(FieldOffset) * i, sizeof(FieldOffset));
 		int t_len = 0;
-		float cmpValue = 0; 
+		int t_len2 = 0;
+		int cmpValue = 0; 
 		if( type == TypeVarChar ){
 		    memcpy( &t_len, (char*)value, sizeof(int) );
-		    t_len += sizeof(int);
+		    memcpy( &t_len2, (char*)returnedData+offset, sizeof(int) );
+		    t_len=max(t_len,t_len2);
+		    printf("t_len is %d\n",t_len);
+		    cmpValue = memcmp( (char*)value+sizeof(int), (char*)returnedData+offset+sizeof(int), t_len);
+		    printf("compare %s cmpValue %d\n",conditionAttribute.c_str(),cmpValue);
+		    printf("target string %s\n",(char*)value+sizeof(int));
+		    printf("string from data %s\n",(char*)returnedData+offset+sizeof(int));
+//		    assert( cmpValue == 0 );
+
 		}else if(type == TypeReal){
 		    t_len = sizeof(float);
 		    float a;
+		    float f_cmpValue;
 		    memcpy( &a, (char*)returnedData+offset, t_len);
-		    memcpy( &cmpValue, value, sizeof(float));
-		    cmpValue = a - cmpValue;
+		    memcpy( &f_cmpValue, value, sizeof(float));
+		    f_cmpValue = a - f_cmpValue;
+		    cmpValue = (int)f_cmpValue;
 		}else if(type == TypeInt){
 		    t_len = sizeof(int);
 		    int a;
@@ -902,9 +904,9 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 		    int b;
 		    memcpy( &b, value, t_len);
 		    cmpValue = a - b;
-		   // printf("age %d \n",a);
+		    printf("age %d b %d cmpValue %d\n",a,b,cmpValue);
 		}
-
+		
 		//cmpValue = memcmp( (char*)returnedData+offset, value, t_len);
 		switch( compOp ){
 		    case NO_OP:
@@ -913,7 +915,9 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 			found=true;
 			break;
 		    case EQ_OP:
+
 			if( cmpValue == 0 ){ // function call
+			    printf("wtf EQ_OP gets called\n");
 			    getFormattedRecord(returnedData,data);
 			    found=true;
 			}

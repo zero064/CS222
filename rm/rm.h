@@ -4,7 +4,6 @@
 
 #include <string>
 #include <vector>
-
 #include <climits>
 #include <math.h>
 #include <stdlib.h>
