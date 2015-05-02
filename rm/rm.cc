@@ -85,9 +85,11 @@ RC RelationManager::PrepareCatalogDescriptor(string tablename,vector<Attribute> 
 
 RC RelationManager::CreateTablesRecord(void *data,int tableid,const string tablename,int systemtable){
 	int offset=0;
+
 	//int size=tablename.size();
 	int size = tablename.size();
 	//assert ( cp == size && "yo");
+
 	char nullind=0;
 
 	//copy null indicator

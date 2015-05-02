@@ -59,5 +59,6 @@ $(CODEROOT)/rbf/librbf.a:
 
 .PHONY: clean
 clean:
-	-rm rmtest_create_tables rmtest_delete_tables rmtest_00 rmtest_01 rmtest_02 rmtest_03 rmtest_04 rmtest_05 rmtest_06 rmtest_07 rmtest_08 rmtest_09 rmtest_10 rmtest_11 rmtest_12 rmtest_13 rmtest_14 rmtest_15 rmtest_extra_1 rmtest_extra_2 *.a *.o *~ 
+	#-rm rmtest_create_tables rmtest_delete_tables rmtest_00 rmtest_01 rmtest_02 rmtest_03 rmtest_04 rmtest_05 rmtest_06 rmtest_07 rmtest_08 rmtest_09 rmtest_10 rmtest_11 rmtest_12 rmtest_13 rmtest_14 rmtest_15 rmtest_extra_1 rmtest_extra_2 *.a *.o *~
+	ls | grep -v .cc | grep -v makefile | grep -v .h | grep -v .sh | xargs rm 
 	$(MAKE) -C $(CODEROOT)/rbf clean

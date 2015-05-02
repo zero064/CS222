@@ -824,10 +824,6 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 
     while( !found ){
 	rid = c_rid;
-
-
-    printf("numOfSlot %d\n",pageDesc.numOfSlot);
-
     	// finish reading all records in a page
 	if( (int)c_rid.slotNum+1 > (int)pageDesc.numOfSlot){
 
@@ -858,8 +854,6 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 	}
 
 
-   
-    
 	for( int i=0 ; i<recordDescriptor.size(); i++ ){
 	    // get the condtional attribute index 
 	    if( conditionAttribute.compare( recordDescriptor[i].name ) == 0 || compOp == NO_OP ){
@@ -880,13 +874,16 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 		int cmpValue = 0; 
 		if( type == TypeVarChar ){
 		    memcpy( &t_len, (char*)value, sizeof(int) );
+
 		    memcpy( &t_len2, (char*)returnedData+offset, sizeof(int) );
 		    t_len=max(t_len,t_len2);
 		    printf("t_len is %d\n",t_len);
 		    cmpValue = memcmp( (char*)value+sizeof(int), (char*)returnedData+offset+sizeof(int), t_len);
+
 		    printf("compare %s cmpValue %d\n",conditionAttribute.c_str(),cmpValue);
 		    printf("target string %s\n",(char*)value+sizeof(int));
-		    printf("string from data %s\n",(char*)returnedData+offset+sizeof(int));
+		    printf("string from data %s\n\n",(char*)returnedData+offset+sizeof(int));
+		    //printf("string from data %s\n\n",str);
 //		    assert( cmpValue == 0 );
 
 		}else if(type == TypeReal){
@@ -904,7 +901,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 		    int b;
 		    memcpy( &b, value, t_len);
 		    cmpValue = a - b;
-		    printf("age %d b %d cmpValue %d\n",a,b,cmpValue);
+		    //printf("age %d b %d cmpValue %d\n",a,b,cmpValue);
 		}
 		
 		//cmpValue = memcmp( (char*)returnedData+offset, value, t_len);
