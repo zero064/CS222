@@ -218,6 +218,7 @@ RC RecordBasedFileManager::updateFreePage(FileHandle &fileHandle,int deletedSize
     size_t DIRECTORY_SIZE = sizeof(Directory);
     void *data = malloc(PAGE_SIZE);
     if( fileHandle.readPage(dirNum,data) == FAILURE ){
+	assert(false && "update free page die");
 	return FAILURE;
     }
 
@@ -446,6 +447,7 @@ size_t RecordBasedFileManager::writeDataToBuffer(const vector<Attribute> &record
     free(test);
 */
     free(nullFieldsIndicator);
+    free(fieldOffsetDescriptor);
     return ( descriptorLength +oldDataSize );
 }
 
@@ -588,6 +590,7 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
 
 RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, const RID &rid)
 {
+    printf("will I die??\n");
     // read page from disk
     void *page = malloc(PAGE_SIZE);
     fileHandle.readPage( rid.pageNum, page );
@@ -745,6 +748,7 @@ RC RBFM_ScanIterator::initScanIterator(FileHandle &fileHandle, const vector<Attr
     this->attributeNames = attributeNames;
     this->compOp = compOp;
     this->value = (char*)value;
+    this->page = malloc(PAGE_SIZE);
     /*
     int v, v2 = 20;
     memcpy( &v, this->value, sizeof(int) );

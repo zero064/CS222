@@ -37,7 +37,7 @@ RC TEST_RM_10(const string &tableName, vector<RID> &rids, vector<int> &sizes)
         sizes[i] = size;
         rids[i] = rid;
     }
-
+    assert(false);
     // Read the updated records and check the integrity
     for(int i = 0; i < 1000; i++)
     {

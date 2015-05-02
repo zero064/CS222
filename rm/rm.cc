@@ -573,6 +573,7 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
 	#ifdef DEBUG
 		cout<<"There is bug on getAttribute "<<endl;
 	#endif
+	free(data);
 	return -1;
 
 }
@@ -603,6 +604,9 @@ int RelationManager::IsSystemTable(const string &tableName){
 		return systemtable;
 
 	}
+
+	free(VarChardata);
+	free(data);
 	return -1;
 }
 
@@ -670,7 +674,7 @@ RC RelationManager::deleteTuple(const string &tableName, const RID &rid)
 
 RC RelationManager::updateTuple(const string &tableName, const void *data, const RID &rid)
 {
-	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
+//	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
 	FileHandle filehandle;
 	vector<Attribute> descriptor;
 
@@ -681,12 +685,15 @@ RC RelationManager::updateTuple(const string &tableName, const void *data, const
 		if(rbfm->openFile(tableName,filehandle)==0){
 			if(rbfm->updateRecord(filehandle,descriptor,data,rid)==0){
 
+			//assert(false && "die here");
 				#ifdef DEBUG
 					cout<<"Successfully update tuple "<<endl;
 				#endif
-				rbfm->closeFile(filehandle);
+				RC rc = rbfm->closeFile(filehandle);
+				assert( rc == 0 && "close file not successful");
 				return 0;
 			}
+
 		}
 
 
@@ -781,7 +788,7 @@ RC RelationManager::scan(const string &tableName,
       const vector<string> &attributeNames,
       RM_ScanIterator &rm_ScanIterator)
 {
-	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
+//	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
 	FileHandle filehandle;
 	vector<Attribute> descriptor;
 	if(tableName.compare("Tables")==0){
@@ -812,7 +819,7 @@ RC RelationManager::scan(const string &tableName,
 			#endif
 			return 0;
 		}
-
+//		rbfm->closeFile(filehandle);
 	}
 
 
