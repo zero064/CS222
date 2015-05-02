@@ -622,12 +622,14 @@ RC RelationManager::insertTuple(const string &tableName, const void *data, RID &
 				#ifdef DEBUG
 					cout<<"Successfully insert tuple \n\n\n"<<endl;
 				#endif
-				return 0;
+
 			}
+			rbfm->closeFile(filehandle);
+			return 0;
 		}
 
-
-    }
+		assert(false);
+	}
 
     #ifdef DEBUG
 		cout<<"There is bug on insertTuple "<<endl;
@@ -651,6 +653,7 @@ RC RelationManager::deleteTuple(const string &tableName, const RID &rid)
 				#ifdef DEBUG
 					cout<<"Successfully delete tuple "<<endl;
 				#endif
+				rbfm->closeFile(filehandle);
 				return 0;
 			}
 		}
@@ -681,6 +684,7 @@ RC RelationManager::updateTuple(const string &tableName, const void *data, const
 				#ifdef DEBUG
 					cout<<"Successfully update tuple "<<endl;
 				#endif
+				rbfm->closeFile(filehandle);
 				return 0;
 			}
 		}
@@ -709,6 +713,7 @@ RC RelationManager::readTuple(const string &tableName, const RID &rid, void *dat
 				#ifdef DEBUG
 					cout<<"Successfully read tuple "<<endl;
 				#endif
+				rbfm->closeFile(filehandle);
 				return 0;
 			}
 		}
