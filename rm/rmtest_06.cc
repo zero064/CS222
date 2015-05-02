@@ -45,13 +45,14 @@ RC TEST_RM_6(const string &tableName)
     string attr = "Age";
     vector<string> attributes;
     attributes.push_back(attr);
+
     rc = rm->scan(tableName, "", NO_OP, NULL, attributes, rmsi);
     assert(rc == success && "RelationManager::scan() should not fail.");
-    
+//    cout<< "\n\n\n start to scan \n\n\n attrSize"<<attributes.size()<<endl; 
     nullAttributesIndicatorActualSize = getActualByteForNullsIndicator(attributes.size());
     while(rmsi.getNextTuple(rid, returnedData) != RM_EOF)
     {
-        // cout << "Returned Age: " << *(int *)((char *)returnedData+nullAttributesIndicatorActualSize) << endl;
+         cout << "Returned Age: " << *(int *)((char *)returnedData+nullAttributesIndicatorActualSize) << endl;
         if (ages.find(*(int *)((char *)returnedData+nullAttributesIndicatorActualSize)) == ages.end())
         {
             cout << "***** [FAIL] Test Case 6 Failed *****" << endl << endl;
