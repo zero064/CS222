@@ -789,10 +789,13 @@ RC RBFM_ScanIterator::getFormattedRecord(void *returnedData, void *data)
 		}
 
 		FieldOffset f_offset = 0;
-		memcpy(&f_offset, (char*)returnedData + sizeof(FieldSize) + sizeof(FieldOffset) * i, sizeof(FieldOffset));
+		memcpy(&f_offset, (char*)returnedData + sizeof(FieldSize) + sizeof(FieldOffset) * j, sizeof(FieldOffset));
 		int t_len = 0;
 		if( type == TypeVarChar ){
 		    memcpy( &t_len, (char*)returnedData+f_offset, sizeof(int) );
+//		    char* temp = (char*)malloc(t_len);
+//		    memcpy(temp, (char*)returnedData+f_offset+sizeof(int),t_len);
+//		    printf("%s %d %s\n",attributeNames[i].c_str(),t_len,temp);
 		    t_len += sizeof(int);
 		}else if(type == TypeReal){
 		    t_len = sizeof(float);
@@ -874,15 +877,16 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 		int cmpValue = 0; 
 		if( type == TypeVarChar ){
 		    memcpy( &t_len, (char*)value, sizeof(int) );
-
 		    memcpy( &t_len2, (char*)returnedData+offset, sizeof(int) );
-		    t_len=max(t_len,t_len2);
-		    printf("t_len is %d\n",t_len);
-		    cmpValue = memcmp( (char*)value+sizeof(int), (char*)returnedData+offset+sizeof(int), t_len);
-
-		    printf("compare %s cmpValue %d\n",conditionAttribute.c_str(),cmpValue);
-		    printf("target string %s\n",(char*)value+sizeof(int));
-		    printf("string from data %s\n\n",(char*)returnedData+offset+sizeof(int));
+		    if( t_len == t_len2){
+			printf("t_len is %d\n",t_len);
+			cmpValue = memcmp( (char*)value+sizeof(int), (char*)returnedData+offset+sizeof(int), t_len);
+			printf("compare %s cmpValue %d\n",conditionAttribute.c_str(),cmpValue);
+			printf("target string %s\n",(char*)value+sizeof(int));
+			printf("string from data %s\n\n",(char*)returnedData+offset+sizeof(int));
+		    }else{
+			cmpValue = -1;
+		    }
 		    //printf("string from data %s\n\n",str);
 //		    assert( cmpValue == 0 );
 
@@ -914,7 +918,6 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 		    case EQ_OP:
 
 			if( cmpValue == 0 ){ // function call
-			    printf("wtf EQ_OP gets called\n");
 			    getFormattedRecord(returnedData,data);
 			    found=true;
 			}
