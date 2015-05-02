@@ -556,8 +556,8 @@ int RBFTest_15(RecordBasedFileManager *rbfm) {
 	free(record);
 	free(returnedData);
 
-	remove("test14a_rids");
-	remove("test14b_rids");
+//	remove("test14a_rids");
+//	remove("test14b_rids");
 
 	return 0;
 }
