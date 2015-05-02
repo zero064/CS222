@@ -982,3 +982,9 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
     free(returnedData);
     return SUCCESS;
 }
+
+RC RBFM_ScanIterator::close() {
+    c_rid.pageNum = 40000000;
+    free(page);
+    return rbfm->closeFile(fileHandle); 
+};
