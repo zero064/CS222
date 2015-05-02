@@ -10,7 +10,7 @@ make
 ./rmtest_07
 ./rmtest_08
 ./rmtest_09
-#./rmtest_10
+./rmtest_10
 #./rmtest_11
 #./rmtest_12
 #./rmtest_13

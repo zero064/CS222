@@ -81,8 +81,8 @@ class RecordBasedFileManager;
 
 class RBFM_ScanIterator {
 public:
-  RBFM_ScanIterator() { page = malloc(PAGE_SIZE);};
-  ~RBFM_ScanIterator() { free(page); };
+  RBFM_ScanIterator() { };
+  ~RBFM_ScanIterator() { };
 
   RC initScanIterator(FileHandle &fileHandle,
       const vector<Attribute> &recordDescriptor,
@@ -92,9 +92,12 @@ public:
       const vector<string> &attributeNames); // a list of projected attributes
   // "data" follows the same format as RecordBasedFileManager::insertRecord()
   RC getNextRecord(RID &rid, void *data); //{ return RBFM_EOF; };
-  RC close() {	c_rid.pageNum = 40000000;
-		return SUCCESS; };
+  RC close();
 
+/* {	c_rid.pageNum = 40000000;
+		free(page);
+		return rbfm->closeFile(fileHandle); };
+*/
 private:
      RecordBasedFileManager *rbfm;
      FileHandle fileHandle;
