@@ -157,7 +157,7 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 	return SUCCESS;
     }
 
-    
+    assert(false); 
 
     // remember to release memory from our custom record 
     free(formattedData);

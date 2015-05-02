@@ -181,6 +181,7 @@ RC FileHandle::initFilePointer(const string &fileName)
 
     fseek(filePointer, 0, SEEK_END); 
     int numOfBytes = ftell(filePointer);
+//    printf("\n\n\n %d \n\n\n",numOfBytes);
     setNumberOfPages(numOfBytes/PAGE_SIZE);
 
     return SUCCESS;

@@ -622,12 +622,14 @@ RC RelationManager::insertTuple(const string &tableName, const void *data, RID &
 				#ifdef DEBUG
 					cout<<"Successfully insert tuple \n\n\n"<<endl;
 				#endif
-				return 0;
+
 			}
+			rbfm->closeFile(filehandle);
+			return 0;
 		}
 
-
-    }
+		assert(false);
+	}
 
     #ifdef DEBUG
 		cout<<"There is bug on insertTuple "<<endl;
