@@ -71,6 +71,7 @@ public:
       const void *value,                    // used in the comparison
       const vector<string> &attributeNames, // a list of projected attributes
       RM_ScanIterator &rm_ScanIterator);
+  RC printTable(const string &tableName);
 
 // Extra credit work (10 points)
 public:

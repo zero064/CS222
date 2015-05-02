@@ -465,6 +465,7 @@ RC RelationManager::deleteTable(const string &tableName)
 	char *data=(char *)malloc(PAGE_SIZE);
 	vector<string> attrname;
 	attrname.push_back("table-id");
+	vector<RID> rids;
 
 	vector<Attribute> tablesdescriptor;
 	PrepareCatalogDescriptor("Tables",tablesdescriptor);
@@ -478,7 +479,11 @@ RC RelationManager::deleteTable(const string &tableName)
 		rbfm->openFile("Tables",filehandle);
 		if(RelationManager::scan("Tables","table-id",EQ_OP,&tableid,attrname,rm_ScanIterator)==0){
 			while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
-				rbfm->deleteRecord(filehandle,tablesdescriptor,rid);
+				rids.push_back(rid);
+			}
+			for(int j=0;j<rids.size();j++){
+				rbfm->deleteRecord(filehandle,tablesdescriptor,rids[j]);
+
 			}
 			rbfm->closeFile(filehandle);
 			rm_ScanIterator.close();
@@ -894,6 +899,45 @@ RC RelationManager::dropAttribute(const string &tableName, const string &attribu
 	}
 	#ifdef DEBUG
 		cout<<"There is bug on dropAttribute "<<endl;
+	#endif
+	return -1;
+}
+RC RelationManager::printTable(const string &tableName){
+	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
+	RM_ScanIterator rm_ScanIterator;
+	RID rid;
+	char *data=(char *)malloc(PAGE_SIZE);
+	vector<Attribute> recordDescriptor;
+	getAttributes(tableName,recordDescriptor);
+	vector<string> attrname;
+	for(int j=0;j<recordDescriptor.size();j++){
+		attrname.push_back(recordDescriptor[j].name);
+	}
+
+
+
+	void *v = malloc(1);
+	if( scan("Tables","",NO_OP,v,attrname,rm_ScanIterator)==0 ){
+
+		while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
+			//!!!! skip null indicator
+			rbfm->printRecord(recordDescriptor,data);
+
+		}
+
+
+
+		free(data);
+		rm_ScanIterator.close();
+		#ifdef DEBUG
+			cout<<"Successfully printTabale "<<endl;
+		#endif
+		free(v);
+		return 0;
+
+	}
+	#ifdef DEBUG
+		cout<<"There is bug on printTabale "<<endl;
 	#endif
 	return -1;
 }
