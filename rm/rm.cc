@@ -84,7 +84,9 @@ RC RelationManager::PrepareCatalogDescriptor(string tablename,vector<Attribute> 
 
 RC RelationManager::CreateTablesRecord(void *data,int tableid,string tablename,int systemtable){
 	int offset=0;
-	int size=tablename.size();
+	//int size=tablename.size();
+	int size = strlen(tablename.c_str());
+	//assert ( cp == size && "yo");
 	char nullind=0;
 
 	//copy null indicator
@@ -171,6 +173,8 @@ RC RelationManager::UpdateColumns(int tableid,vector<Attribute> attributes){
 		for(int i=0;i<size;i++){
 			CreateColumnsRecord(data,tableid,attributes[i],attributes[i].position,0);
 			rbfm->insertRecord(table_filehandle,columndescriptor,data,rid);
+			//printf("\ncolumn RID %d,%d\n",rid.pageNum,rid.slotNum);
+			//rbfm->printRecord(columndescriptor,data);
 		}
 		rbfm->closeFile(table_filehandle);
 		free(data);
@@ -194,7 +198,6 @@ int RelationManager::GetFreeTableid(){
 	int foundID;
 	bool scanID[TABLE_SIZE];
 	std::fill_n(scanID,TABLE_SIZE,0);
-
 	void *v = malloc(1);
 	if( scan("Tables","",NO_OP,v,attrname,rm_ScanIterator)==0 ){
 		while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
@@ -300,12 +303,17 @@ RC RelationManager::createCatalog()
 
 		PrepareCatalogDescriptor("Tables",tablesdescriptor);
 		CreateTablesRecord(data,tableid,"Tables",systemtable);
-		rbfm->insertRecord(table_filehandle,tablesdescriptor,data,rid);
-
+		RC rc = rbfm->insertRecord(table_filehandle,tablesdescriptor,data,rid);
+		assert( rc == 0 && "insert table should not fail");
+		//rbfm->readRecord(table_filehandle,tablesdescriptor,rid,data);
+		//rbfm->printRecord(tablesdescriptor,data);		
+		
 		tableid=2;
 		CreateTablesRecord(data,tableid,"Columns",systemtable);
-		rbfm->insertRecord(table_filehandle,tablesdescriptor,data,rid);
-
+		rc = rbfm->insertRecord(table_filehandle,tablesdescriptor,data,rid);
+		assert( rc == 0 && "insert table should not fail");
+		//rbfm->readRecord(table_filehandle,tablesdescriptor,rid,data);
+		//rbfm->printRecord(tablesdescriptor,data);		
 		rbfm->closeFile(table_filehandle);
 		//create Columns
 		if((rbfm->createFile("Columns"))==0){
@@ -365,11 +373,14 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
 			tableid=GetFreeTableid();
 			PrepareCatalogDescriptor("Tables",tablesdescriptor);
 			CreateTablesRecord(data,tableid,tableName,0);
-			rbfm->insertRecord(filehandle,tablesdescriptor,data,rid);
+			RC rc = rbfm->insertRecord(filehandle,tablesdescriptor,data,rid);
+			assert( rc == 0 && "insert table should not fail");
+			printf("ccccccc tables rid %d,%d\n",rid.pageNum,rid.slotNum);
 			#ifdef DEBUG
 				cout<<"In createTable"<<endl;
 				rbfm->printRecord(tablesdescriptor,data);
 			#endif
+			rbfm->closeFile(filehandle);
 			if(UpdateColumns(tableid,tempattrs)==0){
 				free(data);
 				return 0;
@@ -398,8 +409,10 @@ int RelationManager::getTableId(const string &tableName){
 
 	if( scan("Tables","table-name",EQ_OP,VarChardata,attrname,rm_ScanIterator) == 0 ){
 		while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
+
 			//!!!! skip null indicator
 			memcpy(&tableid,(char *)data+1,sizeof(int));
+			printf("yoooooooooooo table id %d\n",tableid);
 			count++;
 			if(count>=2){
 				cout<<"There are two record in Tables with same table name "<<endl;
@@ -488,6 +501,7 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
 
 
 	tableid=getTableId(tableName);
+	printf("tableid ========= %d\n",tableid);
 	if( scan("Columns","table-id",EQ_OP,&tableid,attrname,rm_ScanIterator) == 0 ){
 		while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
 			printf("scan through attributes\n");
