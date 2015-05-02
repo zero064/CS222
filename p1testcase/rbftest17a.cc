@@ -60,7 +60,15 @@ int RBFTest_17a(RecordBasedFileManager *rbfm) {
     
     rc = rbfm->insertRecord(fileHandle, recordDescriptor, record, rid);
     assert(rc == success && "Inserting a record should not fail.");
-    
+   
+    RID rid2; 
+    rc = rbfm->insertRecord(fileHandle, recordDescriptor, record, rid2);
+    assert(rc == success && "Inserting a record should not fail.");
+    rc = rbfm->insertRecord(fileHandle, recordDescriptor, record, rid2);
+    assert(rc == success && "Inserting a record should not fail.");
+    rc = rbfm->insertRecord(fileHandle, recordDescriptor, record, rid2);
+    assert(rc == success && "Inserting a record should not fail.");
+
     // Given the rid, read the record from file
     rc = rbfm->readRecord(fileHandle, recordDescriptor, rid, returnedData);
     assert(rc == success && "Reading a record should not fail.");
@@ -82,11 +90,35 @@ int RBFTest_17a(RecordBasedFileManager *rbfm) {
     rc = rbfm->deleteRecord(fileHandle, recordDescriptor, rid);
     assert( rc == success && "delete the record should not fail.");
 
+    rid.slotNum = 1;
+    cout<< "delete a record " << endl;
+    rc = rbfm->deleteRecord(fileHandle, recordDescriptor, rid);
+    assert( rc == success && "delete the record should not fail.");
+
     // read the record again, it should fail
     cout<< "revisit the record " << endl;
     rc = rbfm->readRecord(fileHandle, recordDescriptor, rid, returnedData);
     assert( rc != success && "read deleted record should fail.");
 
+    // read the record again, it should not fail
+    cout<< "revisit the record " << endl;
+    rc = rbfm->readRecord(fileHandle, recordDescriptor, rid2, returnedData);
+    assert( rc == success && "read deleted record should fail.");
+    rbfm->printRecord(recordDescriptor,returnedData);
+
+    cout<< "revisit the record by scan" << endl;
+    RBFM_ScanIterator rmsi;
+    vector<string> attributes;
+    for(int i=0; i<recordDescriptor.size();i++){
+         attributes.push_back( recordDescriptor[i].name );
+    }
+    rc = rbfm->scan(fileHandle,recordDescriptor,"",NO_OP,NULL,attributes,rmsi);
+    while( rmsi.getNextRecord(rid, returnedData) != RBFM_EOF){
+	printf("%d %d\n",rid.pageNum,rid.slotNum);
+	rbfm->printRecord(recordDescriptor,returnedData);
+    }
+
+    
     // Close the file "test17a"
     rc = rbfm->closeFile(fileHandle);
     assert(rc == success && "Closing the file should not fail.");
