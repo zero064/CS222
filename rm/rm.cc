@@ -83,7 +83,7 @@ RC RelationManager::PrepareCatalogDescriptor(string tablename,vector<Attribute> 
 
 }
 
-RC RelationManager::CreateTablesRecord(void *data,int tableid,string tablename,int systemtable){
+RC RelationManager::CreateTablesRecord(void *data,int tableid,const string tablename,int systemtable){
 	int offset=0;
 	int size=tablename.size();
 	char nullind=0;
