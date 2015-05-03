@@ -57,8 +57,10 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 	Get directory to look for free page
     */
     void *formattedData;
-    short int dataSize = writeDataToBuffer(recordDescriptor,data,formattedData); // formattedData will be malloc in this function
+
+    short int dataSize = (short int)writeDataToBuffer(recordDescriptor,data,formattedData); // formattedData will be malloc in this function
     rid.pageNum = findFreePage(fileHandle, dataSize );    
+
 
     /*
 	Insert record into data
@@ -81,6 +83,7 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 	// write it yo
 	fileHandle.appendPage(pageData);
 
+	//printf("rid %d %d offset %i length %i\n",rid.pageNum,rid.slotNum,rOffset.offset,rOffset.length);
         // remember to release memory from our custom record 
 	free(formattedData);
 	free(pageData);
@@ -141,6 +144,7 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 	memcpy( (char*)pageData+PAGE_SIZE-sizeof(PageDesc)-sizeof(RecordOffset)*(pageDesc.numOfSlot+1), &newSlotOffset, sizeof(RecordOffset) );
 	memcpy( (char*)pageData+newSlotOffset.offset, formattedData, dataSize ); 
 
+//	printf("rid %d %d offset %i length %i\n",rid.pageNum,rid.slotNum+1,newSlotOffset.offset,newSlotOffset.length);
     	// update PageDesc 
 	pageDesc.numOfSlot++;
 	pageDesc.recordSize += dataSize;
@@ -196,14 +200,17 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
     FieldSize fieldSize;
     memcpy( &fieldSize, formattedData, sizeof(FieldSize) );
     if( fieldSize == TombStoneMark ){
+
+	printf("reading a tombstone %d %d\n",rOffset.offset,rOffset.length);
 	RID trid;
 	memcpy( &trid, (char*)formattedData+sizeof(FieldSize), sizeof(RID) );
 	RC rc = readRecord( fileHandle, recordDescriptor, trid, data);
+	assert( rc == SUCCESS && "read tombstone should not fail");
 	free(page);
 	free(formattedData);
 	return rc;
     }
-    //printf("offset %d length %d\n",rOffset.offset,rOffset.length);
+    printf("offset %d length %d\n",rOffset.offset,rOffset.length);
     readDataFromBuffer(recordDescriptor,data,formattedData);
     free(page);    
     free(formattedData);
@@ -345,7 +352,7 @@ size_t RecordBasedFileManager::getDataSize(const vector<Attribute> &recordDescri
 	    int len = *(int*)buffer;
 	    if(printFlag) printf("%i ",len);
 	    free(buffer);
-	    buffer = malloc(len+1);
+	    buffer = malloc(len+1);  // null terminator
 	    memcpy( buffer, (char*)data+offset, len);
 	    offset += len; 
 	    ((char *)buffer)[len]='\0';
@@ -464,6 +471,7 @@ RC RecordBasedFileManager::readDataFromBuffer(const vector<Attribute> &recordDes
     int descriptorLength = sizeof(FieldSize) + fieldOffsetDescriptorSize;  //getDataSize( recordDescriptor,data,false)
     // get old data's length 
     size_t oldDataSize = getDataSize( recordDescriptor,(char *)formattedData+descriptorLength,false);
+    printf("wtfwtf\n");
     memcpy(data,(char*)formattedData+descriptorLength,oldDataSize);
 
    // printf("offsetToData %d %d %d\n",offsetToData, nullFieldsIndicatorActualSize, numOfField); 
@@ -590,14 +598,16 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
 
 RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, const RID &rid)
 {
-    printf("will I die??\n");
+
     // read page from disk
     void *page = malloc(PAGE_SIZE);
     fileHandle.readPage( rid.pageNum, page );
+
     // get original record info    
     RecordOffset rOffset;
     memcpy( &rOffset, (char*)page+PAGE_SIZE-sizeof(PageDesc)-sizeof(RecordOffset)*(rid.slotNum+1), sizeof(RecordOffset) );
  
+    printf("original rid %d %d offset %i length %i\n",rid.pageNum,rid.slotNum,rOffset.offset,rOffset.length);
     // detect if the record we want to updata is a tombstone
     FieldSize fieldSize;
     memcpy( &fieldSize, (char*)page+rOffset.offset, sizeof(FieldSize) );
@@ -613,18 +623,27 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
 
     void *formattedData; // new updated data
     size_t dataSize = writeDataToBuffer(recordDescriptor,data,formattedData); // formattedData will be malloc in this function
-    
-   // calculate space left
+
+
+    // calculate space left
     PageDesc pageDesc; 
     memcpy( &pageDesc, (char*)page+PAGE_SIZE-sizeof(PageDesc), sizeof(PageDesc) ); 
-    size_t freeSpaceLeft = PAGE_SIZE - ( pageDesc.recordSize + sizeof(PageDesc) + sizeof(RecordOffset) * pageDesc.numOfSlot + rOffset.length);
+    // discontinous case
+    int numOfSlot = pageDesc.numOfSlot < 0 ? pageDesc.numOfSlot*-1 : pageDesc.numOfSlot;
+    int freeSpaceLeft = PAGE_SIZE - ( pageDesc.recordSize + sizeof(PageDesc) + sizeof(RecordOffset) * numOfSlot + rOffset.length);
+
+    printf("pagedesc %d %d \n",pageDesc.numOfSlot,pageDesc.recordSize);
+    printf("dataSize %i freespace %i\n",(int)dataSize,freeSpaceLeft );
 
     int sizeDiff = 0;
     // if run out of space, do tombstone
-    if( dataSize >= freeSpaceLeft ){
+    if( (int)dataSize > (int)freeSpaceLeft ){
 	// find new page to insert updated record
+	printf("tombstonr case\n");
 	RID trid;
-	if( insertRecord( fileHandle, recordDescriptor, data, trid) == FAILURE ) return FAILURE;
+
+	if( insertRecord( fileHandle, recordDescriptor, data, trid) == FAILURE ){ assert(false); return FAILURE;}
+
 
 	// write tombstone to original page 
 	int tombstoneSize = sizeof(FieldSize) + sizeof(RID);
@@ -632,46 +651,62 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
 	memcpy( (char*)page+rOffset.offset+sizeof(FieldSize), &trid, sizeof(RID) );
 
  
+
 	// pack page
 	int offsetBehindTarget = rOffset.offset + rOffset.length;
+	printf("new rid %d %d\n",trid.pageNum,trid.slotNum);
+	printf("offset %d length %d\n",rOffset.offset,rOffset.length);
+	printf("pageDesc.recordSize %d offsetBehindTarget  %d! \n",pageDesc.recordSize, offsetBehindTarget);
+
 	void *temp = malloc( pageDesc.recordSize - offsetBehindTarget );
 	memcpy( temp, (char*)page + offsetBehindTarget, pageDesc.recordSize - offsetBehindTarget );
 	memcpy( (char*)page+rOffset.offset + tombstoneSize, temp, pageDesc.recordSize - offsetBehindTarget );
 	free(temp);
 
 	// update page info and tombstone record slot 
-	pageDesc.recordSize -= ( rOffset.length - tombstoneSize );
-	sizeDiff = rOffset.length - tombstoneSize;
+	pageDesc.recordSize += ( tombstoneSize - rOffset.length);
+	sizeDiff = tombstoneSize - rOffset.length; // size shrink, sizeDiff < 0
 	rOffset.length = tombstoneSize;
 
 	memcpy( (char*)page + PAGE_SIZE - sizeof(PageDesc), &pageDesc, sizeof(PageDesc) );
 	memcpy( (char*)page + PAGE_SIZE - sizeof(PageDesc)-sizeof(RecordOffset)*(rid.slotNum+1), &rOffset, sizeof(RecordOffset) );
 	
     }else{
+
+	printf("offset %d length %d\n",rOffset.offset,rOffset.length);
+	printf("pageDesc.recordSize %d! \n",pageDesc.recordSize);
 	// move records behind the data back 
-	int recordsDataSize = pageDesc.recordSize - ( rOffset.offset + rOffset.length );
+	int recordsDataSize = pageDesc.recordSize - ( rOffset.offset + rOffset.length ); // all data size behind updated record
+	assert( recordsDataSize >= 0 && "wtf data < 0");
 	void *temp = malloc( recordsDataSize );
 	memcpy( temp, (char*)page + rOffset.offset + rOffset.length, recordsDataSize );
 	memcpy( (char*)page + rOffset.offset, formattedData, dataSize ); // paste updated data
-
 	memcpy( (char*)page + rOffset.offset + dataSize, temp, recordsDataSize ); // paste all the records back
+
+
+
 	// update page info 
-	if( (int)dataSize - (int)rOffset.length < 0 ) { printf("bug in updated\n"); return FAILURE; }
 	pageDesc.recordSize += dataSize - rOffset.length;
 	sizeDiff = dataSize - rOffset.length;
 	rOffset.length = dataSize; // update the update slot size info
-	
+	free(temp);	
+
+	memcpy( (char*)page + PAGE_SIZE - sizeof(PageDesc), &pageDesc, sizeof(PageDesc) );
+	memcpy( (char*)page + PAGE_SIZE - sizeof(PageDesc)-sizeof(RecordOffset)*(rid.slotNum+1), &rOffset, sizeof(RecordOffset) );
     }
 
+    printf("sizediff %d\n",sizeDiff);
     // update slots' offset which are behind the updated record
     for( int i=0; i<pageDesc.numOfSlot; i++ ){
 	RecordOffset slot;
 	memcpy( &slot, (char*)page + PAGE_SIZE - sizeof(PageDesc) - sizeof(RecordOffset)*(i+1), sizeof(RecordOffset) );
 	if( slot.offset > rOffset.offset ){
-	    slot.offset -= sizeDiff;
+	    
+	    slot.offset += sizeDiff;
 	    memcpy( (char*)page + PAGE_SIZE - sizeof(PageDesc) - sizeof(RecordOffset)*(i+1), &slot, sizeof(RecordOffset) );
 	}	
     }
+
     // update the updated record's slot info 
     memcpy( (char*)page + PAGE_SIZE - sizeof(PageDesc) - sizeof(RecordOffset)*(rid.slotNum+1), &rOffset, sizeof(RecordOffset) );
     fileHandle.writePage(rid.pageNum,page);

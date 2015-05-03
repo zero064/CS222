@@ -11,9 +11,9 @@ make
 ./rmtest_08
 ./rmtest_09
 ./rmtest_10
-#./rmtest_11
-#./rmtest_12
-#./rmtest_13
-#./rmtest_13b
-#./rmtest_14
-#./rmtest_15
+./rmtest_11
+./rmtest_12
+./rmtest_13
+./rmtest_13b
+./rmtest_14
+./rmtest_15

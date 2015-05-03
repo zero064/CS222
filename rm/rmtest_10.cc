@@ -39,13 +39,15 @@ RC TEST_RM_10(const string &tableName, vector<RID> &rids, vector<int> &sizes)
         sizes[i] = size;
         rids[i] = rid;
     }
-    assert(false);
+
+	cout<< " check -------------------\n";
     // Read the updated records and check the integrity
     for(int i = 0; i < 1000; i++)
     {
         memset(tuple, 0, 2000);
         memset(returnedData, 0, 2000);
         prepareLargeTuple(attrs.size(), nullsIndicator, i+10, tuple, &size);
+	cout<<"hi "<<i<<endl;
         rc = rm->readTuple(tableName, rids[i], returnedData);
         assert(rc == success && "RelationManager::readTuple() should not fail.");
 

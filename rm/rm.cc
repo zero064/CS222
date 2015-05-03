@@ -1,7 +1,7 @@
 
 #include "rm.h"
-#define DEBUG 1
-#define DEBUG1 1
+//#define DEBUG 1
+//#define DEBUG1 1
 
 RC RelationManager::PrepareCatalogDescriptor(string tablename,vector<Attribute> &attributes){
 	string tables="Tables";
@@ -681,10 +681,9 @@ RC RelationManager::updateTuple(const string &tableName, const void *data, const
 
 
 	if(IsSystemTable(tableName)==0){
-		RelationManager::getAttributes(tableName,descriptor);
+		getAttributes(tableName,descriptor);
 		if(rbfm->openFile(tableName,filehandle)==0){
 			if(rbfm->updateRecord(filehandle,descriptor,data,rid)==0){
-
 			//assert(false && "die here");
 				#ifdef DEBUG
 					cout<<"Successfully update tuple "<<endl;
@@ -693,10 +692,9 @@ RC RelationManager::updateTuple(const string &tableName, const void *data, const
 				assert( rc == 0 && "close file not successful");
 				return 0;
 			}
-
+			cout<<"update record failed\n";
 		}
-
-
+		cout<<"open file failed\n";
 	 }
 
 	#ifdef DEBUG
@@ -711,19 +709,16 @@ RC RelationManager::readTuple(const string &tableName, const RID &rid, void *dat
 	FileHandle filehandle;
 	vector<Attribute> descriptor;
 
-
-
-		RelationManager::getAttributes(tableName,descriptor);
-		if(rbfm->openFile(tableName,filehandle)==0){
-			if(rbfm->readRecord(filehandle,descriptor,rid,data)==0){
-
+	getAttributes(tableName,descriptor);
+	if(rbfm->openFile(tableName,filehandle)==0){
+		if(rbfm->readRecord(filehandle,descriptor,rid,data)==0){
 				#ifdef DEBUG
 					cout<<"Successfully read tuple "<<endl;
 				#endif
 				rbfm->closeFile(filehandle);
 				return 0;
-			}
 		}
+	}
 
 
 
