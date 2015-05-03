@@ -562,7 +562,7 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
 			memcpy(&(nullflag),data+offset,sizeof(int));
 			offset+=sizeof(int);
 			if(nullflag==1){
-				attr.length=-1;
+				attr.length=0;
 			}
 			attrs.push_back(attr);
 
