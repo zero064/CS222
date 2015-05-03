@@ -190,6 +190,7 @@ RC RelationManager::UpdateColumns(int tableid,vector<Attribute> attributes){
 	#ifdef DEBUG
 		cout<<"There is bug on UpdateColumns"<<endl;
 	#endif
+	free(data);
 	return -1;
 }
 
@@ -350,6 +351,7 @@ RC RelationManager::createCatalog()
 	#ifdef DEBUG
 		cout<<"Fail to create catalog"<<endl;
 	#endif
+
     return -1;
 }
 
@@ -412,6 +414,7 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
 	#ifdef DEBUG
 		cout<<"There is bug on createTable "<<endl;
 	#endif
+	free(data);
     return -1;
 }
 
@@ -449,6 +452,8 @@ int RelationManager::getTableId(const string &tableName){
 		free(data);
 		return tableid;
 	}
+	free(VarChardata);
+	free(data);
 	return -1;
 }
 
@@ -510,6 +515,7 @@ RC RelationManager::deleteTable(const string &tableName)
 	#ifdef DEBUG
 		cout<<"There is bug on deleteTable "<<endl;
 	#endif
+	free(data);
     return -1;
 }
 
@@ -909,6 +915,8 @@ RC RelationManager::dropAttribute(const string &tableName, const string &attribu
 	#ifdef DEBUG
 		cout<<"There is bug on dropAttribute "<<endl;
 	#endif
+	free(data);
+	free(VarChardata);
 	return -1;
 }
 RC RelationManager::printTable(const string &tableName){
@@ -948,5 +956,7 @@ RC RelationManager::printTable(const string &tableName){
 	#ifdef DEBUG
 		cout<<"There is bug on printTabale "<<endl;
 	#endif
+	free(data);
+	free(v);
 	return -1;
 }
