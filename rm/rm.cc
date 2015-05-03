@@ -475,42 +475,43 @@ RC RelationManager::deleteTable(const string &tableName)
 	PrepareCatalogDescriptor("Tables",tablesdescriptor);
 	vector<Attribute> columnsdescriptor;
 	PrepareCatalogDescriptor("Columns",columnsdescriptor);
+	if(tableName.compare("Tables") && tableName.compare("Columns")){
+		if(rbfm->destroyFile(tableName)==0){
 
-	if(rbfm->destroyFile(tableName)==0){
-
-		tableid=getTableId(tableName);
-		printf("\n\nDelete table id %d\n",tableid);
-		rbfm->openFile("Tables",filehandle);
-		if(RelationManager::scan("Tables","table-id",EQ_OP,&tableid,attrname,rm_ScanIterator)==0){
-			while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
-				rids.push_back(rid);
-			}
-			for(int j=0;j<rids.size();j++){
-				rbfm->deleteRecord(filehandle,tablesdescriptor,rids[j]);
-
-			}
-			rbfm->closeFile(filehandle);
-			rm_ScanIterator.close();
-
-			rbfm->openFile("Columns",filehandle);
-			if(RelationManager::scan("Columns","table-id",EQ_OP,&tableid,attrname,rm_ScanIterator2)==0){
-				while(rm_ScanIterator2.getNextTuple(rid,data)!=RM_EOF){
-					rbfm->deleteRecord(filehandle,columnsdescriptor,rid);
+			tableid=getTableId(tableName);
+			printf("\n\nDelete table id %d\n",tableid);
+			rbfm->openFile("Tables",filehandle);
+			if(RelationManager::scan("Tables","table-id",EQ_OP,&tableid,attrname,rm_ScanIterator)==0){
+				while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
+					rids.push_back(rid);
 				}
-				rm_ScanIterator2.close();
-				rbfm->closeFile(filehandle);
+				for(int j=0;j<rids.size();j++){
+					rbfm->deleteRecord(filehandle,tablesdescriptor,rids[j]);
 
-				free(data);
-				#ifdef DEBUG
+				}
+				rbfm->closeFile(filehandle);
+				rm_ScanIterator.close();
+
+				rbfm->openFile("Columns",filehandle);
+				if(RelationManager::scan("Columns","table-id",EQ_OP,&tableid,attrname,rm_ScanIterator2)==0){
+					while(rm_ScanIterator2.getNextTuple(rid,data)!=RM_EOF){
+						rbfm->deleteRecord(filehandle,columnsdescriptor,rid);
+					}
+					rm_ScanIterator2.close();
+					rbfm->closeFile(filehandle);
+
+					free(data);
+					#ifdef DEBUG
 					cout<<"Successfully delete "<<tableName<<endl;
-				#endif
-				return 0;
+					#endif
+					return 0;
+
+				}
+
 
 			}
-
 
 		}
-
 	}
 	#ifdef DEBUG
 		cout<<"There is bug on deleteTable "<<endl;
