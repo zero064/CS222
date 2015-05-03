@@ -1,7 +1,7 @@
 
 #include "rm.h"
 //#define DEBUG 1
-//#define DEBUG1 1
+#define DEBUG1 1
 
 RC RelationManager::PrepareCatalogDescriptor(string tablename,vector<Attribute> &attributes){
 	string tables="Tables";
@@ -885,33 +885,37 @@ RC RelationManager::dropAttribute(const string &tableName, const string &attribu
 	int offset = 0;
 
 
-
-	tableid=getTableId(tableName);
-	if(RelationManager::scan("Columns","table-id",EQ_OP,&tableid,attrname,rm_ScanIterator)==0){
-		while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
-			//skip null indicator and tableid
-			memcpy(VarChardata,(char *)data+1+sizeof(int),50);
-			VarCharToString(data,tempstr);
-			if(tempstr.compare(attributeName)==0){
-			//skip null indicatior
-				nullflag=1;
-				offset=1+2*sizeof(int)+tempstr.size()+3*sizeof(int);
-				memcpy((char *)data+offset,&nullflag,sizeof(int));
-				rbfm->openFile("Columns",filehandle);
-				PrepareCatalogDescriptor("Columns",descriptor);
-				if(rbfm->updateRecord(filehandle,descriptor,data,rid)==0){
-					rm_ScanIterator.close();
-					free(data);
-					free(VarChardata);
-					#ifdef DEBUG
-						cout<<"Successfully dropAttribute "<<endl;
-					#endif
-					rbfm->closeFile(filehandle);
-					return 0;
+	if(tableName.compare("Tables") && tableName.compare("Columns")){
+		tableid=getTableId(tableName);
+		if(RelationManager::scan("Columns","table-id",EQ_OP,&tableid,attrname,rm_ScanIterator)==0){
+			while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
+				//skip null indicator and tableid
+				memcpy(VarChardata,(char *)data+1+sizeof(int),50);
+				VarCharToString(VarChardata,tempstr);
+				//#ifdef DEBUG1
+				//	cout<<"Successfully dropAttribute "<<endl;
+				//#endif
+				if(tempstr.compare(attributeName)==0){
+					//skip null indicatior
+					nullflag=1;
+					offset=1+2*sizeof(int)+tempstr.size()+3*sizeof(int);
+					memcpy((char *)data+offset,&nullflag,sizeof(int));
+					rbfm->openFile("Columns",filehandle);
+					PrepareCatalogDescriptor("Columns",descriptor);
+					if(rbfm->updateRecord(filehandle,descriptor,data,rid)==0){
+						rm_ScanIterator.close();
+						free(data);
+						free(VarChardata);
+						#ifdef DEBUG
+							cout<<"Successfully dropAttribute "<<endl;
+						#endif
+						rbfm->closeFile(filehandle);
+						return 0;
+					}
 				}
 			}
-		}
 
+		}
 	}
 	#ifdef DEBUG
 		cout<<"There is bug on dropAttribute "<<endl;
@@ -935,7 +939,7 @@ RC RelationManager::printTable(const string &tableName){
 
 
 	void *v = malloc(1);
-	if( scan("Tables","",NO_OP,v,attrname,rm_ScanIterator)==0 ){
+	if( scan(tableName,"",NO_OP,v,attrname,rm_ScanIterator)==0 ){
 
 		while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
 			//!!!! skip null indicator
