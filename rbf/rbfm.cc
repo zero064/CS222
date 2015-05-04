@@ -511,16 +511,38 @@ size_t RecordBasedFileManager::writeDataToBuffer(const vector<Attribute> &record
 RC RecordBasedFileManager::readDataFromBuffer(const vector<Attribute> &recordDescriptor, void *data, const void *formattedData)
 {
     int offset = 0;  // offset for const void data ( original data format )
+    vector<Attribute> pastdescriptor;
+    int fieldNum;
+    int offset1=sizeof(short int);
+    short int attrOffset;
+    int nonNull=0;
+    memcpy(&fieldNum,(char *) formattedData,sizeof(short int));
+    for(int i0=0;i0<fieldNum;i0++){
+    	pastdescriptor.push_back(recordDescriptor[i0]);
 
-    // get null indicator's size 
-    int nullFieldsIndicatorActualSize = ceil((double) recordDescriptor.size() / CHAR_BIT);
+    	memcpy(&attrOffset,(char *)data+offset1,sizeof(short int));
+    	offset1+=sizeof(short int);
+
+    	if(attrOffset==PAGE_SIZE){
+    		pastdescriptor[i0].length=0;
+    	}else{
+        	pastdescriptor[i0].length=4;
+        	nonNull++;
+    	}
+
+    }
+
+    // get null indicator's size
+    //int nullFieldsIndicatorActualSize = ceil((double) recordDescriptor.size() / CHAR_BIT);
+    int nullFieldsIndicatorActualSize = ceil((double) nonNull / CHAR_BIT);
+
     offset += nullFieldsIndicatorActualSize;
     // get field offset descriptor array length
-    int fieldOffsetDescriptorSize = sizeof(unsigned short int) * recordDescriptor.size();
+    int fieldOffsetDescriptorSize = sizeof(unsigned short int) * pastdescriptor.size();
     // get descriptor length 
     int descriptorLength = sizeof(FieldSize) + fieldOffsetDescriptorSize;  //getDataSize( recordDescriptor,data,false)
     // get old data's length 
-    size_t oldDataSize = getDataSize( recordDescriptor,(char *)formattedData+descriptorLength,false);
+    size_t oldDataSize = getDataSize( pastdescriptor,(char *)formattedData+descriptorLength,false);
     printf("wtfwtf\n");
     memcpy(data,(char*)formattedData+descriptorLength,oldDataSize);
 
