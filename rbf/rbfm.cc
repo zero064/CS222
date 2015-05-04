@@ -326,56 +326,70 @@ PageNum RecordBasedFileManager::findFreePage(FileHandle &fileHandle,int recordSi
 // used to calculate the orignal data format's size from given test data
 // put the flag here for options of printing 
 size_t RecordBasedFileManager::getDataSize(const vector<Attribute> &recordDescriptor, const void *data, bool printFlag){
-    int nullFieldsIndicatorActualSize = ceil((double) recordDescriptor.size() / CHAR_BIT), offset = 0;  
+
+
+    //count non-null attribute
+    int nonNull=0;
+    for(int i=0;i<recordDescriptor.size();i++){
+    	if(recordDescriptor[i].length){
+    		nonNull++;
+    	}
+    }
+    // get null indicator's size
+
+    int nullFieldsIndicatorActualSize = ceil((double) nonNull / CHAR_BIT);
+	//int nullFieldsIndicatorActualSize = ceil((double) recordDescriptor.size() / CHAR_BIT)
+    int offset = 0;
     unsigned char *nullFieldsIndicator = (unsigned char *) malloc(nullFieldsIndicatorActualSize);
     memcpy(nullFieldsIndicator, data, nullFieldsIndicatorActualSize);
     offset += nullFieldsIndicatorActualSize;
-
+    int k=0;
     for(int i=0; i<recordDescriptor.size(); i++){
-	Attribute attribute = recordDescriptor[i];
-	string name = attribute.name;
-	AttrLength length = attribute.length;
-	AttrType type = attribute.type;
-
-	if(printFlag) printf("%d %s %d ",i,name.c_str(),length);
+    		Attribute attribute = recordDescriptor[i];
+			string name = attribute.name;
+			AttrLength length = attribute.length;
+			AttrType type = attribute.type;
+		if(attribute.length){
+			if(printFlag) printf("%d %s %d ",i,name.c_str(),length);
 	
-	if( nullFieldsIndicator[i/8] & (1 << (7-(i%8)) ) ){
-	    if(printFlag) printf("null\n");
-	    continue;
-	}
+			if( nullFieldsIndicator[k/8] & (1 << (7-(k%8)) ) ){
+	    		if(printFlag) printf("null\n");
+	    		continue;
+			}
 
-	void *buffer;
-	if( type == TypeVarChar ){
-	    buffer = malloc(sizeof(int));
-	    memcpy( buffer , (char*)data+offset, sizeof(int));
-	    offset += sizeof(int);
-	    int len = *(int*)buffer;
-	    if(printFlag) printf("%i ",len);
-	    free(buffer);
-	    buffer = malloc(len+1);  // null terminator
-	    memcpy( buffer, (char*)data+offset, len);
-	    offset += len; 
-	    ((char *)buffer)[len]='\0';
-	    if(printFlag) printf("%s\n",buffer);
-	    free(buffer);
-	    continue; 
-	}
-	std::size_t size;
-	if( type == TypeReal ){
-	    size = sizeof(float);
-	    buffer = malloc(size);
-	    memcpy( buffer , (char*)data+offset, size);
-	    offset += size;
-	    if(printFlag) printf("%f \n",*(float*)buffer);
-	} else{
-	    size = sizeof(int);
-	    buffer = malloc(size);
-	    memcpy( buffer , (char*)data+offset, size);
-	    offset += size;
-	    if(printFlag) printf("%i \n",*(int*)buffer);
-	}
-	free(buffer);
-	
+			void *buffer;
+			if( type == TypeVarChar ){
+	    		buffer = malloc(sizeof(int));
+	    		memcpy( buffer , (char*)data+offset, sizeof(int));
+	    		offset += sizeof(int);
+	    		int len = *(int*)buffer;
+	    		if(printFlag) printf("%i ",len);
+	    		free(buffer);
+	    		buffer = malloc(len+1);  // null terminator
+	    		memcpy( buffer, (char*)data+offset, len);
+	    		offset += len;
+	    		((char *)buffer)[len]='\0';
+	    		if(printFlag) printf("%s\n",buffer);
+	    		free(buffer);
+	    		continue;
+			}
+			std::size_t size;
+			if( type == TypeReal ){
+	    		size = sizeof(float);
+	    		buffer = malloc(size);
+	    		memcpy( buffer , (char*)data+offset, size);
+	    		offset += size;
+	    		if(printFlag) printf("%f \n",*(float*)buffer);
+			} else{
+	    		size = sizeof(int);
+	    		buffer = malloc(size);
+	    		memcpy( buffer , (char*)data+offset, size);
+	    		offset += size;
+	    		if(printFlag) printf("%i \n",*(int*)buffer);
+			}
+			free(buffer);
+			k++;
+		}
     }
     if(printFlag) printf("given size %d\n",offset);
     free(nullFieldsIndicator);
@@ -388,11 +402,21 @@ size_t RecordBasedFileManager::getDataSize(const vector<Attribute> &recordDescri
 // need to free formattedData after called this function
 size_t RecordBasedFileManager::writeDataToBuffer(const vector<Attribute> &recordDescriptor, const void *data, void * &formattedData){
     int offset = 0;  // offset for const void data ( original data format )
+    //count non-null attribute
+    int nonNull=0;
+    for(int i=0;i<recordDescriptor.size();i++){
+    	if(recordDescriptor[i].length){
+    		nonNull++;
+    	}
+    }
+
 
     // get null indicator's size 
-    int nullFieldsIndicatorActualSize = ceil((double) recordDescriptor.size() / CHAR_BIT);
+    //int nullFieldsIndicatorActualSize = ceil((double) recordDescriptor.size() / CHAR_BIT);
+    int nullFieldsIndicatorActualSize = ceil((double) nonNull / CHAR_BIT);
     offset += nullFieldsIndicatorActualSize;
     // get field offset descriptor array
+
     unsigned short int *fieldOffsetDescriptor = (unsigned short int *)malloc( sizeof(unsigned short int) * recordDescriptor.size() );
     int fieldOffsetDescriptorSize = sizeof(unsigned short int) * recordDescriptor.size();
     // number of field ( 2 byte )
@@ -406,29 +430,55 @@ size_t RecordBasedFileManager::writeDataToBuffer(const vector<Attribute> &record
     memcpy( nullFieldsIndicator, data , nullFieldsIndicatorActualSize );
 
     // calculate offset from data
+    int k = 0;//pointing to non-null Attr
     for(int i=0; i<recordDescriptor.size(); i++){
-	Attribute attribute = recordDescriptor[i];
-	AttrType type = attribute.type;
-	// if null indicator has more than 1 byte , annoying ~"~
-	if( ((unsigned char*)nullFieldsIndicator)[ (0+i) / CHAR_BIT ] & (1 << (7-(i%8)) ) ){
-	    printf("null\n");
-	    continue;
-	}
 
-	fieldOffsetDescriptor[i] = descriptorLength + offset;
-	//int formattedOffset = descriptorLength + offset - nullFieldsIndicatorActualSize;
-	//printf("i %d f offset %d o offset %d \n",fieldOffset+i, formattedOffset , offset );
-	//descriptor[fieldOffset+i] = (unsigned char)formattedOffset;  // assign each field's offet to descriptor
-	if( type == TypeVarChar ){
-	    int len;
-	    memcpy( &len, (char*)data+offset, sizeof(int));
-	    offset += len + sizeof(int);
-	    //printf("string offset %i %i\n",len,offset);
-	}else if(type == TypeReal){
-	    offset += sizeof(float);
-	}else if(type == TypeInt){
-	    offset += sizeof(int);
-	}
+
+    	Attribute attribute = recordDescriptor[i];
+    	AttrType type = attribute.type;
+    	if(attribute.length==0){
+    	// if null indicator has more than 1 byte , annoying ~"~
+
+
+    		fieldOffsetDescriptor[i] = PAGE_SIZE;
+    		//int formattedOffset = descriptorLength + offset - nullFieldsIndicatorActualSize;
+    		//printf("i %d f offset %d o offset %d \n",fieldOffset+i, formattedOffset , offset );
+    		//descriptor[fieldOffset+i] = (unsigned char)formattedOffset;  // assign each field's offet to descriptor
+    		/*if( type == TypeVarChar ){
+    			int len;
+    			memcpy( &len, (char*)data+offset, sizeof(int));
+    			offset += len + sizeof(int);
+    			//printf("string offset %i %i\n",len,offset);
+    		}else if(type == TypeReal){
+    			offset += sizeof(float);
+    		}else if(type == TypeInt){
+    			offset += sizeof(int);
+    		}*/
+    	}else{
+
+        	// if null indicator has more than 1 byte , annoying ~"~
+        		if( ((unsigned char*)nullFieldsIndicator)[ (0+k) / CHAR_BIT ] & (1 << (7-(k%8)) ) ){
+        			printf("null\n");
+        			fieldOffsetDescriptor[i] = descriptorLength + offset;
+        			continue;
+        		}
+
+        		fieldOffsetDescriptor[i] = descriptorLength + offset;
+        		//int formattedOffset = descriptorLength + offset - nullFieldsIndicatorActualSize;
+        		//printf("i %d f offset %d o offset %d \n",fieldOffset+i, formattedOffset , offset );
+        		//descriptor[fieldOffset+i] = (unsigned char)formattedOffset;  // assign each field's offet to descriptor
+        		if( type == TypeVarChar ){
+        			int len;
+        			memcpy( &len, (char*)data+offset, sizeof(int));
+        			offset += len + sizeof(int);
+        			//printf("string offset %i %i\n",len,offset);
+        		}else if(type == TypeReal){
+        			offset += sizeof(float);
+        		}else if(type == TypeInt){
+        			offset += sizeof(int);
+        		}
+        		k++;
+    	}
     }	
 
 /*
