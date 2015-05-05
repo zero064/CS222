@@ -3,6 +3,7 @@
 #include <string.h>
 #include <math.h>
 #include <iostream>
+#define DEBUG 1
 
 RecordBasedFileManager* RecordBasedFileManager::_rbf_manager = 0;
 
@@ -336,11 +337,15 @@ size_t RecordBasedFileManager::getDataSize(const vector<Attribute> &recordDescri
     	}
     }
     // get null indicator's size
+	#ifdef DEBUG
+    	printf("nonNull is %d\n",nonNull);
+    #endif
 
     int nullFieldsIndicatorActualSize = ceil((double) nonNull / CHAR_BIT);
 	//int nullFieldsIndicatorActualSize = ceil((double) recordDescriptor.size() / CHAR_BIT)
     int offset = 0;
     unsigned char *nullFieldsIndicator = (unsigned char *) malloc(nullFieldsIndicatorActualSize);
+    memset(nullFieldsIndicator,0,nullFieldsIndicatorActualSize);
     memcpy(nullFieldsIndicator, data, nullFieldsIndicatorActualSize);
     offset += nullFieldsIndicatorActualSize;
     int k=0;
@@ -354,6 +359,7 @@ size_t RecordBasedFileManager::getDataSize(const vector<Attribute> &recordDescri
 	
 			if( nullFieldsIndicator[k/8] & (1 << (7-(k%8)) ) ){
 	    		if(printFlag) printf("null\n");
+	    		k++;
 	    		continue;
 			}
 
@@ -371,6 +377,7 @@ size_t RecordBasedFileManager::getDataSize(const vector<Attribute> &recordDescri
 	    		((char *)buffer)[len]='\0';
 	    		if(printFlag) printf("%s\n",buffer);
 	    		free(buffer);
+	    		k++;
 	    		continue;
 			}
 			std::size_t size;
