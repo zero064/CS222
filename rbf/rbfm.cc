@@ -467,6 +467,7 @@ size_t RecordBasedFileManager::writeDataToBuffer(const vector<Attribute> &record
         		if( ((unsigned char*)nullFieldsIndicator)[ (0+k) / CHAR_BIT ] & (1 << (7-(k%8)) ) ){
         			printf("null\n");
         			fieldOffsetDescriptor[i] = descriptorLength + offset;
+        			k++;
         			continue;
         		}
 
@@ -559,6 +560,9 @@ RC RecordBasedFileManager::readDataFromBuffer(const vector<Attribute> &recordDes
     int pastoffset=descriptorLength+nullFieldsIndicatorActualSize;
     int currentoffset=0;
     for(int i1=0;i1<recordDescriptor.size();i1++){
+	#ifdef DEBUG
+    	printf("\n%d at the beginning currentoffset is %d pastoffset is %d\n",i1,currentoffset,pastoffset);
+	#endif
     	if(i1<pastdescriptor.size()){
     		if(pastdescriptor[i1].length){
     			if(recordDescriptor[i1].length){
@@ -571,19 +575,48 @@ RC RecordBasedFileManager::readDataFromBuffer(const vector<Attribute> &recordDes
     	        			memcpy( (char *)tempbuffer+currentoffset, (char*)formattedData+pastoffset, sizeof(int)+len);
     	        			pastoffset += len + sizeof(int);
     	        			currentoffset+=len+sizeof(int);
+							#ifdef DEBUG
+    	        				printf("\nTypeVarChar copy current offset is %d pastoffset is %d\n",currentoffset,pastoffset);
+							#endif
     	        			//printf("string offset %i %i\n",len,offset);
     	        		}else if(pastdescriptor[i1].type == TypeReal){
     	        			memcpy( (char *)tempbuffer+currentoffset, (char*)formattedData+pastoffset, sizeof(float));
     	        			pastoffset += sizeof(float);
     	        			currentoffset += sizeof(float);
+							#ifdef DEBUG
+    	        				printf("\nTypeReal copy current offset is %d pastoffset is %d\n",currentoffset,pastoffset);
+							#endif
     	        		}else if(pastdescriptor[i1].type == TypeInt){
     	        			memcpy( (char *)tempbuffer+currentoffset, (char*)formattedData+pastoffset, sizeof(int));
     	        			pastoffset += sizeof(int);
     	        			currentoffset += sizeof(int);
+							#ifdef DEBUG
+    	        				printf("\nTypeInt copy current offset is %d pastoffset is %d\n",currentoffset,pastoffset);
+							#endif
     	        		}
     				}
 
     				currentNonNullAttr++;
+    			}else{
+    				if( pastdescriptor[i1].type == TypeVarChar ){
+    				    int len;
+    				    memcpy( &len, (char*)formattedData+pastoffset, sizeof(int));
+    				    pastoffset += len + sizeof(int);
+    					#ifdef DEBUG
+    				    	printf("\nTypeVarChar copy current offset is %d pastoffset is %d\n",currentoffset,pastoffset);
+    					#endif
+    				    //printf("string offset %i %i\n",len,offset);
+    				    }else if(pastdescriptor[i1].type == TypeReal){
+    				    pastoffset += sizeof(float);
+    					#ifdef DEBUG
+    				    	printf("\nTypeReal copy current offset is %d pastoffset is %d\n",currentoffset,pastoffset);
+    					#endif
+    				    }else if(pastdescriptor[i1].type == TypeInt){
+    				    pastoffset += sizeof(int);
+    					#ifdef DEBUG
+    				    	printf("\nTypeInt copy current offset is %d pastoffset is %d\n",currentoffset,pastoffset);
+    					#endif
+    				    	        		}
     			}
     			pastNonNullAttr++;
     		}
@@ -593,7 +626,9 @@ RC RecordBasedFileManager::readDataFromBuffer(const vector<Attribute> &recordDes
     			currentNonNullAttr++;
     		}
     	}
-
+	#ifdef DEBUG
+    	printf("\n%i at the end currentoffset is %d pastoffset is %d\n",i1,currentoffset,pastoffset);
+	#endif
     }
 	#ifdef DEBUG
     	cout<<"pastNonNullAttr: "<<pastNonNullAttr<<endl;
