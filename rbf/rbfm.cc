@@ -535,18 +535,75 @@ RC RecordBasedFileManager::readDataFromBuffer(const vector<Attribute> &recordDes
     // get null indicator's size
     //int nullFieldsIndicatorActualSize = ceil((double) recordDescriptor.size() / CHAR_BIT);
     int nullFieldsIndicatorActualSize = ceil((double) nonNull / CHAR_BIT);
-
-    offset += nullFieldsIndicatorActualSize;
-    // get field offset descriptor array length
     int fieldOffsetDescriptorSize = sizeof(unsigned short int) * pastdescriptor.size();
-    // get descriptor length 
+    // get descriptor length
     int descriptorLength = sizeof(FieldSize) + fieldOffsetDescriptorSize;  //getDataSize( recordDescriptor,data,false)
-    // get old data's length 
-    size_t oldDataSize = getDataSize( pastdescriptor,(char *)formattedData+descriptorLength,false);
+
+    char * nullIndicator=(char *)malloc(PAGE_SIZE);
+
+    //CREATE null indicator for data
+    memcpy(nullIndicator,(char *)formattedData+descriptorLength,nullFieldsIndicatorActualSize);
+    int pastNonNullAttr=0;
+    int currentNonNullAttr=0;
+    int currentNonNull=0;
+    char *newnullIndicator=(char *)malloc(PAGE_SIZE);
+    memset(newnullIndicator,0,PAGE_SIZE);
+    char * tempbuffer=(char *)malloc(PAGE_SIZE);
+    int pastoffset=descriptorLength+nullFieldsIndicatorActualSize;
+    int currentoffset=0;
+    for(int i1=0;i1<recordDescriptor.size();i1++){
+    	if(i1<pastdescriptor.size()){
+    		if(pastdescriptor[i1].length){
+    			if(recordDescriptor[i1].length){
+    				if(nullIndicator[pastNonNullAttr / 8] & (1 << (7-(pastNonNullAttr%8)))){
+    					newnullIndicator[currentNonNullAttr / 8] += (1 << (7-(currentNonNullAttr%8)));
+    				}else{
+    	        		if( pastdescriptor[i1].type == TypeVarChar ){
+    	        			int len;
+    	        			memcpy( &len, (char*)formattedData+pastoffset, sizeof(int));
+    	        			memcpy( (char *)tempbuffer+currentoffset, (char*)formattedData+pastoffset, sizeof(int)+len);
+    	        			pastoffset += len + sizeof(int);
+    	        			currentoffset+=len+sizeof(int);
+    	        			//printf("string offset %i %i\n",len,offset);
+    	        		}else if(pastdescriptor[i1].type == TypeReal){
+    	        			memcpy( (char *)tempbuffer+currentoffset, (char*)formattedData+pastoffset, sizeof(float));
+    	        			pastoffset += sizeof(float);
+    	        			currentoffset += sizeof(float);
+    	        		}else if(pastdescriptor[i1].type == TypeInt){
+    	        			memcpy( (char *)tempbuffer+currentoffset, (char*)formattedData+pastoffset, sizeof(int));
+    	        			pastoffset += sizeof(int);
+    	        			currentoffset += sizeof(int);
+    	        		}
+    				}
+
+    				currentNonNullAttr++;
+    			}
+    			pastNonNullAttr++;
+    		}
+    	}else{
+    		if(recordDescriptor[i1].length){
+    			newnullIndicator[currentNonNullAttr / 8] += (1 << (7-(currentNonNullAttr%8)));
+    			currentNonNullAttr++;
+    		}
+    	}
+
+    }
+	#ifdef DEBUG
+    	cout<<"pastNonNullAttr: "<<pastNonNullAttr<<endl;
+    	cout<<"currentNonNullAttr: "<<currentNonNullAttr<<endl;
+	#endif
+
+    int newnullFieldsIndicatorActualSize = ceil((double) currentNonNullAttr / CHAR_BIT);
+
+
     printf("wtfwtf\n");
-    memcpy(data,(char*)formattedData+descriptorLength,oldDataSize);
+    memcpy(data,(char*)newnullIndicator,newnullFieldsIndicatorActualSize);
+    memcpy((char *)data+newnullFieldsIndicatorActualSize,tempbuffer,currentoffset);
 
    // printf("offsetToData %d %d %d\n",offsetToData, nullFieldsIndicatorActualSize, numOfField); 
+    free(nullIndicator);
+    free(newnullIndicator);
+    free(tempbuffer);
     return SUCCESS;
 }
 
