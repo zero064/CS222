@@ -27,7 +27,7 @@ RecordBasedFileManager::~RecordBasedFileManager()
 
 RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor, const void *data) {
     getDataSize( recordDescriptor, data, true );
-    return -1;
+    return 0;
 }
 
 
