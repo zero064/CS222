@@ -17,3 +17,5 @@ make
 ./rmtest_13b
 ./rmtest_14
 ./rmtest_15
+./rmtest_extra_1
+./rmtest_extra_2

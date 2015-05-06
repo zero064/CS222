@@ -87,7 +87,7 @@ protected:
 private:
   static RelationManager *_rm;
 
-  RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
+  RecordBasedFileManager *rbfm; 
   int VarCharToString(void *data, string &str);
   int GetFreeTableid();
   int getTableId(const string &tableName);

@@ -81,7 +81,7 @@ class RecordBasedFileManager;
 
 class RBFM_ScanIterator {
 public:
-  RBFM_ScanIterator() { };
+  RBFM_ScanIterator() { pageNum = 1; };
   ~RBFM_ScanIterator() { };
 
   RC initScanIterator(FileHandle &fileHandle,
@@ -106,7 +106,7 @@ private:
      CompOp compOp;
      void *value, *page;
      vector<string> attributeNames;
-     unsigned pageNum = 1; 
+     unsigned pageNum; 
      RID c_rid; PageDesc pageDesc;
      RC getFormattedRecord(void *returnedData, void *data);
 };

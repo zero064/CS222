@@ -292,6 +292,7 @@ RelationManager* RelationManager::instance()
 
 RelationManager::RelationManager()
 {
+    rbfm = RecordBasedFileManager::instance();
 }
 
 RelationManager::~RelationManager()
