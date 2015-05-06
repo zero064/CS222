@@ -520,7 +520,7 @@ RC RecordBasedFileManager::readDataFromBuffer(const vector<Attribute> &recordDes
 {
     int offset = 0;  // offset for const void data ( original data format )
     vector<Attribute> pastdescriptor;
-    int fieldNum;
+    short int fieldNum;
     int offset1=sizeof(short int);
     short int attrOffset;
     int nonNull=0;
@@ -528,7 +528,7 @@ RC RecordBasedFileManager::readDataFromBuffer(const vector<Attribute> &recordDes
     for(int i0=0;i0<fieldNum;i0++){
     	pastdescriptor.push_back(recordDescriptor[i0]);
 
-    	memcpy(&attrOffset,(char *)data+offset1,sizeof(short int));
+    	memcpy(&attrOffset,(char *)formattedData+offset1,sizeof(short int));
     	offset1+=sizeof(short int);
 
     	if(attrOffset==PAGE_SIZE){
