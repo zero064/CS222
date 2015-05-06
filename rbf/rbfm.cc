@@ -975,6 +975,10 @@ RC RBFM_ScanIterator::getFormattedRecord(void *returnedData, void *data)
     // get descriptor length 
     int descriptorLength = sizeof(short int) + fieldOffsetDescriptorSize;  
 
+    // fieldSize in record
+    FieldSize fieldSize;
+    memcpy( &fieldSize, returnedData, sizeof(fieldSize) );
+
 
     unsigned int nullFieldsIndicatorActualSize = ceil((double)attributeNames.size() / CHAR_BIT );
     unsigned char *nullIndicator = (unsigned char*)malloc( nullFieldsIndicatorActualSize );
@@ -985,14 +989,21 @@ RC RBFM_ScanIterator::getFormattedRecord(void *returnedData, void *data)
 	for(int j=0; j<recordDescriptor.size(); j++){
 	    if( attributeNames[i].compare( recordDescriptor[j].name ) == 0 ){
 		AttrType type = recordDescriptor[j].type;
-		
+
+		// deleted attribute
+		if( recordDescriptor[j].length == 0 ){
+		    continue;
+		}
+
+	
 		int o_nullIndicatorOffet = ( j / CHAR_BIT );  // null indicator position in original data
 		//printf("sup j %d\n",o_nullIndicatorOffet);
 		char o_nullIndicator; // null indicator in oringinal data
 		// copy original data's null indicator byte set
 		memcpy( &o_nullIndicator, (char*)returnedData + descriptorLength + o_nullIndicatorOffet , sizeof(char));
+
 	    	// if it's null 
-		if( o_nullIndicator & (1 << (7-(j%8)))  ){
+		if( o_nullIndicator & (1 << (7-(j%8))) || j+1 > fieldSize  ){
 		    nullIndicator[ i / 8 ] = ( 1 << (7 - (i%8))  ) ;
 		    break;
 		}
@@ -1094,6 +1105,12 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 		if( nullIndicator & (1 << (7-(i%8))) && compOp != NO_OP) {
 		    break;
 		}
+		
+		if( fieldSize < i ){
+		    // it means old data, which attribute we want is null
+		    break;
+		}
+
 		FieldOffset offset = 0;
 		memcpy(&offset, (char*)returnedData + sizeof(FieldSize) + sizeof(FieldOffset) * i, sizeof(FieldOffset));
 		int t_len = 0;
