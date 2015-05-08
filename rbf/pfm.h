@@ -1,5 +1,7 @@
 #ifndef _pfm_h_
 #define _pfm_h_
+    
+#define NDEBUG 
 
 #include <string>
 #include <climits>
@@ -25,18 +27,28 @@ struct DirectoryDesc{
 #define FAILURE -1
 
 
-#ifdef NDEBUG
-#define debug_print(fmt, ...) fprintf(stderr, fmt, __VA_ARGS__)
-#else
-#define debug_print(fmt, ...) do {} while (0)
-#endif
-
 using namespace std;
+
+class DebugMsg
+{
+    public:
+	void dprintf(const char *format, ... ){
+	    if( !debug ) return;
+	    va_list args;
+	    va_start(args,format);
+	    vprintf(format,args);
+	    va_end(args);
+	};
+    protected:
+	bool debug;
+	DebugMsg(){ debug = false; };
+	~DebugMsg(){};
+}; 
+
 
 class FileHandle;
 
-
-class PagedFileManager
+class PagedFileManager : public DebugMsg
 {
 public:
     static PagedFileManager* instance();                     // Access to the _pf_manager instance
@@ -56,7 +68,7 @@ private:
 };
 
 
-class FileHandle
+class FileHandle : public DebugMsg
 {
 public:
     // variables to keep counter for each operation
@@ -82,5 +94,6 @@ private:
     FILE *filePointer;  // a file pointer to write Pages into disk
     unsigned numberOfPages;
 }; 
+
 
 #endif

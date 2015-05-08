@@ -3,7 +3,6 @@
 #include <string.h>
 #include <math.h>
 #include <iostream>
-#define DEBUG 1
 
 RecordBasedFileManager* RecordBasedFileManager::_rbf_manager = 0;
 
@@ -32,24 +31,19 @@ RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor
 
 
 RC RecordBasedFileManager::createFile(const string &fileName) {
-    printf("createFile\n");
     return pagedFileManager->createFile(fileName);
-    //return -1;
 }
 
 RC RecordBasedFileManager::destroyFile(const string &fileName) {
     return pagedFileManager->destroyFile(fileName);
-    //return -1;
 }
 
 RC RecordBasedFileManager::openFile(const string &fileName, FileHandle &fileHandle) {
     return pagedFileManager->openFile(fileName,fileHandle);
-    //return -1;
 }
 
 RC RecordBasedFileManager::closeFile(FileHandle &fileHandle) {
     return pagedFileManager->closeFile(fileHandle);
-    //return -1;
 }
 
 RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, RID &rid) {
@@ -84,16 +78,13 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 	// write it yo
 	fileHandle.appendPage(pageData);
 
-	//printf("rid %d %d offset %i length %i\n",rid.pageNum,rid.slotNum,rOffset.offset,rOffset.length);
+	dprintf("rid %d %d offset %i length %i\n",rid.pageNum,rid.slotNum,rOffset.offset,rOffset.length);
         // remember to release memory from our custom record 
 	free(formattedData);
 	free(pageData);
 	return SUCCESS;
 
     }else{
-	//short int index = 0;
-	//memcpy(&index, (char*)pageData+PAGE_SIZE-sizeof(short int) ,sizeof(short int));
-	//int offset = 0;
 
 	// read page descriptor for slot and record information
 	PageDesc pageDesc;
@@ -108,7 +99,7 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 		memcpy( &rOffset[i] , (char*)pageData+PAGE_SIZE-sizeof(PageDesc)-sizeof(RecordOffset)*(i+1),sizeof(RecordOffset) );
 	    }
 	    //memcpy(rOffset, (char*)pageData+PAGE_SIZE-sizeof(PageDesc)-sizeof(RecordOffset)*numOfSlot ,sizeof(RecordOffset)*numOfSlot );
-	    //printf("offset %d , length %d\n", rOffset.offset, rOffset.length); 
+	    dprintf("offset %d , length %d\n", rOffset->offset, rOffset->length); 
 
 	    for( int i=0; i< numOfSlot; i++) {
 		// found previous deleted slot to use
@@ -145,13 +136,12 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 	memcpy( (char*)pageData+PAGE_SIZE-sizeof(PageDesc)-sizeof(RecordOffset)*(pageDesc.numOfSlot+1), &newSlotOffset, sizeof(RecordOffset) );
 	memcpy( (char*)pageData+newSlotOffset.offset, formattedData, dataSize ); 
 
-//	printf("rid %d %d offset %i length %i\n",rid.pageNum,rid.slotNum+1,newSlotOffset.offset,newSlotOffset.length);
+	dprintf("rid %d %d offset %i length %i\n",rid.pageNum,rid.slotNum+1,newSlotOffset.offset,newSlotOffset.length);
     	// update PageDesc 
 	pageDesc.numOfSlot++;
 	pageDesc.recordSize += dataSize;
 	memcpy( (char*)pageData+PAGE_SIZE-sizeof(PageDesc), &pageDesc , sizeof(PageDesc) );
 	rid.slotNum = pageDesc.numOfSlot-1; // last index = size -1 ^.<
-//	printf("wwwwwwwwww %d\n",rid.slotNum);
 
 	// write it to file
 	RC rc = fileHandle.writePage(rid.pageNum,pageData);
@@ -162,7 +152,7 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 	return SUCCESS;
     }
 
-    assert(false); 
+    assert(false && "Something went wrong in inserting new record\n"); 
 
     // remember to release memory from our custom record 
     free(formattedData);
@@ -174,23 +164,21 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, void *data) {
     void *page = malloc(PAGE_SIZE);
     if( fileHandle.readPage(rid.pageNum,page) == FAILURE ){
-	//printf("Yo readRecord failed dude (wrong page)\n");
+	assert(false && "Yo readRecord failed dude (wrong page)\n");
 	return FAILURE;
     }
 
     // read slot info 
     short int index = rid.slotNum+1;
-    //printf("slot %d\n",rid.slotNum);
     RecordOffset rOffset;
-    //printf("~~~~%d\n",rid.slotNum);//sizeof(RecordOffset)*index);
     memcpy( &rOffset, (char*)page+PAGE_SIZE-sizeof(PageDesc)-sizeof(RecordOffset)*index, sizeof(RecordOffset) );
     
     PageDesc pageDesc;
     memcpy( &pageDesc, (char*)page+PAGE_SIZE-sizeof(PageDesc), sizeof(PageDesc) );
 
     if( rOffset.offset == DeletedSlotMark ){
-	//printf("page %d slot %d listsize %d\n",rid.pageNum,rid.slotNum,pageDesc.numOfSlot);
-	//printf("Yo readRecord failed dude (deleted slot)\n");
+	printf("assert \n page %d slot %d listsize %d\n",rid.pageNum,rid.slotNum,pageDesc.numOfSlot);
+	assert( false && "readRecord failed dude" ); 
 	return FAILURE;
     }
 
@@ -202,7 +190,7 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
     memcpy( &fieldSize, formattedData, sizeof(FieldSize) );
     if( fieldSize == TombStoneMark ){
 
-	printf("reading a tombstone %d %d\n",rOffset.offset,rOffset.length);
+	dprintf("reading a tombstone %d %d\n",rOffset.offset,rOffset.length);
 	RID trid;
 	memcpy( &trid, (char*)formattedData+sizeof(FieldSize), sizeof(RID) );
 	RC rc = readRecord( fileHandle, recordDescriptor, trid, data);
@@ -211,7 +199,7 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
 	free(formattedData);
 	return rc;
     }
-    printf("offset %d length %d\n",rOffset.offset,rOffset.length);
+    dprintf("reading record with offset %d length %d\n",rOffset.offset,rOffset.length);
     readDataFromBuffer(recordDescriptor,data,formattedData);
     free(page);    
     free(formattedData);
@@ -285,7 +273,7 @@ PageNum RecordBasedFileManager::findFreePage(FileHandle &fileHandle,int recordSi
 		fileHandle.writePage(currentDir*512,data); // update current directory 
 		free(dir);
 		free(data);
-//		printf("free space left %d on page %d\n",((Directory *)dir)->freespace,num);
+		dprintf("free space left %d on page %d\n",((Directory *)dir)->freespace,num);
 		return num;
 	    }
 	    free(dir);
@@ -295,7 +283,7 @@ PageNum RecordBasedFileManager::findFreePage(FileHandle &fileHandle,int recordSi
 	// if can't find a free space from directory, create a new directory
 	// last directory used to store the next directory if this one has not enough space 
 	if( fileHandle.readPage(currentDir*512,data) == FAILURE ){
-	    printf("creating new directory, numpage %d\n",fileHandle.getNumberOfPages());
+	    dprintf("creating new directory, numpage %d\n",fileHandle.getNumberOfPages());
 	    DirectoryDesc descriptor;
 	    nextDir++;  // point this new directory to a pseudo new directory
 	    descriptor.nextDir = nextDir ; 
@@ -312,7 +300,6 @@ PageNum RecordBasedFileManager::findFreePage(FileHandle &fileHandle,int recordSi
 	    }
 	
 	    fileHandle.appendPage(data);
-	//    printf("numpage %d\n",fileHandle.getNumberOfPages());
 	}
 
 
@@ -337,9 +324,7 @@ size_t RecordBasedFileManager::getDataSize(const vector<Attribute> &recordDescri
     	}
     }
     // get null indicator's size
-	#ifdef DEBUG
-    	printf("nonNull is %d\n",nonNull);
-    #endif
+    dprintf("nonNull is %d\n",nonNull);
 
     int nullFieldsIndicatorActualSize = ceil((double) nonNull / CHAR_BIT);
 	//int nullFieldsIndicatorActualSize = ceil((double) recordDescriptor.size() / CHAR_BIT)
@@ -350,58 +335,63 @@ size_t RecordBasedFileManager::getDataSize(const vector<Attribute> &recordDescri
     offset += nullFieldsIndicatorActualSize;
     int k=0;
     for(int i=0; i<recordDescriptor.size(); i++){
-    		Attribute attribute = recordDescriptor[i];
-			string name = attribute.name;
-			AttrLength length = attribute.length;
-			AttrType type = attribute.type;
-		if(attribute.length){
-			if(printFlag) printf("%d %s %d ",i,name.c_str(),length);
-	
-			if( nullFieldsIndicator[k/8] & (1 << (7-(k%8)) ) ){
-	    		if(printFlag) printf("null\n");
-	    		k++;
-	    		continue;
-			}
+	Attribute attribute = recordDescriptor[i];
+	string name = attribute.name;
+	AttrLength length = attribute.length;
+	AttrType type = attribute.type;
 
-			void *buffer;
-			if( type == TypeVarChar ){
-	    		buffer = malloc(sizeof(int));
-	    		memcpy( buffer , (char*)data+offset, sizeof(int));
-	    		offset += sizeof(int);
-	    		int len = *(int*)buffer;
-	    		if(printFlag) printf("%i ",len);
-	    		free(buffer);
-	    		buffer = malloc(len+1);  // null terminator
-	    		memcpy( buffer, (char*)data+offset, len);
-	    		offset += len;
-	    		((char *)buffer)[len]='\0';
-	    		if(printFlag) printf("%s\n",buffer);
-	    		free(buffer);
-	    		k++;
-	    		continue;
-			}
-			std::size_t size;
-			if( type == TypeReal ){
-	    		size = sizeof(float);
-	    		buffer = malloc(size);
-	    		memcpy( buffer , (char*)data+offset, size);
-	    		offset += size;
-	    		if(printFlag) printf("%f \n",*(float*)buffer);
-			} else{
-	    		size = sizeof(int);
-	    		buffer = malloc(size);
-	    		memcpy( buffer , (char*)data+offset, size);
-	    		offset += size;
-	    		if(printFlag) printf("%i \n",*(int*)buffer);
-			}
-			free(buffer);
-			k++;
-		}
+	if(attribute.length != 0){
+	    
+	    if(printFlag) printf("%d %s %d ",i,name.c_str(),length);
+	
+	    if( nullFieldsIndicator[k/8] & (1 << (7-(k%8)) ) ){
+	    	if(printFlag) printf("null\n");
+	    	k++;
+	    	continue;
+	    }
+
+	    void *buffer;
+	    if( type == TypeVarChar ){
+		buffer = malloc(sizeof(int));
+		memcpy( buffer , (char*)data+offset, sizeof(int));
+		offset += sizeof(int);
+		int len = *(int*)buffer;
+		if(printFlag) printf("%i ",len);
+		free(buffer);
+		buffer = malloc(len+1);  // null terminator
+		memcpy( buffer, (char*)data+offset, len);
+		offset += len;
+		((char *)buffer)[len]='\0';
+		if(printFlag) printf("%s\n",buffer);
+		free(buffer);
+		k++;
+		continue;
+	    }
+	
+	    std::size_t size;
+	    if( type == TypeReal ){
+		size = sizeof(float);
+		buffer = malloc(size);
+		memcpy( buffer , (char*)data+offset, size);
+		offset += size;
+		if(printFlag) printf("%f \n",*(float*)buffer);
+
+	    }else{
+		size = sizeof(int);
+		buffer = malloc(size);
+		memcpy( buffer , (char*)data+offset, size);
+		offset += size;
+		if(printFlag) printf("%i \n",*(int*)buffer);
+	    }
+
+	    free(buffer);
+	    k++;
+	}
     }
+
     if(printFlag) printf("given size %d\n",offset);
     free(nullFieldsIndicator);
     return offset;
-
 }
 
 // write Data to our custom compact format 
@@ -465,7 +455,7 @@ size_t RecordBasedFileManager::writeDataToBuffer(const vector<Attribute> &record
 
         	// if null indicator has more than 1 byte , annoying ~"~
         		if( ((unsigned char*)nullFieldsIndicator)[ (0+k) / CHAR_BIT ] & (1 << (7-(k%8)) ) ){
-        			printf("null\n");
+        			dprintf("null\n");
         			fieldOffsetDescriptor[i] = descriptorLength + offset;
         			k++;
         			continue;
@@ -560,89 +550,72 @@ RC RecordBasedFileManager::readDataFromBuffer(const vector<Attribute> &recordDes
     int pastoffset=descriptorLength+nullFieldsIndicatorActualSize;
     int currentoffset=0;
     for(int i1=0;i1<recordDescriptor.size();i1++){
-	#ifdef DEBUG
-    	printf("\n%d at the beginning currentoffset is %d pastoffset is %d\n",i1,currentoffset,pastoffset);
-	#endif
+    	dprintf("\n%d at the beginning currentoffset is %d pastoffset is %d\n",i1,currentoffset,pastoffset);
     	if(i1<pastdescriptor.size()){
-    		if(pastdescriptor[i1].length){
-    			if(recordDescriptor[i1].length){
-    				if(nullIndicator[pastNonNullAttr / 8] & (1 << (7-(pastNonNullAttr%8)))){
-    					newnullIndicator[currentNonNullAttr / 8] += (1 << (7-(currentNonNullAttr%8)));
-    				}else{
-    	        		if( pastdescriptor[i1].type == TypeVarChar ){
-    	        			int len;
-    	        			memcpy( &len, (char*)formattedData+pastoffset, sizeof(int));
-    	        			memcpy( (char *)tempbuffer+currentoffset, (char*)formattedData+pastoffset, sizeof(int)+len);
-    	        			pastoffset += len + sizeof(int);
-    	        			currentoffset+=len+sizeof(int);
-							#ifdef DEBUG
-    	        				printf("\nTypeVarChar copy current offset is %d pastoffset is %d\n",currentoffset,pastoffset);
-							#endif
-    	        			//printf("string offset %i %i\n",len,offset);
-    	        		}else if(pastdescriptor[i1].type == TypeReal){
-    	        			memcpy( (char *)tempbuffer+currentoffset, (char*)formattedData+pastoffset, sizeof(float));
-    	        			pastoffset += sizeof(float);
-    	        			currentoffset += sizeof(float);
-							#ifdef DEBUG
-    	        				printf("\nTypeReal copy current offset is %d pastoffset is %d\n",currentoffset,pastoffset);
-							#endif
-    	        		}else if(pastdescriptor[i1].type == TypeInt){
-    	        			memcpy( (char *)tempbuffer+currentoffset, (char*)formattedData+pastoffset, sizeof(int));
-    	        			pastoffset += sizeof(int);
-    	        			currentoffset += sizeof(int);
-							#ifdef DEBUG
-    	        				printf("\nTypeInt copy current offset is %d pastoffset is %d\n",currentoffset,pastoffset);
-							#endif
-    	        		}
-    				}
+	    if(pastdescriptor[i1].length != 0){
+	    	if(recordDescriptor[i1].length != 0){
+		    if(nullIndicator[pastNonNullAttr / 8] & (1 << (7-(pastNonNullAttr%8)))){
+			newnullIndicator[currentNonNullAttr / 8] += (1 << (7-(currentNonNullAttr%8)));
+		    }else{
+	        	if( pastdescriptor[i1].type == TypeVarChar ){
+	        	    int len;
+	        	    memcpy( &len, (char*)formattedData+pastoffset, sizeof(int));
+	        	    memcpy( (char *)tempbuffer+currentoffset, (char*)formattedData+pastoffset, sizeof(int)+len);
+	        	    pastoffset += len + sizeof(int);
+	        	    currentoffset+=len+sizeof(int);
+	        	    dprintf("\nTypeVarChar copy current offset is %d pastoffset is %d\n",currentoffset,pastoffset);
 
-    				currentNonNullAttr++;
-    			}else{
-    				if( pastdescriptor[i1].type == TypeVarChar ){
-    				    int len;
-    				    memcpy( &len, (char*)formattedData+pastoffset, sizeof(int));
-    				    pastoffset += len + sizeof(int);
-    					#ifdef DEBUG
-    				    	printf("\nTypeVarChar copy current offset is %d pastoffset is %d\n",currentoffset,pastoffset);
-    					#endif
-    				    //printf("string offset %i %i\n",len,offset);
-    				    }else if(pastdescriptor[i1].type == TypeReal){
-    				    pastoffset += sizeof(float);
-    					#ifdef DEBUG
-    				    	printf("\nTypeReal copy current offset is %d pastoffset is %d\n",currentoffset,pastoffset);
-    					#endif
-    				    }else if(pastdescriptor[i1].type == TypeInt){
-    				    pastoffset += sizeof(int);
-    					#ifdef DEBUG
-    				    	printf("\nTypeInt copy current offset is %d pastoffset is %d\n",currentoffset,pastoffset);
-    					#endif
-    				    	        		}
-    			}
-    			pastNonNullAttr++;
+	    		}else if(pastdescriptor[i1].type == TypeReal){
+	    		    memcpy( (char *)tempbuffer+currentoffset, (char*)formattedData+pastoffset, sizeof(float));
+	        	    pastoffset += sizeof(float);
+	        	    currentoffset += sizeof(float);
+	        	    dprintf("\nTypeReal copy current offset is %d pastoffset is %d\n",currentoffset,pastoffset);
+
+	        	}else if(pastdescriptor[i1].type == TypeInt){
+	        	    memcpy( (char *)tempbuffer+currentoffset, (char*)formattedData+pastoffset, sizeof(int));
+	        	    pastoffset += sizeof(int);
+	        	    currentoffset += sizeof(int);
+	        	    dprintf("\nTypeInt copy current offset is %d pastoffset is %d\n",currentoffset,pastoffset);
+	        	}
+		    }
+
+    		    currentNonNullAttr++;
+    		}else{
+
+    		    if( pastdescriptor[i1].type == TypeVarChar ){
+			int len;
+	    		memcpy( &len, (char*)formattedData+pastoffset, sizeof(int));
+			pastoffset += len + sizeof(int);
+			dprintf("\nTypeVarChar copy current offset is %d pastoffset is %d\n",currentoffset,pastoffset);
+
+		    }else if(pastdescriptor[i1].type == TypeReal){
+    			pastoffset += sizeof(float);
+    			dprintf("\nTypeReal copy current offset is %d pastoffset is %d\n",currentoffset,pastoffset);
+		    }else if(pastdescriptor[i1].type == TypeInt){
+			pastoffset += sizeof(int);
+			dprintf("\nTypeInt copy current offset is %d pastoffset is %d\n",currentoffset,pastoffset);
+		    }
+		    pastNonNullAttr++;
     		}
-    	}else{
-    		if(recordDescriptor[i1].length){
-    			newnullIndicator[currentNonNullAttr / 8] += (1 << (7-(currentNonNullAttr%8)));
-    			currentNonNullAttr++;
-    		}
-    	}
-	#ifdef DEBUG
-    	printf("\n%i at the end currentoffset is %d pastoffset is %d\n",i1,currentoffset,pastoffset);
-	#endif
+	    }else{
+    		
+		if(recordDescriptor[i1].length){
+    		    newnullIndicator[currentNonNullAttr / 8] += (1 << (7-(currentNonNullAttr%8)));
+    		    currentNonNullAttr++;
+		}
+	    }
+    	dprintf("\n%i at the end currentoffset is %d pastoffset is %d\n",i1,currentoffset,pastoffset);
+	}
     }
-	#ifdef DEBUG
-    	cout<<"pastNonNullAttr: "<<pastNonNullAttr<<endl;
-    	cout<<"currentNonNullAttr: "<<currentNonNullAttr<<endl;
-	#endif
+    
+    dprintf("pastNonNullAttr: %d\n currentNonNullAttr: %d\n",pastNonNullAttr,currentNonNullAttr); 
 
     int newnullFieldsIndicatorActualSize = ceil((double) currentNonNullAttr / CHAR_BIT);
 
 
-    printf("wtfwtf\n");
     memcpy(data,(char*)newnullIndicator,newnullFieldsIndicatorActualSize);
     memcpy((char *)data+newnullFieldsIndicatorActualSize,tempbuffer,currentoffset);
 
-   // printf("offsetToData %d %d %d\n",offsetToData, nullFieldsIndicatorActualSize, numOfField); 
     free(nullIndicator);
     free(newnullIndicator);
     free(tempbuffer);
@@ -695,7 +668,7 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
 	numOfSlot *= -1;
     }
 
-//    printf("page %d slot %d listsize %d\n",rid.pageNum,rid.slotNum,numOfSlot);
+    dprintf("page %d slot %d listsize %d\n",rid.pageNum,rid.slotNum,numOfSlot);
 
     // read whole slot descriptors 
     RecordOffset *rOffset = (RecordOffset*)malloc(sizeof(RecordOffset)*numOfSlot);
@@ -707,7 +680,7 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
     // check if the slot has already been marked as deleted
     RecordOffset recordToDelete = rOffset[rid.slotNum];
     if( recordToDelete.offset == DeletedSlotMark ){
-	printf("Yo detele an invalid record dude\n");
+	assert( false && "Yo detele an invalid record dude\n");
 	return FAILURE;
     }
 
@@ -719,7 +692,7 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
 	memcpy( &trid, (char*)page+recordToDelete.offset+sizeof(FieldSize), sizeof(RID) );
 	// delete the actual record on other page
 	if( deleteRecord( fileHandle, recordDescriptor, trid) == FAILURE ){
-	    printf( "something wrong in deletion with tombstone\n");
+	    assert( false && "something wrong in deletion with tombstone\n");
 	    return FAILURE;
 	}
     }
@@ -778,7 +751,7 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
     RecordOffset rOffset;
     memcpy( &rOffset, (char*)page+PAGE_SIZE-sizeof(PageDesc)-sizeof(RecordOffset)*(rid.slotNum+1), sizeof(RecordOffset) );
  
-    printf("original rid %d %d offset %i length %i\n",rid.pageNum,rid.slotNum,rOffset.offset,rOffset.length);
+    dprintf("original rid %d %d offset %i length %i\n",rid.pageNum,rid.slotNum,rOffset.offset,rOffset.length);
     // detect if the record we want to updata is a tombstone
     FieldSize fieldSize;
     memcpy( &fieldSize, (char*)page+rOffset.offset, sizeof(FieldSize) );
@@ -803,14 +776,13 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
     int numOfSlot = pageDesc.numOfSlot < 0 ? pageDesc.numOfSlot*-1 : pageDesc.numOfSlot;
     int freeSpaceLeft = PAGE_SIZE - ( pageDesc.recordSize + sizeof(PageDesc) + sizeof(RecordOffset) * numOfSlot + rOffset.length);
 
-    printf("pagedesc %d %d \n",pageDesc.numOfSlot,pageDesc.recordSize);
-    printf("dataSize %i freespace %i\n",(int)dataSize,freeSpaceLeft );
+    dprintf("pagedesc %d %d \n",pageDesc.numOfSlot,pageDesc.recordSize);
+    dprintf("dataSize %i freespace %i\n",(int)dataSize,freeSpaceLeft );
 
     int sizeDiff = 0;
     // if run out of space, do tombstone
     if( (int)dataSize > (int)freeSpaceLeft ){
 	// find new page to insert updated record
-	printf("tombstonr case\n");
 	RID trid;
 
 	if( insertRecord( fileHandle, recordDescriptor, data, trid) == FAILURE ){ assert(false); return FAILURE;}
@@ -825,9 +797,9 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
 
 	// pack page
 	int offsetBehindTarget = rOffset.offset + rOffset.length;
-	printf("new rid %d %d\n",trid.pageNum,trid.slotNum);
-	printf("offset %d length %d\n",rOffset.offset,rOffset.length);
-	printf("pageDesc.recordSize %d offsetBehindTarget  %d! \n",pageDesc.recordSize, offsetBehindTarget);
+	dprintf("new rid %d %d\n",trid.pageNum,trid.slotNum);
+	dprintf("offset %d length %d\n",rOffset.offset,rOffset.length);
+	dprintf("pageDesc.recordSize %d offsetBehindTarget  %d! \n",pageDesc.recordSize, offsetBehindTarget);
 
 	void *temp = malloc( pageDesc.recordSize - offsetBehindTarget );
 	memcpy( temp, (char*)page + offsetBehindTarget, pageDesc.recordSize - offsetBehindTarget );
@@ -844,8 +816,8 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
 	
     }else{
 
-	printf("offset %d length %d\n",rOffset.offset,rOffset.length);
-	printf("pageDesc.recordSize %d! \n",pageDesc.recordSize);
+	dprintf("offset %d length %d\n",rOffset.offset,rOffset.length);
+	dprintf("pageDesc.recordSize %d! \n",pageDesc.recordSize);
 	// move records behind the data back 
 	int recordsDataSize = pageDesc.recordSize - ( rOffset.offset + rOffset.length ); // all data size behind updated record
 	assert( recordsDataSize >= 0 && "wtf data < 0");
@@ -866,7 +838,7 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
 	memcpy( (char*)page + PAGE_SIZE - sizeof(PageDesc)-sizeof(RecordOffset)*(rid.slotNum+1), &rOffset, sizeof(RecordOffset) );
     }
 
-    printf("sizediff %d\n",sizeDiff);
+    dprintf("size difference %d\n",sizeDiff);
     // update slots' offset which are behind the updated record
     for( int i=0; i<pageDesc.numOfSlot; i++ ){
 	RecordOffset slot;
@@ -955,13 +927,7 @@ RC RBFM_ScanIterator::initScanIterator(FileHandle &fileHandle, const vector<Attr
     this->compOp = compOp;
     this->value = (char*)value;
     this->page = malloc(PAGE_SIZE);
-    /*
-    int v, v2 = 20;
-    memcpy( &v, this->value, sizeof(int) );
-    printf("%d\n",v); 
-    printf("%d\n",memcmp( &v, &v2 ,sizeof(int)) );
-    */
-    // init, start from 1st record, <1,0>
+     // init, start from 1st record, <1,0>
     this->c_rid.pageNum = 0;
     this->c_rid.slotNum = 0;
     pageDesc.numOfSlot = -1;
@@ -1031,7 +997,6 @@ RC RBFM_ScanIterator::getFormattedRecord(void *returnedData, void *data)
     }
     memcpy( data, nullIndicator, nullFieldsIndicatorActualSize);
     free(nullIndicator);
-    //free(returnedData);
 }
 
 RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
@@ -1061,7 +1026,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 	
 	// read slot
 	memcpy( &rOffset, (char*)page+PAGE_SIZE-sizeof(PageDesc)-sizeof(RecordOffset)*(c_rid.slotNum+1), sizeof(RecordOffset) );
-//	printf("rOffset %d %d\n",rOffset.offset,rOffset.length);
+	dprintf("rOffset %d %d\n",rOffset.offset,rOffset.length);
 	if( rOffset.offset == DeletedSlotMark ){
 	    c_rid.slotNum++;
 	    continue;
@@ -1129,7 +1094,6 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 			cmpValue = -1;
 		    }
 		    //printf("string from data %s\n\n",str);
-//		    assert( cmpValue == 0 );
 
 		}else if(type == TypeReal){
 		    t_len = sizeof(float);

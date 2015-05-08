@@ -31,7 +31,7 @@ RC PagedFileManager::createFile(const string &fileName)
 {
     // if file doesn't exist
     if ( access( fileName.c_str(), F_OK ) == -1  ){
-	printf("file doen't exsit \n");
+	dprintf("file doen't exsit \n");
 	FILE* file = fopen(fileName.c_str(),"w+b");
 	if( file != NULL )
 	   fclose(file);
@@ -59,19 +59,9 @@ RC PagedFileManager::openFile(const string &fileName, FileHandle &fileHandle)
     
     // file does exist, open it 
     if ( access( fileName.c_str(), F_OK ) == 0  ){
-	//printf("file does exist, open it \n");
+	dprintf("file does exist, open it \n");
 	if( fileHandle.initFilePointer( fileName ) == FAILURE )
 	    return FAILURE; 
-    	
-	/*
-	if( filePointer != NULL ){
-	    fclose(filePointer);
-	}
-	filePointer = fopen(fileName.c_str(),"a+");
-	printf("YOLO\n");
-	// undefined area where reading header from file and write it to filaHandle obejct
-	// .......
-	*/
 	
 	fileHandle.readPageCounter = 0;
 	fileHandle.writePageCounter = 0;
@@ -107,23 +97,20 @@ FileHandle::~FileHandle()
 
 RC FileHandle::readPage(PageNum pageNum, void *data)
 {
-//    printf("r%d\n",pageNum );
     fseek( filePointer , pageNum * PAGE_SIZE ,SEEK_SET );
     int result = fread(data, sizeof(char), PAGE_SIZE, filePointer);
     if( result != PAGE_SIZE ){
-	//printf("page hasn't been opened yet\n");
 	return FAILURE;
     }
 
     readPageCounter++;
     return SUCCESS;
-    return -1;
 }
 
 
 RC FileHandle::writePage(PageNum pageNum, const void *data)
 {
-    //printf("w%d\n",pageNum * PAGE_SIZE );
+    dprintf("w%d\n",pageNum * PAGE_SIZE );
     assert( pageNum <= numberOfPages && "pageNum should smaller than numberofPages" );
     if( pageNum > numberOfPages ){
 	return FAILURE;
@@ -132,12 +119,11 @@ RC FileHandle::writePage(PageNum pageNum, const void *data)
     int result = fwrite(data, sizeof(char), PAGE_SIZE, filePointer);
   
     if( result != PAGE_SIZE ){
-	printf("page hasn't been opened yet\n");
+	dprintf("page hasn't been opened yet\n");
 	return FAILURE;
     }
     writePageCounter++;
     return SUCCESS;
-    return -1;
 }
 
 
@@ -152,14 +138,12 @@ RC FileHandle::appendPage(const void *data)
     appendPageCounter++;
     numberOfPages++;
     return SUCCESS;
-    //return -1;
 }
 
 
 unsigned FileHandle::getNumberOfPages()
 {
     return appendPageCounter;
-//    return -1;
 }
 
 
@@ -169,7 +153,6 @@ RC FileHandle::collectCounterValues(unsigned &readPageCount, unsigned &writePage
     writePageCount = writePageCounter;
     appendPageCount = appendPageCounter;
     return SUCCESS;
-    //return -1;
 }
 
 RC FileHandle::initFilePointer(const string &fileName)
@@ -181,7 +164,7 @@ RC FileHandle::initFilePointer(const string &fileName)
 
     fseek(filePointer, 0, SEEK_END); 
     int numOfBytes = ftell(filePointer);
-//    printf("\n\n\n %d \n\n\n",numOfBytes);
+    dprintf("file length in byte in %s is %d \n\n",fileName.c_str(),numOfBytes);
     setNumberOfPages(numOfBytes/PAGE_SIZE);
 
     return SUCCESS;

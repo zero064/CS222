@@ -79,7 +79,7 @@ The scan iterator is NOT required to be implemented for part 1 of the project
 //  rbfmScanIterator.close();
 class RecordBasedFileManager;
 
-class RBFM_ScanIterator {
+class RBFM_ScanIterator : public DebugMsg {
 public:
   RBFM_ScanIterator() { pageNum = 1; };
   ~RBFM_ScanIterator() { };
@@ -112,7 +112,7 @@ private:
 };
 
 
-class RecordBasedFileManager
+class RecordBasedFileManager : public DebugMsg
 {
 public:
   static RecordBasedFileManager* instance();
