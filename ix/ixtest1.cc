@@ -25,7 +25,6 @@ int testCase_1(const string &indexFileName)
     // open index file
     IXFileHandle fileHandle;
     assertOpenIndexFile(success, indexManager, indexFileName, fileHandle);
-
     // create duplicate index file
     assertCreateIndexFile(fail, indexManager, indexFileName);
 
