@@ -30,9 +30,8 @@ typedef struct {
 } KeyDesc;
 
 typedef struct {
-    KeyType type;
+    Attribute type;
     short int numOfRID;
-    short int size
     void *keyValue;
 } DataEntryDesc;
 
@@ -83,12 +82,13 @@ class IndexManager : public DebugMsg {
         static IndexManager *_index_manager;
 
 
-	RC splitNode(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page);
+	RC splitLeaf(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page);
 
+/*
 	splitLeaf()
 	splitNonLeaf()
 	bool checkSplit( void *page );
-/*
+
 	RC TraverseTree(PageNum, const void *key, const RID &rid);
 
 	RC makeKey(	

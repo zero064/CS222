@@ -83,7 +83,7 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
     PageSize size = nodeDesc.size;
 
     if( size > THRESHOLD )
-	spiltNode(ixfileHandle,attribute,key,rid,page);	    
+	splitLeaf(ixfileHandle,attribute,key,rid,page);	    
     
     switch( type ){
 	case Leaf:
@@ -104,10 +104,12 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
     return -1;
 }
 
-RC IndexManager::splitNode(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page)
+RC IndexManager::splitLeaf(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page)
 {
     
+    
 }
+
 
 RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid)
 {
