@@ -191,7 +191,7 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 	NodeDesc splitNodeDesc;
 	splitNodeDesc.type = Leaf;
 	splitNodeDesc.size = nodeDesc.size - offset;
-	splitNodeDesc.next = -1;
+	splitNodeDesc.next = nodeDesc.next;
 	memcpy( (char*)splitPage+PAGE_SIZE-sizeof(NodeDesc), &splitNodeDesc, sizeof(NodeDesc) );
 	nodeDesc.size = offset;
 	nodeDesc.next = freePageID;
