@@ -95,7 +95,7 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
     // retrieve node info
     NodeDesc nodeDesc;
     memcpy( &nodeDesc, (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
-    int offset = 0;
+    int offset = 0 ; bool insert = false;
     // potential split page buffer
     void *splitPage = malloc(PAGE_SIZE);
 
@@ -131,6 +131,7 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 	    memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc), &nodeDesc, sizeof(NodeDesc) );
 
 	    free(ded.keyValue); 
+	    insert = true;
 	    break;
 	}
 	// same key value, append RID to the list
@@ -148,10 +149,28 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 	    memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc) , &nodeDesc , sizeof(NodeDesc) );
 	    
 	    free(ded.keyValue); 
+	    insert = true;
 	    break;
 	}
+	
 	free(ded.keyValue); 
         offset += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID);    
+    }
+
+    // if the key is the biggest in the page, append it
+    if( !insert ){
+	// insert a new <key,rid> pair
+	DataEntryDesc nDed;
+        nDed.numOfRID = 1;
+        nDed.overflow = false;
+        nDed.keySize = getKeySize(attribute,key); 
+	memcpy( (char*)page+offset, &nDed, sizeof(DataEntryDesc));
+        memcpy( (char*)page+offset+DataEntryKeyOffset, key , nDed.keySize ) ; 
+        memcpy( (char*)page+offset+DataEntryKeyOffset+nDed.keySize, &rid , sizeof(RID) );
+
+	// update the node descriptor's size info
+	nodeDesc.size += sizeof(DataEntryDesc) + nDed.keySize + nDed.numOfRID * sizeof(RID);
+        memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc), &nodeDesc, sizeof(NodeDesc) );
     }
 
     // size > threshold , do split
@@ -178,7 +197,14 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 	nodeDesc.next = freePageID;
 	memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc), &nodeDesc, sizeof(NodeDesc) );	
 
-	ixfileHandle.writePage(freePageID,splitPage); 
+	ixfileHandle.writePage(freePageID,splitPage);
+
+	// get First entry key value
+	DataEntryDesc nDed;
+	memcpy( &nDed, (char*)splitPage, sizeof(DataEntryDesc));
+	keyDesc.rightNode = freePageID;
+	keyDesc.leftNode = pageNum;
+	memcpy( keyDesc.keyValue, (char*)splitPage+sizeof(DataEntryDesc), nDed.keySize);
     }
     
     ixfileHandle.writePage(pageNum,page); 
@@ -199,21 +225,26 @@ int IndexManager::keyCompare(const Attribute &attribute, const void *keyA, const
 {
     AttrType type = attribute.type;
 
+    int i_a , i_b;
     switch( type ){
 	case TypeInt:
-	    int i_a , i_b;
 	    memcpy( &i_a , keyA , sizeof(int));
-	    memcpy( &i_b , keyA , sizeof(int));
+	    memcpy( &i_b , keyB , sizeof(int));
 	    return (i_a - i_b);
 	    break;
 	case TypeReal:
 	    float f_a, f_b;
 	    memcpy( &f_a , keyA , sizeof(float));
-	    memcpy( &f_b , keyA , sizeof(float));
+	    memcpy( &f_b , keyB , sizeof(float));
 	    f_a = (f_a-f_b) * 100000;
 	    return (int)f_a;
 	    break;
 	case TypeVarChar:
+	    memcpy( &i_a , keyA , sizeof(int));
+	    memcpy( &i_b , keyB , sizeof(int));
+	    string sa ((char*)keyA+sizeof(int),i_a);
+	    string sb ((char*)keyB+sizeof(int),i_b);
+	    return sa.compare(sb);
 	    assert( false && "string comparsion under construction");
 	    break;
     }
@@ -234,7 +265,7 @@ int IndexManager::getKeySize(const Attribute &attribute, const void *key)
 	    memcpy( &size, key , sizeof(int) );
 	    assert( size >= 0 && "something wrong with getting varchar key size\n");
 	    assert( size < 50 && "something wrong with getting varchar key size\n");
-	    return size;
+	    return size+sizeof(int);
     }
 
 }

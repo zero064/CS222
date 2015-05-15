@@ -39,7 +39,7 @@ typedef struct {
     void *keyValue;
 } DataEntryDesc;
 
-const int DataEntryKeyOffset =  sizeof(bool) + sizeof(short int) * 2;
+const int DataEntryKeyOffset =  sizeof(DataEntryDesc) ;
 
 class IX_ScanIterator;
 class IXFileHandle;
