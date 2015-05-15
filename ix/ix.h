@@ -17,9 +17,12 @@ const char Leaf = 1 , NonLeaf = 2;
 
 const int THRESHOLD = PAGE_SIZE / 2;
 
+typedef enum { OP_Split, OP_Merge , OP_Dist , OP_None , OP_Error }TreeOp; 
+
 typedef struct {
     NodeType type;
     PageSize size;
+    PageNum next;
 } NodeDesc;
 
 typedef struct {
@@ -30,11 +33,13 @@ typedef struct {
 } KeyDesc;
 
 typedef struct {
-    Attribute type;
+    bool overflow = false;
     short int numOfRID;
+    short int keySize;
     void *keyValue;
 } DataEntryDesc;
 
+const int DataEntryKeyOffset =  sizeof(bool) + sizeof(short int) * 2;
 
 class IX_ScanIterator;
 class IXFileHandle;
@@ -82,8 +87,9 @@ class IndexManager : public DebugMsg {
         static IndexManager *_index_manager;
 
 
-	RC splitLeaf(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page);
-
+	TreeOp insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, KeyDesc &keyDesc);
+	int keyCompare(const Attribute &attribute, const void *keyA, const void* keyB); 
+	int getKeySize(const Attribute &attribute, const void *key);
 /*
 	splitLeaf()
 	splitNonLeaf()

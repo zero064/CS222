@@ -82,21 +82,6 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
     NodeType type = nodeDesc.type;
     PageSize size = nodeDesc.size;
 
-    if( size > THRESHOLD )
-	splitLeaf(ixfileHandle,attribute,key,rid,page);	    
-    
-    switch( type ){
-	case Leaf:
-	    
-	    break;
-	case NonLeaf:
-
-	    break;
-	default:
-	    assert(false && "type fault");
-	    break;
-    }
-
     // traverse tree
 
     // 
@@ -104,10 +89,100 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
     return -1;
 }
 
-RC IndexManager::splitLeaf(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page)
+TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, KeyDesc &keyDesc)
 {
+    TreeOp operation = OP_None;
+    // retrieve node info
+    NodeDesc nodeDesc;
+    memcpy( &nodeDesc, (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
+    int offset = 0;
+    // potential split page buffer
+    void *splitPage = malloc(PAGE_SIZE);
+
+    // insert first 
+    while( offset < nodeDesc.size ){
+		    
+	DataEntryDesc ded;
+	memcpy( &ded, (char*)page+offset, sizeof(DataEntryDesc) );
+
+	ded.keyValue = malloc(ded.keySize);
+	memcpy( ded.keyValue, (char*)page+offset+DataEntryKeyOffset, ded.keySize); 
+	
+	// compare the key to find insertion point 
+	int result = keyCompare(attribute, ded.keyValue, key);
+	// key value smaller than rest of the data
+	// insert new key,rid pair right here
+	if( result > 0 ){
+	    // use splitpage buffer as temp buffer, copy the rest of the key and rid lists
+	    memcpy( splitPage , (char*)page+offset , nodeDesc.size - offset ); 
+	    // insert a new <key,rid> pair
+	    DataEntryDesc nDed;
+	    nDed.numOfRID = 1;
+	    nDed.overflow = false;
+	    nDed.keySize = getKeySize(attribute,key); 
+	    memcpy( (char*)page+offset, &nDed, sizeof(DataEntryDesc));
+	    memcpy( (char*)page+offset+DataEntryKeyOffset, key , nDed.keySize ) ; 
+	    memcpy( (char*)page+offset+DataEntryKeyOffset+nDed.keySize, &rid , sizeof(RID) );
+	    // update offset and copy rest of the data back
+	    offset += sizeof(DataEntryDesc) + nDed.keySize + nDed.numOfRID * sizeof(RID);
+	    memcpy( (char*)page+offset, splitPage, nodeDesc.size - offset );
+	    // update the node descriptor's size info
+	    nodeDesc.size += sizeof(DataEntryDesc) + nDed.keySize + nDed.numOfRID * sizeof(RID);
+	    memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc), &nodeDesc, sizeof(NodeDesc) );
+
+	    free(ded.keyValue); 
+	    break;
+	}
+	// same key value, append RID to the list
+	if( result == 0 ){
+	    // use splitpage buffer as temp buffer, copy the rest of the key and rid lists
+	    memcpy( splitPage , (char*)page+offset , nodeDesc.size - offset ); 
+	    // add RID to the back
+	    memcpy( (char*)page+offset + sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID) , &rid , sizeof(RID));
+	    memcpy( (char*)page+offset + sizeof(DataEntryDesc) + ded.keySize + (ded.numOfRID+1)*sizeof(RID) , splitPage , nodeDesc.size - offset );
+	    // increase number of rid by 1 , write it back
+	    ded.numOfRID++;
+	    memcpy( (char*)page+offset, &ded , sizeof(DataEntryDesc) );
+	    // update page descriptor  
+	    nodeDesc.size += sizeof(RID);
+	    memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc) , &nodeDesc , sizeof(NodeDesc) );
+	    
+	    free(ded.keyValue); 
+	    break;
+	}
+	free(ded.keyValue); 
+        offset += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID);    
+    }
+
+    // size > threshold , do split
+    if( nodeDesc.size > THRESHOLD*1.7 ){
+	offset = 0; // offset of entry which is going to split to right node
+	operation = OP_Split;
+	// add offset until it passes the half of size
+	while( offset < nodeDesc.size / 2){    
+	    DataEntryDesc ded;
+	    memcpy( &ded, (char*)page+offset, sizeof(DataEntryDesc) );
+	    offset += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID);    
+
+	}
+	// allocate new page to insert splitted nodes
+	PageNum freePageID = ixfileHandle.findFreePage();
+	// form a new page, fill up the information 
+	memcpy(splitPage, (char*)page+offset, nodeDesc.size - offset );
+	NodeDesc splitNodeDesc;
+	splitNodeDesc.type = Leaf;
+	splitNodeDesc.size = nodeDesc.size - offset;
+	splitNodeDesc.next = -1;
+	memcpy( (char*)splitPage+PAGE_SIZE-sizeof(NodeDesc), &splitNodeDesc, sizeof(NodeDesc) );
+	nodeDesc.size = offset;
+	nodeDesc.next = freePageID;
+	memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc), &nodeDesc, sizeof(NodeDesc) );	
+
+	ixfileHandle.writePage(freePageID,splitPage); 
+    }
     
-    
+    ixfileHandle.writePage(pageNum,page); 
+    return operation;    
 }
 
 
@@ -116,6 +191,53 @@ RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
     return -1;
 }
 
+// Comparsion between two keys, 
+// if KeyA greater than KeyB , return > 0 
+// if KeyA smaller than KeyB , return < 0
+// if eauqlity return 0
+int IndexManager::keyCompare(const Attribute &attribute, const void *keyA, const void* keyB)
+{
+    AttrType type = attribute.type;
+
+    switch( type ){
+	case TypeInt:
+	    int i_a , i_b;
+	    memcpy( &i_a , keyA , sizeof(int));
+	    memcpy( &i_b , keyA , sizeof(int));
+	    return (i_a - i_b);
+	    break;
+	case TypeReal:
+	    float f_a, f_b;
+	    memcpy( &f_a , keyA , sizeof(float));
+	    memcpy( &f_b , keyA , sizeof(float));
+	    f_a = (f_a-f_b) * 100000;
+	    return (int)f_a;
+	    break;
+	case TypeVarChar:
+	    assert( false && "string comparsion under construction");
+	    break;
+    }
+
+}
+
+// Get Keysize 
+int IndexManager::getKeySize(const Attribute &attribute, const void *key)
+{
+    AttrType type = attribute.type;
+    int size = -1;
+    switch( type ){
+	case TypeInt:
+	    return sizeof(int);
+	case TypeReal:
+	    return sizeof(float);
+	case TypeVarChar:
+	    memcpy( &size, key , sizeof(int) );
+	    assert( size >= 0 && "something wrong with getting varchar key size\n");
+	    assert( size < 50 && "something wrong with getting varchar key size\n");
+	    return size;
+    }
+
+}
 
 RC IndexManager::scan(IXFileHandle &ixfileHandle,
         const Attribute &attribute,
