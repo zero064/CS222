@@ -343,7 +343,7 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 	ded.keyValue = malloc(ded.keySize);
 	memcpy( ded.keyValue, (char*)page+offset+DataEntryKeyOffset, ded.keySize); 
 	
-	// compare the key to find insertion point 
+	// compare the key to find the deleted record
 	int result = keyCompare(attribute, ded.keyValue, key);
 
 	// if it only contains 1 RID , remove whole entries
@@ -391,7 +391,26 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 
 	    // re-distribution case , else it needs to merge
 	    if( nodeDesc.size + nNodeDesc.size > PAGE_SIZE ){
+		offset = 0;
+		while( offset < nNodeDesc.size / 3 * 2 ){
+		    DataEntryDesc ded;
+		    memcpy( &ded, (char*)nextPage+offset, sizeof(DataEntryDesc) );
+		    offset += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID);
+		}
 
+		void *temp = malloc(PAGE_SIZE);
+		memcpy( temp, page, nodeDesc.size );
+		memcpy( page, (char*)nextPage+offset, nNodeDesc.size - offset );
+		memcpy( (char*)page+offset, temp, nodeDesc.size );
+		nodeDesc.size += ( nNodeDesc.size - offset );
+		nNodeDesc.size = offset;
+		free(temp);
+	
+	    	keyDesc.rightNode = pageNum;
+		keyDesc.leftNode = nodeDesc.prev;
+		DataEntryDesc newKeyEntry;
+		memcpy( &newKeyEntry, page, sizeof(DataEntryDesc) );
+		memcpy( keyDesc.keyValue, (char*)page+sizeof(DataEntryDesc), newKeyEntry.keySize);
     
 
 	    }else{
@@ -416,7 +435,25 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 	    
 	    // re-distribution case , else it needs to merge
 	    if( nodeDesc.size + nNodeDesc.size > PAGE_SIZE ){
-		
+		offset = 0;
+		while( offset < nNodeDesc.size / 3 ){
+		    DataEntryDesc ded;
+		    memcpy( &ded, (char*)nextPage+offset, sizeof(DataEntryDesc) );
+		    offset += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID);
+		}
+		memcpy( (char*)page+nodeDesc.size, nextPage, offset );
+		void *temp = malloc(PAGE_SIZE);
+		memcpy( temp, (char*)nextPage+offset, nNodeDesc.size - offset );
+		memcpy( nextPage , temp , nNodeDesc.size - offset );
+		nNodeDesc.size -= offset;
+		nodeDesc.size += offset;
+		free(temp);	
+	    	keyDesc.leftNode = pageNum;
+		keyDesc.rightNode = nodeDesc.next;
+		DataEntryDesc newKeyEntry;
+		memcpy( &newKeyEntry, nextPage, sizeof(DataEntryDesc) );
+		memcpy( keyDesc.keyValue, (char*)nextPage+sizeof(DataEntryDesc), newKeyEntry.keySize);
+
 	    }else{
 		// merge case
 		memcpy( (char*)page+nodeDesc.size, nextPage, nNodeDesc.size );
