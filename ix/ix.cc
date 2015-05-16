@@ -192,6 +192,7 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 	splitNodeDesc.type = Leaf;
 	splitNodeDesc.size = nodeDesc.size - offset;
 	splitNodeDesc.next = nodeDesc.next;
+	splitNodeDesc.prev = pageNum;
 	memcpy( (char*)splitPage+PAGE_SIZE-sizeof(NodeDesc), &splitNodeDesc, sizeof(NodeDesc) );
 	nodeDesc.size = offset;
 	nodeDesc.next = freePageID;
@@ -215,6 +216,123 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid)
 {
     return -1;
+}
+
+
+TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page,
+				    PageNum pageNum, KeyDesc &keyDesc)
+{
+    TreeOp operation = OP_None;
+    // retrieve node info
+    NodeDesc nodeDesc;
+    memcpy( &nodeDesc, (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
+    int offset = 0 ; 
+    // potential split page buffer
+    void *nextPage = malloc(PAGE_SIZE);
+    
+    while( offset < nodeDesc.size ){
+	DataEntryDesc ded;
+	memcpy( &ded, (char*)page+offset, sizeof(DataEntryDesc) );
+
+	ded.keyValue = malloc(ded.keySize);
+	memcpy( ded.keyValue, (char*)page+offset+DataEntryKeyOffset, ded.keySize); 
+	
+	// compare the key to find insertion point 
+	int result = keyCompare(attribute, ded.keyValue, key);
+
+	// if it only contains 1 RID , remove whole entries
+	if( result == 0 && ded.numOfRID == 1){
+	    // use nextPage as temp buffer
+	    int entrySize = sizeof(DataEntryDesc) + ded.keySize + sizeof(RID);
+	    memcpy( nextPage, (char*)page+offset+entrySize , nodeDesc.size - ( offset + entrySize ) );
+	    memcpy( (char*)page+offset , nextPage, nodeDesc.size - ( offset + entrySize ) );
+
+	    nodeDesc.size -= entrySize;
+	    memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc), &nodeDesc, sizeof(NodeDesc) );
+	    break;   
+	}else{
+	    // if it has more than two RIDs, remove the one in the list
+	    
+	    for( int i=0; i<ded.numOfRID; i++){
+		RID t_rid;
+		memcpy( &t_rid, (char*)page+offset+sizeof(DataEntryDesc)+ded.keySize+sizeof(RID)*i, sizeof(RID) );
+		if( rid.pageNum == t_rid.pageNum && rid.slotNum == t_rid.slotNum ){
+		    int entrySize = sizeof(DataEntryDesc) + ded.keySize + sizeof(RID)*ded.numOfRID;
+		    int restDataSize = (ded.numOfRID-(i+1))*sizeof(RID) + ( nodeDesc.size - offset - entrySize ) ;
+		    memcpy( nextPage, (char*)page+offset+sizeof(DataEntryDesc)+ded.keySize+sizeof(RID)*(i+1), restDataSize );
+		    memcpy( (char*)page+offset+sizeof(DataEntryDesc)+ded.keySize+sizeof(RID)*i, nextPage, restDataSize );
+		    ded.numOfRID -= 1;
+		    memcpy( (char*)page+offset, &ded, sizeof(DataEntryDesc) );
+		    nodeDesc.size -= sizeof(RID);
+		    memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc), &nodeDesc, sizeof(NodeDesc) );
+		    break; // break for loop
+		}
+		
+	    }
+	    break; // break while loop
+	}
+
+	offset += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID);
+
+    }
+ 
+    if( nodeDesc.size < THRESHOLD ){
+	NodeDesc nNodeDesc;
+	// right most leaf case 
+	if( nodeDesc.next == -1 ){
+	    ixfileHandle.readPage( nodeDesc.prev, nextPage );
+	    memcpy( &nNodeDesc, (char*)nextPage+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
+
+	    // re-distribution case , else it needs to merge
+	    if( nodeDesc.size + nNodeDesc.size > PAGE_SIZE ){
+
+    
+
+	    }else{
+		// merge case, nextPage is actually previous page
+		memcpy( (char*)page+nodeDesc.size, nextPage, nNodeDesc.size );
+		nodeDesc.size += nNodeDesc.size;
+
+		ixfileHandle.deletePage( nodeDesc.prev );
+		nodeDesc.prev = nNodeDesc.prev;
+		memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc), &nodeDesc, sizeof(NodeDesc) );
+		operation = OP_Merge;
+		ixfileHandle.writePage( pageNum , page );
+
+	    }
+
+
+
+	}else{
+	    // normal case
+	    ixfileHandle.readPage( nodeDesc.next, nextPage );
+	    memcpy( &nNodeDesc, (char*)nextPage+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
+	    
+	    // re-distribution case , else it needs to merge
+	    if( nodeDesc.size + nNodeDesc.size > PAGE_SIZE ){
+		
+	    }else{
+		// merge case
+		memcpy( (char*)page+nodeDesc.size, nextPage, nNodeDesc.size );
+		nodeDesc.size += nNodeDesc.size;
+
+		ixfileHandle.deletePage( nodeDesc.next );
+		nodeDesc.next = nNodeDesc.next;
+		memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc), &nodeDesc, sizeof(NodeDesc) );
+		operation = OP_Merge;
+		ixfileHandle.writePage( pageNum, page );	    
+
+	    }
+
+	}
+
+    }
+
+    
+	
+
+    free(nextPage);
+    return operation;
 }
 
 // Comparsion between two keys, 
@@ -416,6 +534,23 @@ RC IXFileHandle::readPage(PageNum pageNum, void *data)
 RC IXFileHandle::writePage(PageNum pageNum, const void *data)
 {
     return fileHandle.writePage(pageNum,data);
+}
+
+RC IXFileHandle::deletePage(PageNum pageNum)
+{
+    PageNum dir = pageNum / IXDirectorySize;
+    assert( dir % IXDirectorySize == 0 && "Not valid directory index\n" );
+    int pageIndex = pageNum % IXDirectorySize;
+    assert( pageIndex >= 1 && pageIndex < 1024 && "Not valid page index \n");
+
+    void *page = malloc(PAGE_SIZE);
+    fileHandle.readPage( dir, page );
+    // mark the slot as empty
+    PageNum empty = 0;		
+    memcpy( (char*)page+pageIndex , &empty , sizeof(PageNum) ); 
+    fileHandle.writePage( dir, page );    
+    free(page);
+
 }
 
 RC IXFileHandle::collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount)
