@@ -69,12 +69,33 @@ RC IndexManager::closeFile(IXFileHandle &ixfileHandle)
 
 TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, KeyDesc &keyDesc)
 {
+	void *keypage=malloc(maxvarchar);
 	NodeDesc nodeDesc;
 	NodeDesc tempnodeDesc;
 	memcpy(&nodeDesc,(char *)page+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
-
+	PageSize offset=0;
 	KeyDesc currentkeyDesc;
-	keyDesc oldkeyDesc;
+	//scan to find the desired pointer
+	while(true){
+		memcpy(&currentkeyDesc,(char *) page+offset,sizeof(NodeDesc));
+		offset+=sizeof(NodeDesc);
+		memcpy(keypage,(char *) page+offset,currentkeyDesc.keySize);
+		offset+=currentkeyDesc.keySize;
+
+		if(keyCompare(key,keypage)<0){
+			//get the page pointer
+
+		}
+
+	}
+	if(nodeDesc.size >= UpperThreshold){
+		//split the page
+
+	}
+	//recursively call TraverseTreeInsert
+
+	free(keypage);
+	return ;
 }
 
 
