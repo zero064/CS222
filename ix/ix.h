@@ -25,6 +25,7 @@ typedef struct {
     NodeType type;
     PageSize size;
     PageNum next;
+    PageNum prev;
 } NodeDesc;
 
 typedef struct {
@@ -90,6 +91,11 @@ class IndexManager : public DebugMsg {
 
 
 	TreeOp insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, KeyDesc &keyDesc);
+
+	
+	TreeOp deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page,
+			      PageNum pageNum, KeyDesc &keyDesc);
+
 	int keyCompare(const Attribute &attribute, const void *keyA, const void* keyB); 
 	int getKeySize(const Attribute &attribute, const void *key);
 /*
@@ -134,6 +140,7 @@ class IXFileHandle {
 	// PageNum from pfm is unsigned int
 	RC readPage(PageNum pageNum, void *data);
 	RC writePage(PageNum pageNum, const void *data);
+	RC deletePage(PageNum pageNum);
 
 	PageNum findFreePage();
 	PageNum findRootPage();
