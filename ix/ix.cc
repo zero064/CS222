@@ -67,6 +67,17 @@ RC IndexManager::closeFile(IXFileHandle &ixfileHandle)
     return ixfileHandle.closeFilePointer();
 }
 
+TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, KeyDesc &keyDesc)
+{
+	NodeDesc nodeDesc;
+	NodeDesc tempnodeDesc;
+	memcpy(&nodeDesc,(char *)page+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
+
+	KeyDesc currentkeyDesc;
+	keyDesc oldkeyDesc;
+}
+
+
 RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid)
 {
     RC rc;
@@ -75,6 +86,10 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
     void *page = malloc(PAGE_SIZE);
     rc = ixfileHandle.readPage(root,page); 
     
+    KeyDesc keyDesc;
+    keyDesc.type=attribute;
+    keyDesc.keyValue=malloc(maxvarchar);
+
     // check if root needs to be split 
     NodeDesc nodeDesc;
     memcpy( &nodeDesc, (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
@@ -83,7 +98,77 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
     PageSize size = nodeDesc.size;
 
     // traverse tree
+    if(type==Leaf){
+    	//root page is leaf page
 
+    	TreeOp treeop=insertToLeaf(ixfileHandle, attribute, key, rid, page, root, keyDesc);
+    	assert( ((treeop == OP_Split) || (treeop == OP_None)) && "treeop should be OP_Split or OP_None"  );
+    	if(treeop == OP_Split){
+    		PageNum newroot;
+    		newroot=ixfileHandle.findFreePage();
+    		ixfileHandle.updateRootPage(newroot);
+    		NodeDesc newnodeDesc;
+    		int keysize = getKeySize(keyDesc.type,keyDesc.keyValue);
+
+    		newnodeDesc.next=-1;
+    		newnodeDesc.type=NonLeaf;
+    		newnodeDesc.size=0;
+
+    		//reuse void * page, copy keyDesc to the page
+    		memcpy((char *)page+newnodeDesc.size,&keyDesc,sizeof(KeyDesc));
+    		newnodeDesc.size+=sizeof(KeyDesc);
+    		memcpy((char *)page+newnodeDesc.size,keyDesc.keyValue,keysize);
+    		newnodeDesc.size+=keysize;
+
+    		memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),&newnodeDesc,sizeof(NodeDesc));
+
+    		rc = writePage(newroot,page);
+    		assert(rc == SUCCESS && "Fail to write root page as leaf page");
+    		dprintf("Successfully split root page");
+    	}
+
+    	free(keyDesc.keyValue);
+    	free(page);
+    	dprintf("Original root page is Leaf");
+    	return 0;
+    }else if(type == NonLeaf){
+    	//root page is NonLeaf
+
+       	TreeOp treeop=TraverseTreeInsert(ixfileHandle, attribute, key, rid, page, root, keyDesc);
+        	assert( ((treeop == OP_Split) || (treeop == OP_None)) && "treeop should be OP_Split or OP_None"  );
+        	if(treeop == OP_Split){
+        		PageNum newroot;
+        		newroot=ixfileHandle.findFreePage();
+        		ixfileHandle.updateRootPage(newroot);
+        		NodeDesc newnodeDesc;
+        		int keysize = getKeySize(keyDesc.type,keyDesc.keyValue);
+
+        		newnodeDesc.next=-1;
+        		newnodeDesc.type=NonLeaf;
+        		newnodeDesc.size=0;
+
+        		//reuse void * page, copy keyDesc to the page
+        		memcpy((char *)page+newnodeDesc.size,&keyDesc,sizeof(KeyDesc));
+        		newnodeDesc.size+=sizeof(KeyDesc);
+        		memcpy((char *)page+newnodeDesc.size,keyDesc.keyValue,keysize);
+        		newnodeDesc.size+=keysize;
+
+        		memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),&newnodeDesc,sizeof(NodeDesc));
+
+        		rc = writePage(newroot,page);
+        		assert(rc == SUCCESS && "Fail to write root page as leaf page");
+        		dprintf("Successfully split root page");
+        	}
+
+
+
+    	free(keyDesc.keyValue);
+    	free(page);
+    	dprintf("Original root page is NonLeaf");
+    	return 0;
+    }else{
+    	assert("root page should be Leaf or NonLeaf");
+    }
     // 
     
     return -1;
@@ -397,6 +482,14 @@ PageNum IXFileHandle::findRootPage()
 	RC rc;
 	rc = writePage(0, page);
 	assert( rc == SUCCESS && "write root page failed" );
+
+	NodeDesc nodeDesc;
+	nodeDesc.next=-1;
+	nodeDesc.type=Leaf;
+	nodeDesc.size=0;
+	memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),&nodeDesc,sizeof(NodeDesc));
+	rc = writePage(1,page);
+	assert(rc == SUCCESS && "Fail to write root page as leaf page");
 
     }else{
 	// read 1st directory's 1st entry
