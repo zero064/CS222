@@ -16,9 +16,6 @@ typedef char NodeType;
 const char Leaf = 1 , NonLeaf = 2;
 
 const int THRESHOLD = PAGE_SIZE / 2;
-const int UpperThreshold = (PAGE_SIZE -sizeof(NodeDesc))*0.85;
-const int LowerThreshold = (PAGE_SIZE -sizeof(NodeDesc))*0.4;
-const int maxvarchar=54;
 
 typedef enum { OP_Split, OP_Merge , OP_Dist , OP_None , OP_Error }TreeOp; 
 

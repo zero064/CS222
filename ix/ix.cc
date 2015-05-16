@@ -311,6 +311,7 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 	memcpy( &nDed, (char*)splitPage, sizeof(DataEntryDesc));
 	keyDesc.rightNode = freePageID;
 	keyDesc.leftNode = pageNum;
+	keyDesc.keySize = nDed.keySize;
 	memcpy( keyDesc.keyValue, (char*)splitPage+sizeof(DataEntryDesc), nDed.keySize);
     }
     
@@ -408,6 +409,7 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 	
 	    	keyDesc.rightNode = pageNum;
 		keyDesc.leftNode = nodeDesc.prev;
+		keyDesc.keySize = newKeyEntry.keySize;
 		DataEntryDesc newKeyEntry;
 		memcpy( &newKeyEntry, page, sizeof(DataEntryDesc) );
 		memcpy( keyDesc.keyValue, (char*)page+sizeof(DataEntryDesc), newKeyEntry.keySize);
@@ -450,6 +452,7 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 		free(temp);	
 	    	keyDesc.leftNode = pageNum;
 		keyDesc.rightNode = nodeDesc.next;
+		keyDesc.keySize = newKeyEntry.keySize;
 		DataEntryDesc newKeyEntry;
 		memcpy( &newKeyEntry, nextPage, sizeof(DataEntryDesc) );
 		memcpy( keyDesc.keyValue, (char*)nextPage+sizeof(DataEntryDesc), newKeyEntry.keySize);
