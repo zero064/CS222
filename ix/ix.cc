@@ -13,6 +13,7 @@ IndexManager* IndexManager::instance()
 
 IndexManager::IndexManager()
 {
+	debug = true;
 }
 
 IndexManager::~IndexManager()
@@ -66,6 +67,58 @@ RC IndexManager::closeFile(IXFileHandle &ixfileHandle)
 {
     return ixfileHandle.closeFilePointer();
 }
+TreeOp IndexManager::TraverseTree(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, PageNum &returnpageNum)
+{
+
+	void *nextpage = malloc(PAGE_SIZE);
+	NodeDesc nodeDesc;
+	NodeDesc nextnodeDesc;
+	memcpy(&nodeDesc,(char *)page+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
+
+	PageSize offset=0;
+	KeyDesc currentkeyDesc;
+	currentkeyDesc.keyValue = malloc(maxvarchar);
+	PageNum currentpageNum=-1;
+
+	TreeOp treeop = OP_None;
+	while(true){
+		memcpy(&currentkeyDesc,(char *) page+offset,sizeof(KeyDesc));
+		offset+=sizeof(KeyDesc);
+		memcpy(currentkeyDesc.keyValue,(char *) page+offset,currentkeyDesc.keySize);
+		offset+=currentkeyDesc.keySize;
+
+		if(keyCompare(attribute,key,currentkeyDesc.keyValue)<0){
+			//get the page pointer
+			currentpageNum=currentkeyDesc.leftNode;
+			offset -= sizeof(KeyDesc);//adjust the offset for inserting a  key entry,
+			offset -= currentkeyDesc.keySize;
+			break;
+		}
+		if(offset == nodeDesc.size){
+			//last entry
+			currentpageNum=currentkeyDesc.rightNode;
+			break;
+		}
+	}
+	dprintf("currentpageNUm is %d",currentpageNum);
+	ixfileHandle.readPage(currentpageNum,nextpage);
+	memcpy(&nextnodeDesc,(char *)nextpage+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
+	if(nextnodeDesc.type == Leaf){
+		returnpageNum=currentpageNum;
+		treeop=OP_None;
+		free(nextpage);
+		return treeop;
+	}else if(nextnodeDesc.type == NonLeaf){
+
+		TraverseTree(ixfileHandle, attribute, key, rid, nextpage, currentpageNum, returnpageNum);
+		treeop=OP_None;
+		free(nextpage);
+		return treeop;
+
+	}
+
+}
+
 
 TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, KeyDesc &keyDesc)
 {
@@ -159,6 +212,7 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 
 
 	//recursively call TraverseTreeInsert
+	dprintf("currentpageNUm is %d",currentpageNum);
 	ixfileHandle.readPage(currentpageNum,nextpage);
 	memcpy(&nextnodeDesc,(char *)nextpage+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
 	if(nextnodeDesc.type == Leaf){
@@ -178,7 +232,7 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 	if(nexttreeop == OP_Split){
 		if(treeop == OP_Split ){
 
-			if(offset = nodeDesc.size){
+			if(offset == nodeDesc.size){
 				offset -= nodeDesc.size;
 
 				//update sibling KeyDesc
@@ -265,8 +319,11 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 {
     RC rc;
     // find root first 
+    dprintf("in insertEntry\n");
+
     PageNum root = ixfileHandle.findRootPage();
     void *page = malloc(PAGE_SIZE);
+    dprintf("root pageNum is %d",root);
     rc = ixfileHandle.readPage(root,page); 
     
     KeyDesc keyDesc;
@@ -484,8 +541,79 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 
 RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid)
 {
-    return -1;
-}
+    RC rc;
+    // find root first
+    dprintf("in deleteEntry\n");
+
+    PageNum root = ixfileHandle.findRootPage();
+    void *page = malloc(PAGE_SIZE);
+    dprintf("root pageNum is %d",root);
+    rc = ixfileHandle.readPage(root,page);
+
+    KeyDesc keyDesc;
+    keyDesc.type=attribute;
+    keyDesc.keyValue=malloc(maxvarchar);
+
+    // check if root needs to be split
+    NodeDesc nodeDesc;
+    memcpy( &nodeDesc, (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
+
+    NodeType type = nodeDesc.type;
+    PageSize size = nodeDesc.size;
+
+    // traverse tree
+    if(type==Leaf){
+    	//root page is leaf page
+
+    	TreeOp treeop=deleteFromLeaf(ixfileHandle, attribute, key, rid, page, root, keyDesc);
+    	assert( ((treeop == OP_Dist) || (treeop == OP_Merge) || (treeop == OP_None)) && "treeop should be OP_Merge, OP_Dist or OP_None"  );
+    	if(treeop != OP_Error){
+    		free(keyDesc.keyValue);
+    		free(page);
+    		dprintf("Original root page is Leaf");
+    		return 0;
+    	}
+    }else if(type == NonLeaf){
+    	//root page is NonLeaf
+
+       	TreeOp treeop=TraverseTreeInsert(ixfileHandle, attribute, key, rid, page, root, keyDesc);
+        	assert( ((treeop == OP_Split) || (treeop == OP_None)) && "treeop should be OP_Split or OP_None"  );
+        	if(treeop == OP_Split){
+        		PageNum newroot;
+        		newroot=ixfileHandle.findFreePage();
+        		ixfileHandle.updateRootPage(newroot);
+        		NodeDesc newnodeDesc;
+        		int keysize = getKeySize(keyDesc.type,keyDesc.keyValue);
+
+        		newnodeDesc.next=-1;
+        		newnodeDesc.type=NonLeaf;
+        		newnodeDesc.size=0;
+
+        		//reuse void * page, copy keyDesc to the page
+        		memcpy((char *)page+newnodeDesc.size,&keyDesc,sizeof(KeyDesc));
+        		newnodeDesc.size+=sizeof(KeyDesc);
+        		memcpy((char *)page+newnodeDesc.size,keyDesc.keyValue,keysize);
+        		newnodeDesc.size+=keysize;
+
+        		memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),&newnodeDesc,sizeof(NodeDesc));
+
+        		rc = ixfileHandle.writePage(newroot,page);
+        		assert(rc == SUCCESS && "Fail to write root page as leaf page");
+        		dprintf("Successfully split root page");
+        	}
+
+
+
+    	free(keyDesc.keyValue);
+    	free(page);
+    	dprintf("Original root page is NonLeaf");
+    	return 0;
+    }else{
+    	assert("root page should be Leaf or NonLeaf");
+    }
+    //
+
+    return -1;}
 
 
 TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page,

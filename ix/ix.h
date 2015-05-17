@@ -5,6 +5,7 @@
 #include <string>
 #include <stdlib.h>
 #include <unistd.h>
+#include <cstdio>
 
 #include "../rbf/rbfm.h"
 
@@ -95,6 +96,9 @@ class IndexManager : public DebugMsg {
 
     private:
         static IndexManager *_index_manager;
+
+    TreeOp TraverseTree(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, PageNum &returnpageNum);
+
 
     TreeOp TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, KeyDesc &keyDesc);
 
