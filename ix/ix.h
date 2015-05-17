@@ -33,8 +33,6 @@ const int LowerThreshold = (PAGE_SIZE-sizeof(NodeDesc))*0.4;
 
 
 
-
-
 typedef struct {
     Attribute type;
     PageNum leftNode;
@@ -56,7 +54,7 @@ class IX_ScanIterator;
 class IXFileHandle;
 
 class IndexManager : public DebugMsg {
-
+    friend class IX_ScanIterator;
     public:
         static IndexManager* instance();
 
@@ -88,7 +86,7 @@ class IndexManager : public DebugMsg {
                 IX_ScanIterator &ix_ScanIterator);
 
         // Print the B+ tree JSON record in pre-order
-        void printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute) const;
+        void printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute);
 
     protected:
         IndexManager();
@@ -125,17 +123,8 @@ class IndexManager : public DebugMsg {
 */
 };
 
-class IX_ScanIterator {
-    public:
-        IX_ScanIterator();  							// Constructor
-        ~IX_ScanIterator(); 							// Destructor
 
-        RC getNextEntry(RID &rid, void *key);  		// Get next matching entry
-        RC close();             						// Terminate index scan
-};
-
-
-class IXFileHandle {
+class IXFileHandle : public DebugMsg {
     public:
         // Put the current counter values of associated PF FileHandles into variables
         RC collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount);
@@ -161,6 +150,38 @@ class IXFileHandle {
 		
     private:
 	FileHandle fileHandle;
+};
+
+
+
+
+class IX_ScanIterator {
+
+    public:
+        IX_ScanIterator();  							// Constructor
+        ~IX_ScanIterator(); 							// Destructor
+
+        RC getNextEntry(RID &rid, void *key);			 		// Get next matching entry
+        RC close();             						// Terminate index scan
+	
+	// Initialize and IX_ScanIterator to supports a range search
+        RC init(IXFileHandle &ixfileHandle,
+                const Attribute &attribute,
+                const void *lowKey,
+                const void *highKey,
+                bool lowKeyInclusive,
+                bool highKeyInclusive);
+    
+    private:
+	IXFileHandle ixfileHandle;
+	IndexManager *im;
+	Attribute attribute;
+	void *lowKey;
+	void *highKey;
+	bool lowKeyInclusive, highKeyInclusive;
+	void *page;
+	int offsetToKey, offsetToRID;	
+	
 };
 
 // print out the error message for a given return code

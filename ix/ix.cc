@@ -626,7 +626,7 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
     int offset = 0 ; 
     // potential split page buffer
     void *nextPage = malloc(PAGE_SIZE);
-    
+    bool found = false;     
     while( offset < nodeDesc.size ){
 	DataEntryDesc ded;
 	memcpy( &ded, (char*)page+offset, sizeof(DataEntryDesc) );
@@ -646,6 +646,7 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 
 	    nodeDesc.size -= entrySize;
 	    memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc), &nodeDesc, sizeof(NodeDesc) );
+	    found = true;
 	    break;   
 	}else{
 	    // if it has more than two RIDs, remove the one in the list
@@ -666,13 +667,16 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 		}
 		
 	    }
+	    found = true;
 	    break; // break while loop
 	}
 
 	offset += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID);
 
     }
- 
+    
+    if( !found ) return OP_Error;
+
     if( nodeDesc.size < THRESHOLD ){
 	NodeDesc nNodeDesc;
 	// right most leaf case 
@@ -830,14 +834,15 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
         const Attribute &attribute,
         const void      *lowKey,
         const void      *highKey,
-        bool			lowKeyInclusive,
+        bool		lowKeyInclusive,
         bool        	highKeyInclusive,
         IX_ScanIterator &ix_ScanIterator)
 {
-    return -1;
+    return ix_ScanIterator.init(ixfileHandle,attribute,lowKey,highKey,lowKeyInclusive,highKeyInclusive);
 }
 
-void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute) const {
+void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute)
+{
 }
 
 IX_ScanIterator::IX_ScanIterator()
@@ -848,6 +853,70 @@ IX_ScanIterator::~IX_ScanIterator()
 {
 }
 
+
+RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
+        const Attribute &attribute,
+        const void      *lowKey,
+        const void      *highKey,
+        bool		lowKeyInclusive,
+        bool        	highKeyInclusive)
+{
+    this->ixfileHandle = ixfileHandle;	
+    this->attribute = attribute;
+    this->lowKey = (char*)lowKey;
+    this->highKey = (char*)highKey;
+    this->lowKeyInclusive = lowKeyInclusive;
+    this->highKeyInclusive = highKeyInclusive;
+    this->page = malloc(PAGE_SIZE);
+    im = IndexManager::instance();    
+
+    RC rc;
+    // find root first 
+    PageNum root = ixfileHandle.findRootPage();
+    void *page = malloc(PAGE_SIZE);
+    rc = ixfileHandle.readPage(root,page); 
+
+    // Get Root Page Info
+    NodeDesc nodeDesc;
+    memcpy( &nodeDesc , (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc));
+    
+    if( nodeDesc.type == NonLeaf ){
+	
+	
+	
+    }
+
+	
+    offsetToKey = 0;
+    offsetToRID = 0;
+    while( true ){    
+        DataEntryDesc ded;
+        memcpy( &ded, (char*)page+offsetToKey, sizeof(DataEntryDesc));
+	// retrieve key value
+        void *key = malloc( ded.keySize );
+        memcpy( &ded, (char*)page+offsetToKey+sizeof(DataEntryDesc), ded.keySize );
+        if( lowKeyInclusive ){
+	    if( im->keyCompare( attribute , key , lowKey ) >= 0 ){
+		free(key);
+		return SUCCESS;		
+	    }
+	}else{
+	    if( im->keyCompare( attribute , key , lowKey ) > 0 ){
+		free(key);
+		return SUCCESS;		
+	    }
+	}
+	free(key);
+	offsetToKey += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID);
+    } 
+    
+   
+
+ 
+    return FAILURE;
+}
+
+
 RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 {
     return -1;
@@ -855,7 +924,8 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 
 RC IX_ScanIterator::close()
 {
-    return -1;
+    free(page);
+    return SUCCESS;
 }
 
 
@@ -940,11 +1010,13 @@ PageNum IXFileHandle::findRootPage()
     // A directory can have (4096 / 4) - 1 = 1023 cells to describe pages ( leaf & non-leaf );
     // Each directory start with index 1, where use 0 or 1 to indicate empty or full
     // The first directory is a specical case where 1st entry stores root node's pagenum ( positive integer )
+    debug = true;
 
     int directorySize = PAGE_SIZE / sizeof( PageNum );
     void *page = malloc(PAGE_SIZE);
     PageNum root = 1; // assume root page is 1 if the whole structure hasn't been initialized 
     if( readPage(0, page) == FAILURE ) {
+
 	for(int i=1; i< directorySize; i++ ){
 	    PageNum empty = 0;
 	    memcpy( (char*)page+i*sizeof(PageNum) , &empty, sizeof(PageNum) );
@@ -974,11 +1046,13 @@ PageNum IXFileHandle::findRootPage()
 
 RC IXFileHandle::readPage(PageNum pageNum, void *data)
 {
-    return readPage(pageNum,data);
+    this->readPageCount++;
+    return fileHandle.readPage(pageNum,data);
 }
 
 RC IXFileHandle::writePage(PageNum pageNum, const void *data)
 {
+    this->writePageCount++;
     return fileHandle.writePage(pageNum,data);
 }
 
@@ -996,7 +1070,7 @@ RC IXFileHandle::deletePage(PageNum pageNum)
     memcpy( (char*)page+pageIndex , &empty , sizeof(PageNum) ); 
     fileHandle.writePage( dir, page );    
     free(page);
-
+    return SUCCESS;
 }
 
 RC IXFileHandle::collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount)
