@@ -812,11 +812,13 @@ PageNum IXFileHandle::findRootPage()
     // A directory can have (4096 / 4) - 1 = 1023 cells to describe pages ( leaf & non-leaf );
     // Each directory start with index 1, where use 0 or 1 to indicate empty or full
     // The first directory is a specical case where 1st entry stores root node's pagenum ( positive integer )
+    debug = true;
 
     int directorySize = PAGE_SIZE / sizeof( PageNum );
     void *page = malloc(PAGE_SIZE);
     PageNum root = 1; // assume root page is 1 if the whole structure hasn't been initialized 
     if( readPage(0, page) == FAILURE ) {
+
 	for(int i=1; i< directorySize; i++ ){
 	    PageNum empty = 0;
 	    memcpy( (char*)page+i*sizeof(PageNum) , &empty, sizeof(PageNum) );
@@ -846,11 +848,13 @@ PageNum IXFileHandle::findRootPage()
 
 RC IXFileHandle::readPage(PageNum pageNum, void *data)
 {
-    return readPage(pageNum,data);
+    this->readPageCount++;
+    return fileHandle.readPage(pageNum,data);
 }
 
 RC IXFileHandle::writePage(PageNum pageNum, const void *data)
 {
+    this->writePageCount++;
     return fileHandle.writePage(pageNum,data);
 }
 

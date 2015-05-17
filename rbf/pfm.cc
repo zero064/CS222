@@ -110,11 +110,15 @@ RC FileHandle::readPage(PageNum pageNum, void *data)
 
 RC FileHandle::writePage(PageNum pageNum, const void *data)
 {
+/*
+    debug = true;
     dprintf("w%d\n",pageNum * PAGE_SIZE );
+
     assert( pageNum <= numberOfPages && "pageNum should smaller than numberofPages" );
     if( pageNum > numberOfPages ){
 	return FAILURE;
     }
+*/
     fseek( filePointer , pageNum * PAGE_SIZE , SEEK_SET );
     int result = fwrite(data, sizeof(char), PAGE_SIZE, filePointer);
   
