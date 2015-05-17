@@ -14,7 +14,6 @@ typedef unsigned short int PageSize;
 
 typedef char NodeType;
 const char Leaf = 1 , NonLeaf = 2;
-const int maxvarchar = 60;
 
 const int maxvarchar = 54;
 const int THRESHOLD = PAGE_SIZE / 2;
@@ -97,7 +96,7 @@ class IndexManager : public DebugMsg {
     private:
         static IndexManager *_index_manager;
 
-    TreeOp TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, KeyDesc &keyDesc)
+    TreeOp TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, KeyDesc &keyDesc);
 
 
 	TreeOp insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, KeyDesc &keyDesc);

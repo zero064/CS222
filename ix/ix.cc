@@ -221,7 +221,7 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 			memcpy((char *)page+offset+sizeof(keyDesc),nextkeyDesc.keyValue,nextkeyDesc.keySize);
 
 			nodeDesc.size += (sizeof(KeyDesc) + nextkeyDesc.keySize);
-			memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),nodeDesc,sizeof(NodeDesc));
+			memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),&nodeDesc,sizeof(NodeDesc));
 			ixfileHandle.writePage(pageNum,page);
 
 		}else{
@@ -545,13 +545,15 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 		nNodeDesc.size = offset;
 		free(temp);
 	
-	    	keyDesc.rightNode = pageNum;
-		keyDesc.leftNode = nodeDesc.prev;
-		keyDesc.keySize = newKeyEntry.keySize;
+
+
 		DataEntryDesc newKeyEntry;
 		memcpy( &newKeyEntry, page, sizeof(DataEntryDesc) );
 		memcpy( keyDesc.keyValue, (char*)page+sizeof(DataEntryDesc), newKeyEntry.keySize);
     
+	    	keyDesc.rightNode = pageNum;
+		keyDesc.leftNode = nodeDesc.prev;
+		keyDesc.keySize = newKeyEntry.keySize;
 
 	    }else{
 		// merge case, nextPage is actually previous page
@@ -588,12 +590,12 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 		nNodeDesc.size -= offset;
 		nodeDesc.size += offset;
 		free(temp);	
-	    	keyDesc.leftNode = pageNum;
-		keyDesc.rightNode = nodeDesc.next;
-		keyDesc.keySize = newKeyEntry.keySize;
 		DataEntryDesc newKeyEntry;
 		memcpy( &newKeyEntry, nextPage, sizeof(DataEntryDesc) );
 		memcpy( keyDesc.keyValue, (char*)nextPage+sizeof(DataEntryDesc), newKeyEntry.keySize);
+	    	keyDesc.leftNode = pageNum;
+		keyDesc.rightNode = nodeDesc.next;
+		keyDesc.keySize = newKeyEntry.keySize;
 
 	    }else{
 		// merge case
