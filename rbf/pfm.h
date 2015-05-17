@@ -7,6 +7,7 @@
 #include <climits>
 #include <assert.h>
 #include <stdarg.h>
+#include <cstring>
 
 
 typedef int RC;
