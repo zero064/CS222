@@ -77,6 +77,7 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 	memcpy(&nodeDesc,(char *)page+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
 
 	PageSize offset=0;
+	KeyDesc siblingkeyDesc;
 	KeyDesc currentkeyDesc;
 	currentkeyDesc.keyValue = malloc(maxvarchar);
 	KeyDesc nextkeyDesc;
@@ -179,6 +180,12 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 
 			if(offset = nodeDesc.size){
 				offset -= nodeDesc.size;
+
+				//update sibling KeyDesc
+				memcpy(&siblingkeyDesc,(char *)bufferpage+offset,sizeof(KeyDesc));
+				siblingkeyDesc.leftNode = nextkeyDesc.rightNode;
+				memcpy((char *)bufferpage+offset,&siblingkeyDesc,sizeof(KeyDesc));
+
 				//may cause problem
 				memcpy((char *)bufferpage+offset+sizeof(KeyDesc)+nextkeyDesc.keySize,(char *)bufferpage+offset,tempnodeDesc.size-offset);
 				memcpy((char *)bufferpage+offset,&nextkeyDesc,sizeof(KeyDesc));
@@ -194,6 +201,12 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 				offset -= nodeDesc.size;
 				offset -= sizeof(KeyDesc);
 				offset -= keyDesc.keySize;
+
+				//update sibling KeyDesc
+				memcpy(&siblingkeyDesc,(char *)bufferpage+offset,sizeof(KeyDesc));
+				siblingkeyDesc.leftNode = nextkeyDesc.rightNode;
+				memcpy((char *)bufferpage+offset,&siblingkeyDesc,sizeof(KeyDesc));
+
 				//may cause problem
 				memcpy((char *)bufferpage+offset+sizeof(KeyDesc)+nextkeyDesc.keySize,(char *)bufferpage+offset,tempnodeDesc.size-offset);
 				memcpy((char *)bufferpage+offset,&nextkeyDesc,sizeof(KeyDesc));
@@ -204,6 +217,12 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 				ixfileHandle.writePage(nodeDesc.next,bufferpage);
 
 			}else{
+
+				//update sibling KeyDesc
+				memcpy(&siblingkeyDesc,(char *)page+offset,sizeof(KeyDesc));
+				siblingkeyDesc.leftNode = nextkeyDesc.rightNode;
+				memcpy((char *)page+offset,&siblingkeyDesc,sizeof(KeyDesc));
+
 				memcpy((char *)page+offset+sizeof(KeyDesc)+nextkeyDesc.keySize,(char *)page+offset,nodeDesc.size-offset);
 				memcpy((char *)page+offset,&nextkeyDesc,sizeof(KeyDesc));
 				memcpy((char *)page+offset+sizeof(keyDesc),nextkeyDesc.keyValue,nextkeyDesc.keySize);
@@ -215,6 +234,11 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 			}
 
 		}else if(treeop == OP_None){
+
+			//update sibling KeyDesc
+			memcpy(&siblingkeyDesc,(char *)page+offset,sizeof(KeyDesc));
+			siblingkeyDesc.leftNode = nextkeyDesc.rightNode;
+			memcpy((char *)page+offset,&siblingkeyDesc,sizeof(KeyDesc));
 
 			memcpy((char *)page+offset+sizeof(KeyDesc)+nextkeyDesc.keySize,(char *)page+offset,nodeDesc.size-offset);
 			memcpy((char *)page+offset,&nextkeyDesc,sizeof(KeyDesc));
