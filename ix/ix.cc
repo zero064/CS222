@@ -69,33 +69,171 @@ RC IndexManager::closeFile(IXFileHandle &ixfileHandle)
 
 TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, KeyDesc &keyDesc)
 {
-	void *keypage=malloc(maxvarchar);
+	void *bufferpage = malloc(PAGE_SIZE);
+	void *nextpage = malloc(PAGE_SIZE);
 	NodeDesc nodeDesc;
 	NodeDesc tempnodeDesc;
+	NodeDesc nextnodeDesc;
 	memcpy(&nodeDesc,(char *)page+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
+
 	PageSize offset=0;
 	KeyDesc currentkeyDesc;
+	currentkeyDesc.keyValue = malloc(maxvarchar);
+	KeyDesc nextkeyDesc;
+	nextkeyDesc.keyValue = malloc(maxvarchar);
+	PageNum currentpageNum=-1;
+
+	TreeOp treeop = OP_None;
+	TreeOp nexttreeop = OP_None;
+
 	//scan to find the desired pointer
 	while(true){
-		memcpy(&currentkeyDesc,(char *) page+offset,sizeof(NodeDesc));
-		offset+=sizeof(NodeDesc);
-		memcpy(keypage,(char *) page+offset,currentkeyDesc.keySize);
+		memcpy(&currentkeyDesc,(char *) page+offset,sizeof(KeyDesc));
+		offset+=sizeof(KeyDesc);
+		memcpy(currentkeyDesc.keyValue,(char *) page+offset,currentkeyDesc.keySize);
 		offset+=currentkeyDesc.keySize;
 
-		if(keyCompare(key,keypage)<0){
+		if(keyCompare(attribute,key,currentkeyDesc.keyValue)<0){
 			//get the page pointer
-
+			currentpageNum=currentkeyDesc.leftNode;
+			offset -= sizeof(KeyDesc);//adjust the offset for inserting a  key entry,
+			offset -= currentkeyDesc.keySize;
+			break;
 		}
-
+		if(offset == nodeDesc.size){
+			//last entry
+			currentpageNum=currentkeyDesc.rightNode;
+			break;
+		}
 	}
+	assert( currentpageNum != -1 && "Should find a pageNum");
+
 	if(nodeDesc.size >= UpperThreshold){
 		//split the page
+		int splitoffset=0;
+		NodeDesc tempnodeDesc;
+		PageSize origsize=nodeDesc.size;
+
+		while(true){
+
+			//use keyDesc
+			memcpy(&keyDesc,(char *) page+splitoffset,sizeof(KeyDesc));
+			splitoffset += sizeof(KeyDesc);
+			splitoffset += keyDesc.keySize;
+
+
+			if(splitoffset >= UpperThreshold/2){
+
+				break;
+			}
+		}
+		//create nodeDesc for two pages
+		nodeDesc.size = splitoffset;
+		nodeDesc.next = ixfileHandle.findFreePage();
+
+		//push up a key value
+		memcpy(&keyDesc,(char *) page+splitoffset,sizeof(KeyDesc));
+		splitoffset += sizeof(KeyDesc);
+		memcpy(keyDesc.keyValue,(char *) page+splitoffset,keyDesc.keySize);
+		splitoffset += keyDesc.keySize;
+		keyDesc.leftNode = pageNum;
+		keyDesc.rightNode = nodeDesc.next;
+
+
+
+		tempnodeDesc.size = origsize-splitoffset;
+		tempnodeDesc.prev = pageNum;
+		tempnodeDesc.type = NonLeaf;
+		assert(splitoffset < origsize && "splitoffset should be less than origsize");
+
+		memcpy(bufferpage,(char *)page+splitoffset,origsize-splitoffset);
+		memcpy((char *)bufferpage+PAGE_SIZE-sizeof(NodeDesc),&tempnodeDesc,sizeof(NodeDesc));
+		memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),&nodeDesc,sizeof(NodeDesc));
+		ixfileHandle.writePage(pageNum,page);
+		ixfileHandle.writePage(nodeDesc.next,bufferpage);
+		treeop = OP_Split;
+
 
 	}
-	//recursively call TraverseTreeInsert
 
-	free(keypage);
-	return ;
+
+	//recursively call TraverseTreeInsert
+	ixfileHandle.readPage(currentpageNum,nextpage);
+	memcpy(&nextnodeDesc,(char *)nextpage+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
+	if(nextnodeDesc.type == Leaf){
+		nexttreeop = insertToLeaf(ixfileHandle,attribute,key,rid,nextpage,currentpageNum, nextkeyDesc);
+
+		assert((nexttreeop == OP_Split || nexttreeop == OP_None) && "nexttreeop should be OP_split or OP_None");
+
+	}else if(nextnodeDesc.type == NonLeaf){
+
+		nexttreeop = TraverseTreeInsert(ixfileHandle,attribute,key,rid,nextpage,currentpageNum, nextkeyDesc);
+		assert((nexttreeop == OP_Split || nexttreeop == OP_None) && "nexttreeop should be OP_split or OP_None");
+
+
+	}else{
+		assert("page type should be leaf or NonLeaf");
+	}
+	if(nexttreeop == OP_Split){
+		if(treeop == OP_Split ){
+
+			if(offset = nodeDesc.size){
+				offset -= nodeDesc.size;
+				//may cause problem
+				memcpy((char *)bufferpage+offset+sizeof(KeyDesc)+nextkeyDesc.keySize,(char *)bufferpage+offset,tempnodeDesc.size-offset);
+				memcpy((char *)bufferpage+offset,&nextkeyDesc,sizeof(KeyDesc));
+				memcpy((char *)bufferpage+offset+sizeof(keyDesc),nextkeyDesc.keyValue,nextkeyDesc.keySize);
+
+				tempnodeDesc.size += (sizeof(KeyDesc) + nextkeyDesc.keySize);
+				memcpy((char *)bufferpage+PAGE_SIZE-sizeof(NodeDesc),&tempnodeDesc,sizeof(NodeDesc));
+				ixfileHandle.writePage(nodeDesc.next,bufferpage);
+
+
+
+			}else if(offset > nodeDesc.size){
+				offset -= nodeDesc.size;
+				offset -= sizeof(KeyDesc);
+				offset -= keyDesc.keySize;
+				//may cause problem
+				memcpy((char *)bufferpage+offset+sizeof(KeyDesc)+nextkeyDesc.keySize,(char *)bufferpage+offset,tempnodeDesc.size-offset);
+				memcpy((char *)bufferpage+offset,&nextkeyDesc,sizeof(KeyDesc));
+				memcpy((char *)bufferpage+offset+sizeof(keyDesc),nextkeyDesc.keyValue,nextkeyDesc.keySize);
+
+				tempnodeDesc.size += (sizeof(KeyDesc) + nextkeyDesc.keySize);
+				memcpy((char *)bufferpage+PAGE_SIZE-sizeof(NodeDesc),&tempnodeDesc,sizeof(NodeDesc));
+				ixfileHandle.writePage(nodeDesc.next,bufferpage);
+
+			}else{
+				memcpy((char *)page+offset+sizeof(KeyDesc)+nextkeyDesc.keySize,(char *)page+offset,nodeDesc.size-offset);
+				memcpy((char *)page+offset,&nextkeyDesc,sizeof(KeyDesc));
+				memcpy((char *)page+offset+sizeof(keyDesc),nextkeyDesc.keyValue,nextkeyDesc.keySize);
+
+				nodeDesc.size += (sizeof(KeyDesc) + nextkeyDesc.keySize);
+				memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),&nodeDesc,sizeof(NodeDesc));
+				ixfileHandle.writePage(pageNum,page);
+
+			}
+
+		}else if(treeop == OP_None){
+
+			memcpy((char *)page+offset+sizeof(KeyDesc)+nextkeyDesc.keySize,(char *)page+offset,nodeDesc.size-offset);
+			memcpy((char *)page+offset,&nextkeyDesc,sizeof(KeyDesc));
+			memcpy((char *)page+offset+sizeof(keyDesc),nextkeyDesc.keyValue,nextkeyDesc.keySize);
+
+			nodeDesc.size += (sizeof(KeyDesc) + nextkeyDesc.keySize);
+			memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),nodeDesc,sizeof(NodeDesc));
+			ixfileHandle.writePage(pageNum,page);
+
+		}else{
+			assert("treeop should be OP_split or OP_None");
+		}
+	}
+
+	free(nextpage);
+	free(bufferpage);
+	free(currentkeyDesc.keyValue);
+	free(nextkeyDesc.keyValue);
+	return treeop;
 }
 
 
@@ -143,7 +281,7 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 
     		memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),&newnodeDesc,sizeof(NodeDesc));
 
-    		rc = writePage(newroot,page);
+    		rc = ixfileHandle.writePage(newroot,page);
     		assert(rc == SUCCESS && "Fail to write root page as leaf page");
     		dprintf("Successfully split root page");
     	}
@@ -176,7 +314,7 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 
         		memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),&newnodeDesc,sizeof(NodeDesc));
 
-        		rc = writePage(newroot,page);
+        		rc = ixfileHandle.writePage(newroot,page);
         		assert(rc == SUCCESS && "Fail to write root page as leaf page");
         		dprintf("Successfully split root page");
         	}
