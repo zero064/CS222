@@ -16,6 +16,7 @@ typedef char NodeType;
 const char Leaf = 1 , NonLeaf = 2;
 const int maxvarchar = 60;
 
+const int maxvarchar = 54;
 const int THRESHOLD = PAGE_SIZE / 2;
 
 typedef enum { OP_Split, OP_Merge , OP_Dist , OP_None , OP_Error }TreeOp; 
@@ -23,9 +24,16 @@ typedef enum { OP_Split, OP_Merge , OP_Dist , OP_None , OP_Error }TreeOp;
 typedef struct {
     NodeType type;
     PageSize size;
-    PageNum next;
-    PageNum prev;
+    PageNum next = -1;
+    PageNum prev = -1;
 } NodeDesc;
+
+const int UpperThreshold = (PAGE_SIZE-sizeof(NodeDesc))*0.85;
+const int LowerThreshold = (PAGE_SIZE-sizeof(NodeDesc))*0.4;
+
+
+
+
 
 typedef struct {
     Attribute type;
@@ -88,6 +96,8 @@ class IndexManager : public DebugMsg {
 
     private:
         static IndexManager *_index_manager;
+
+    TreeOp TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, KeyDesc &keyDesc)
 
 
 	TreeOp insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, KeyDesc &keyDesc);
