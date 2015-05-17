@@ -321,6 +321,57 @@ RC createTable(const string &tableName)
     return success;
 }
 
+void prepareLargeTupleNull(int attributeCount, unsigned char *nullAttributesIndicator, const int index, void *buffer, int *size)
+{
+    int offset = 0;
+
+	// Null-indicators
+    int nullAttributesIndicatorActualSize = getActualByteForNullsIndicator(attributeCount);
+    //printf("yo %d\n",nullAttributesIndicatorActualSize);
+    nullAttributesIndicator[0] = 224 ;  // 1110000 00000000 00000000 
+
+	// Null-indicator for the fields
+    memcpy((char *)buffer + offset, nullAttributesIndicator, nullAttributesIndicatorActualSize);
+	offset += nullAttributesIndicatorActualSize;
+
+    // compute the count
+    int count = index % 50 + 1;
+
+    // compute the letter
+    char text = index % 26 + 97;
+
+    for(int i = 0; i < 10; i++)
+    {
+	if( i == 0 ) continue;
+    	// length
+        memcpy((char *)buffer + offset, &count, sizeof(int));
+        offset += sizeof(int);
+
+        // varchar
+        for(int j = 0; j < count; j++)
+        {
+            memcpy((char *)buffer + offset, &text, 1);
+            offset += 1;
+        }
+	int tt = 300;
+        // integer
+        //memcpy((char *)buffer + offset, &index, sizeof(int));
+        memcpy((char *)buffer + offset, &tt, sizeof(int));
+        offset += sizeof(int);
+
+        // real
+        float real = 110.1;
+        //float real = (float)(index + 1);
+        memcpy((char *)buffer + offset, &real, sizeof(float));
+        memcpy((char *)buffer + offset, &real, sizeof(float));
+        offset += sizeof(float);
+    }
+    *size = offset;
+}
+
+
+
+
 void prepareLargeTuple(int attributeCount, unsigned char *nullAttributesIndicator, const int index, void *buffer, int *size)
 {
     int offset = 0;
@@ -352,7 +403,9 @@ void prepareLargeTuple(int attributeCount, unsigned char *nullAttributesIndicato
         }
 
         // integer
-        memcpy((char *)buffer + offset, &index, sizeof(int));
+	int ttt = 300;
+        //memcpy((char *)buffer + offset, &index, sizeof(int));
+        memcpy((char *)buffer + offset, &ttt, sizeof(int));
         offset += sizeof(int);
 
         // real

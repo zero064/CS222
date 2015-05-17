@@ -1065,9 +1065,10 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 		char nullIndicator;
 		memcpy( &nullIndicator, (char*)returnedData+descriptorLength+nullIndicatorOffet , sizeof(char));
 		
-
 		// if it's null & it's not NO_OP
 		if( nullIndicator & (1 << (7-(i%8))) && compOp != NO_OP) {
+		    printf("1231231231\n");
+//		    assert(false);
 		    break;
 		}
 		

@@ -274,7 +274,7 @@ RelationManager* RelationManager::instance()
 
 RelationManager::RelationManager()
 {  
-    debug = true;
+//    debug = true;
     rbfm = RecordBasedFileManager::instance();
 }
 
@@ -405,7 +405,6 @@ int RelationManager::getTableId(const string &tableName){
 
 			//!!!! skip null indicator
 			memcpy(&tableid,(char *)data+1,sizeof(int));
-			printf("yoooooooooooo table id %d\n",tableid);
 			count++;
 			assert( count < 2 && "should be exact one table-id match one table name" );
 			if(count>=2){
