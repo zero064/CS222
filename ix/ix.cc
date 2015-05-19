@@ -830,6 +830,31 @@ int IndexManager::getKeySize(const Attribute &attribute, const void *key)
 
 }
 
+// print key to screen 
+void IndexManager::printKey(const Attribute &attribute, const void *key)
+{
+    AttrType type = attribute.type;
+    int size = -1;
+    switch( type ){
+	case TypeInt:
+	    printf("%d",(int*)key);
+	    return;
+	case TypeReal:
+	    printf("%f",(float*)key);
+	    return 
+	case TypeVarChar:
+	    memcpy( &size, key , sizeof(int) );
+	    assert( size >= 0 && "something wrong with getting varchar key size\n");
+	    assert( size < 50 && "something wrong with getting varchar key size\n");
+	    printf("%s",(char*)key+4);
+	    return;
+    }
+
+
+
+}
+
+
 RC IndexManager::scan(IXFileHandle &ixfileHandle,
         const Attribute &attribute,
         const void      *lowKey,
@@ -840,9 +865,104 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
 {
     return ix_ScanIterator.init(ixfileHandle,attribute,lowKey,highKey,lowKeyInclusive,highKeyInclusive);
 }
-
 void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute)
 {
+    RC rc;
+    void *page = malloc(PAGE_SIZE);
+    PageNum rootPage = ixfileHandle.findRootPage();
+    ixfileHandle.readPage(rootPage,page);
+
+    NodeDesc nodeDesc;
+    memcpy( &nodeDesc, (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
+    if( nodeDesc.type == Leaf ){
+	int offset = 0;
+	DataEntryDesc ded;
+	printf("{\n\"keys\":[");
+	while( offset < nodeDesc.size ){
+	    if( offset > 0 ) printf(",");
+	    memcpy( &ded, (char*)page+offset, sizeof(DataEntryDesc) );
+	    void *key = malloc( ded.keySize );
+	    memcpy( key , (char*)page+offset+sizeof(DataEntryDesc), ded.keySize);
+	    // print key
+	    printf("\""); printKey( attribute, key ); printf("\"");
+	    free(key);	 
+	    offset += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID * sizeof(RID) ;   
+	}
+	printf("]\n");
+    }    
+
+    if( nodeDesc.type = NonLeaf ){
+
+    }
+
+    printf("}\n");
+    free(page);
+}
+
+
+void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute, void *page, int depth, PageNum nodeNum)
+{
+    RC rc;
+    rc = ixfileHandle( page, nodeNum );
+    assert( rc == SUCCESS && "Something wrong in read page in printBTree subTree");
+
+    NodeDesc nodeDesc;
+    memcpy( &nodeDesc, (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
+    // print indent based on depth
+    for(int i=0; i<depth; i++) printf("\t");   
+ 
+    if( nodeDesc.type == Leaf ){
+	int offset = 0;
+	KeyDesc keyDesc;
+	DataEntryDesc ded;	
+	printf("{\n\"keys\": [");
+	while( offset < nodeDesc.size ){
+	    if( offset > 0 ) printf(",");
+	    
+	    memcpy( &keyDesc, (char*)page+offset, sizeof(KeyDesc));
+	    keyDesc.keyValue = malloc( keyDesc.keySize );
+	    memcpy( keyDesc.keyValue,(char *) page+offset, keyDesc.keySize);
+	    
+	    printKey( attribute, keyDesc.keyValue );
+
+	    free( keyDesc.keyValue);
+
+
+	    offset += sizeof(KeyDesc) + keyDesc.keySize;
+
+
+	}
+
+
+    }
+    
+    if( nodeDesc.type == NonLeaf ){
+	int offset = 0;
+	DataEntryDesc ded;
+	printf("{\n\"keys\": [");
+	while( offset < nodeDesc.size ){
+	    if( offset > 0 ) printf(",");
+	    memcpy( &ded, (char*)page+offset, sizeof(DataEntryDesc) );
+	    void *key = malloc( ded.keySize );
+	    memcpy( key , (char*)page+offset+sizeof(DataEntryDesc), ded.keySize);
+	    // print key
+	    printf("\""); printKey( attribute, key ); printf(":[");
+	    // print RIDs
+	    for(int i=0; i<ded.numOfRID; i++){
+		RID rid;
+		memcpy( &rid, (char*)page+offset+sizeof(DataEntryDesc)+ded.keySize+ i*sizeof(RID), sizeof(RID) );
+		printf("(%d,%d)",rid.pageNum,rid.slotNum);
+		if( i < ded.numOfRID-1 ) printf(","); 
+	    }
+	    printf("]\"");
+	    free(key);	 
+	    offset += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID * sizeof(RID) ;   
+	}
+	printf("]\n");
+	return;
+    }
+
+    assert( false && "It should return before this" );    
 }
 
 IX_ScanIterator::IX_ScanIterator()
@@ -900,8 +1020,6 @@ RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
 
 	rc = ixfileHandle.readPage(returnPageNum,page);
     }
-
-
 
 	
     offsetToKey = 0;
