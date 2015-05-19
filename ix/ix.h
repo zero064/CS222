@@ -95,7 +95,7 @@ class IndexManager : public DebugMsg {
     private:
         static IndexManager *_index_manager;
 
-    TreeOp TraverseTree(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, PageNum &returnpageNum);
+    TreeOp TraverseTree(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, void *page, PageNum pageNum, PageNum &returnpageNum);
 
 
     TreeOp TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, KeyDesc &keyDesc);
@@ -119,7 +119,6 @@ class IndexManager : public DebugMsg {
 	RC makeKey(	
 	RC readKey(void *page, int offset, KeyDesc &keyDesc);
 	RC releaseKey
-	int compareKey( 
 */
 };
 
