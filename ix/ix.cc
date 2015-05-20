@@ -1,4 +1,5 @@
 
+#include <cmath>
 #include "ix.h"
 
 IndexManager* IndexManager::_index_manager = 0;
@@ -67,7 +68,7 @@ RC IndexManager::closeFile(IXFileHandle &ixfileHandle)
 {
     return ixfileHandle.closeFilePointer();
 }
-TreeOp IndexManager::TraverseTree(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, PageNum &returnpageNum)
+TreeOp IndexManager::TraverseTree(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, void *page, PageNum pageNum, PageNum &returnpageNum)
 {
 
 	void *nextpage = malloc(PAGE_SIZE);
@@ -110,7 +111,7 @@ TreeOp IndexManager::TraverseTree(IXFileHandle &ixfileHandle, const Attribute &a
 		return treeop;
 	}else if(nextnodeDesc.type == NonLeaf){
 
-		TraverseTree(ixfileHandle, attribute, key, rid, nextpage, currentpageNum, returnpageNum);
+		TraverseTree(ixfileHandle, attribute, key, nextpage, currentpageNum, returnpageNum);
 		treeop=OP_None;
 		free(nextpage);
 		return treeop;
@@ -168,7 +169,7 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 		int splitoffset=0;
 		NodeDesc tempnodeDesc;
 		PageSize origsize=nodeDesc.size;
-		keyDesc tempkeyDesc
+		KeyDesc tempkeyDesc;
 		while(true){
 
 			//use keyDesc
@@ -182,16 +183,18 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 				break;
 			}
 		}
-		//add keySize information for returned key
-		keyDesc.keySize = tempkeyDesc.keySize;
+
 		//create nodeDesc for two pages
 		int tempnext=nodeDesc.next;
 		nodeDesc.size = splitoffset;
 		nodeDesc.next = ixfileHandle.findFreePage();
 
 		//push up a key value
-		memcpy(&keyDesc,(char *) page+splitoffset,sizeof(KeyDesc));
+		memcpy(&tempkeyDesc,(char *) page+splitoffset,sizeof(KeyDesc));
 		splitoffset += sizeof(KeyDesc);
+		//updating keySize to returned key
+		keyDesc.keySize = tempkeyDesc.keySize;
+		dprintf("keyDesc.keySize is %d\n",keyDesc.keySize);
 		memcpy(keyDesc.keyValue,(char *) page+splitoffset,keyDesc.keySize);
 		splitoffset += keyDesc.keySize;
 		keyDesc.leftNode = pageNum;
@@ -288,7 +291,7 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 				memcpy((char *)page+offset,&siblingkeyDesc,sizeof(KeyDesc));
 
 				//move data backward
-				mecpy(buffer,(char *)page+offset,nodeDesc.size-offset);
+				memcpy(buffer,(char *)page+offset,nodeDesc.size-offset);
 				memcpy((char *)page+offset+sizeof(KeyDesc)+nextkeyDesc.keySize,buffer,nodeDesc.size-offset);
 				memcpy((char *)page+offset,&nextkeyDesc,sizeof(KeyDesc));
 				memcpy((char *)page+offset+sizeof(keyDesc),nextkeyDesc.keyValue,nextkeyDesc.keySize);
@@ -556,7 +559,7 @@ void IndexManager::FindLastKey(void *page,KeyDesc &keyDesc)
 {
 	NodeDesc nodeDesc;
 	int offset = 0;
-	memcpy(&nodeDesc,page+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
+	memcpy(&nodeDesc,(char*)page+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
 	while(true){
 		memcpy(&keyDesc,(char *) page+offset,sizeof(KeyDesc));
 		offset+=(sizeof(KeyDesc) + keyDesc.keySize);
@@ -572,7 +575,7 @@ RC IndexManager::FindOffset(void *page,int size,int &offset,bool IsGreater)
 	offset = 0;
 	int oldoffset = -1;
 	NodeDesc nodeDesc;
-	memcpy(&nodeDesc,page+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
+	memcpy(&nodeDesc,(char*)page+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
 
 	while(true){
 		memcpy(&keyDesc,(char *)page+offset,sizeof(keyDesc));
@@ -598,7 +601,7 @@ RC IndexManager::FindOffset(void *page,int size,int &offset,bool IsGreater)
 
 TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, KeyDesc &keyDesc)
 {
-	void *bufferpage = malloc(PAGE_SIZE);
+	/*void *bufferpage = malloc(PAGE_SIZE);
 	void *nextpage = malloc(PAGE_SIZE);
 	void *leftsibling = malloc(PAGE_SIZE);
 	void *rightsibling = malloc(PAGE_SIZE);
@@ -653,7 +656,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 
 
 	if(nodeDesc.size < LowerThreshold){
-		//split the page
+		//merege or redistribute the page
 		int splitoffset=0;
 		NodeDesc leftnodeDesc;
 		NodeDesc rightnodeDesc;
@@ -947,7 +950,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 
 				memcpy((char *)leftsibling+PAGE_SIZE-sizeof(NodeDesc),&leftnodeDesc,sizeof(NodeDesc));
 				//write page to disk
-				ixfileHandle.writePage(nodeDesc.prev,sibling);
+				ixfileHandle.writePage(nodeDesc.prev,leftsibling);
 			}else if(treeop == OP_None){
 
 				//if nodeDesc.next != -1, offset and oldoffset do not change
@@ -1094,7 +1097,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 	free(bufferpage);
 	free(currentkeyDesc.keyValue);
 	free(nextkeyDesc.keyValue);
-	return treeop;
+	return treeop;*/
 
 }
 RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid)

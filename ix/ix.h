@@ -96,10 +96,11 @@ class IndexManager : public DebugMsg {
     private:
         static IndexManager *_index_manager;
     void FindLastKey(void *page,KeyDesc &keyDesc);
-    RC FindOffset(void *page,int size,int &offset);
+    RC FindOffset(void *page,int size,int &offset,bool IsGreater);
 
     TreeOp TraverseTree(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, void *page, PageNum pageNum, PageNum &returnpageNum);
 
+    TreeOp TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, KeyDesc &keyDesc);
 
     TreeOp TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, KeyDesc &keyDesc);
 
