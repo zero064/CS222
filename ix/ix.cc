@@ -1578,95 +1578,138 @@ IX_ScanIterator::~IX_ScanIterator()
 
 
 RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
-		const Attribute &attribute,
-		const void *lowKey,
-		const void *highKey,
-		bool	lowKeyInclusive,
-		bool highKeyInclusive)
+        const Attribute &attribute,
+        const void      *lowKey,
+        const void      *highKey,
+        bool		lowKeyInclusive,
+        bool        	highKeyInclusive)
 {
-	this->ixfileHandle = ixfileHandle;
-	this->attribute = attribute;
-	this->lowKey = (char*)lowKey;
-	this->highKey = (char*)highKey;
-	this->lowKeyInclusive = lowKeyInclusive;
-	this->highKeyInclusive = highKeyInclusive;
-	this->page = malloc(PAGE_SIZE);
-	im = IndexManager::instance();
-	float INF = INFINITY, NINF = -INFINITY;
+    this->ixfileHandle = ixfileHandle;	
+    this->attribute = attribute;
+    this->lowKey = (char*)lowKey;
+    this->highKey = (char*)highKey;
+    this->lowKeyInclusive = lowKeyInclusive;
+    this->highKeyInclusive = highKeyInclusive;
+    this->page = malloc(PAGE_SIZE);
+    im = IndexManager::instance();    
+    float INF = INFINITY, NINF = -INFINITY;
+    
+    if( lowKey == NULL ){
+	this->lowKey = malloc(sizeof(float));
+	memcpy( this->lowKey , &NINF, sizeof(float));
+    }
+    if( highKey == NULL ){
+	this->highKey = malloc(sizeof(float));
+	memcpy( this->highKey , &INF, sizeof(float));
+    }
 
-	if( lowKey == NULL ){
-		this->lowKey = malloc(sizeof(float));
-		memcpy( this->lowKey , &NINF, sizeof(float));
-	}
-	if( highKey == NULL ){
-		this->highKey = malloc(sizeof(float));
-		memcpy( this->highKey , &INF, sizeof(float));
-	}
+    RC rc;
+    // find root first 
+    PageNum root = ixfileHandle.findRootPage();
+    void *page = malloc(PAGE_SIZE);
+    rc = ixfileHandle.readPage(root,page); 
 
-	RC rc;
-	// find root first
-	PageNum root = ixfileHandle.findRootPage();
-	void *page = malloc(PAGE_SIZE);
-	rc = ixfileHandle.readPage(root,page);
-
-	// Get Root Page Info
-	NodeDesc nodeDesc;
-	memcpy( &nodeDesc , (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc));
-
-	// Start Tree Traversal if root is non-leaf
-	PageNum returnPageNum = 0;
-	if( nodeDesc.type == NonLeaf ){
-		im->TraverseTree( ixfileHandle, attribute, lowKey, page, root, returnPageNum);
-		assert( root == returnPageNum && "root should not be leaf in this case" );
-		assert( returnPageNum >=1 && "something went wrong when traversing tree in scan ");
-
-		rc = ixfileHandle.readPage(returnPageNum,page);
-	}
+    // Get Root Page Info
+    NodeDesc nodeDesc;
+    memcpy( &nodeDesc , (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc));
 
 
-	offsetToKey = 0;
-	offsetToRID = 0;
-	while( true ){
+    // Start Tree Traversal if root is non-leaf
+    PageNum returnPageNum = 0;
+    if( nodeDesc.type == NonLeaf ){		
+	im->TraverseTree( ixfileHandle, attribute, lowKey, page, root, returnPageNum);	
+	assert( root == returnPageNum && "root should not be leaf in this case" );
+	assert( returnPageNum >=1 && "something went wrong when traversing tree in scan ");
 
-		DataEntryDesc ded;
-		memcpy( &ded, (char*)page+offsetToKey, sizeof(DataEntryDesc));
-		// retrieve key value
-		void *key = malloc( ded.keySize );
-		memcpy( key, (char*)page+offsetToKey+sizeof(DataEntryDesc), ded.keySize );
+	rc = ixfileHandle.readPage(returnPageNum,page);
+    }
 
-		if( lowKeyInclusive ){
+	
+    offsetToKey = 0;
+    offsetToRID = 0;
+    while( true ){    
 
-			if( im->keyCompare( attribute , key , this->lowKey ) >= 0 ){
+        DataEntryDesc ded;
+        memcpy( &ded, (char*)page+offsetToKey, sizeof(DataEntryDesc));
+	// retrieve key value
+        void *key = malloc( ded.keySize );
+        memcpy( key, (char*)page+offsetToKey+sizeof(DataEntryDesc), ded.keySize );
 
-				free(key);
-				return SUCCESS;
-			}
-		}else{
-			if( im->keyCompare( attribute , key , this->lowKey ) > 0 ){
-				free(key);
-				return SUCCESS;
-			}
-		}
+        if( lowKeyInclusive ){
+
+	    if( im->keyCompare( attribute , key , this->lowKey ) >= 0 ){
+
 		free(key);
-
-		offsetToKey += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID);
+		return SUCCESS;		
+	    }
+	}else{
+	    if( im->keyCompare( attribute , key , this->lowKey ) > 0 ){
+		free(key);
+		return SUCCESS;		
+	    }
 	}
+	free(key);
 
-	return FAILURE;
+	offsetToKey += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID);
+    } 
+    
+ 
+    return FAILURE;
 }
 
 
 RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 {
-	return -1;
+
+    RC rc;
+    // check if the offset exceeds the page size
+    NodeDesc nodeDesc;
+    memcpy( &nodeDesc, (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
+    
+    if( offsetToKey >= nodeDesc.size ){
+	if( nodeDesc.next == -1 ) return IX_EOF;
+	rc = ixfileHandle.readPage( nodeDesc.next, page );
+	assert( rc == SUCCESS && "something wrong in readpage in getNextEntry" );
+	// Reset all offets for new pages;
+	offsetToKey = 0;
+	offsetToRID = 0;
+	memcpy( &nodeDesc, (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
+    }
+
+
+    DataEntryDesc ded;    
+    memcpy( &ded, (char*)page+offsetToKey, sizeof(DataEntryDesc) );
+
+    // Read key and compare 
+    memcpy( key, (char*)page+offsetToKey+sizeof(DataEntryDesc), ded.keySize);
+
+    int result = im->keyCompare( attribute, key , highKey );
+    if( highKeyInclusive ){
+	if( result > 0 ) return IX_EOF;
+    }else{
+	if( result == 0 ) return IX_EOF;
+    }
+    
+    // Read rid and return
+    memcpy( &rid, (char*)page+offsetToKey+sizeof(DataEntryDesc)+ded.keySize+offsetToRID*sizeof(RID), sizeof(RID) );
+    printf("RID %d %d %d\n",rid.pageNum,rid.slotNum, ded.numOfRID); 
+
+    offsetToRID++;
+    if( offsetToRID == ded.numOfRID ){
+	offsetToKey += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID) ;
+    } 
+
+
+    return SUCCESS;
 }
 
 RC IX_ScanIterator::close()
 {
-	free(page);
-	return SUCCESS;
+    free(page);
+    free(lowKey);
+    free(highKey);
+    return SUCCESS;
 }
-
 
 IXFileHandle::IXFileHandle()
 {
