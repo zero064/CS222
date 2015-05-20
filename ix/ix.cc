@@ -139,6 +139,7 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 	nextkeyDesc.keyValue = malloc(maxvarchar);
 	PageNum currentpageNum=-1;
 
+
 	TreeOp treeop = OP_None;
 	TreeOp nexttreeop = OP_None;
 
@@ -324,6 +325,7 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 			assert("treeop should be OP_split or OP_None");
 		}
 	}
+
 	free(buffer);
 	free(nextpage);
 	free(bufferpage);
@@ -416,12 +418,8 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
         		dprintf("Successfully split root page");
         	}
 
-		printf("1 A LO HA\n");
-
-		printf("2 A LO HA\n");
     	free(page);
     	free(keyDesc.keyValue);
-		printf("3 A LO HA\n");
     	dprintf("Original root page is NonLeaf");
     	return 0;
     }else{
@@ -1407,7 +1405,7 @@ void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attri
     void *page = malloc(PAGE_SIZE);
     PageNum rootPage = ixfileHandle.findRootPage();
     ixfileHandle.readPage(rootPage,page);
-
+/*
     NodeDesc nodeDesc;
     memcpy( &nodeDesc, (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
     if( nodeDesc.type == Leaf ){
@@ -1426,12 +1424,13 @@ void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attri
 	}
 	printf("]\n");
     }    
-
-    if( nodeDesc.type = NonLeaf ){
-
+    if( nodeDesc.type == NonLeaf ){
+		printBtree(ixfileHandle,attribute,page,0,rootPage);
     }
+*/
 
-    printf("}\n");
+	printBtree(ixfileHandle,attribute,page,0,rootPage);
+
     free(page);
 }
 
@@ -1453,20 +1452,21 @@ void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attri
 		int offset = 0;
 		KeyDesc keyDesc;
 		DataEntryDesc ded;	
-		printf("{\n\"keys\": [");
+		printf("{\"keys\":[");
 		// print key in non-leaf first 
 		while( offset < nodeDesc.size ){
 	    	if( offset > 0 ) printf(","); 
 		    memcpy( &keyDesc, (char*)page+offset, sizeof(KeyDesc));
 		    keyDesc.keyValue = malloc( keyDesc.keySize );
-		    memcpy( keyDesc.keyValue,(char *) page+offset, keyDesc.keySize);
+		    memcpy( keyDesc.keyValue,(char *) page+offset+sizeof(KeyDesc), keyDesc.keySize);
 			// print key
-		    printf("\""); printKey( attribute, keyDesc.keyValue ); printf(":[");
+		    printf("\""); printKey( attribute, keyDesc.keyValue ); printf("\"");
 			// add links to vector ( without last one )
 		    links.push_back( keyDesc.leftNode );
 			free( keyDesc.keyValue);
 		    offset += sizeof(KeyDesc) + keyDesc.keySize;
 		}
+		printf("],\n");	
 		// add the last link to vectory
 		links.push_back( keyDesc.rightNode );
 
@@ -1478,14 +1478,14 @@ void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attri
 			printBtree(ixfileHandle,attribute,page,depth+1,links[i]);
 			if( i < links.size() - 1 ) printf(",\n");
 		}
-		printf("\n");
+		printf("]}\n");
 		return;
     }
     
     if( nodeDesc.type == Leaf ){
 		int offset = 0;
 		DataEntryDesc ded;
-		printf("{\n\"keys\": [");
+		printf("{\"keys\": [");
 		while( offset < nodeDesc.size ){
 	    	if( offset > 0 ) printf(",");
 		    memcpy( &ded, (char*)page+offset, sizeof(DataEntryDesc) );

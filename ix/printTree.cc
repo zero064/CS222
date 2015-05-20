@@ -34,7 +34,7 @@ int printTree(const string &indexFileName)
 
 		memcpy( key, &s, 4 );
 		memcpy( (char*)key+4, &k, 1 );
-		for(int j=0; j< 50; j++){
+		for(int j=0; j< 25; j++){
 			rid.slotNum = j;
 			indexManager->insertEntry(fileHandle, attribute, key, rid);
 		} 
