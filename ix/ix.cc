@@ -14,7 +14,7 @@ IndexManager* IndexManager::instance()
 
 IndexManager::IndexManager()
 {
-//	debug = true;
+	//	debug = true;
 }
 
 IndexManager::~IndexManager()
@@ -78,17 +78,17 @@ TreeOp IndexManager::TraverseTree(IXFileHandle &ixfileHandle, const Attribute &a
 
 	PageSize offset=0;
 	KeyDesc currentkeyDesc;
-	currentkeyDesc.keyValue = malloc(maxvarchar);
+	char *currentkeyValue = (char*)malloc(maxvarchar);
 	PageNum currentpageNum=-1;
 
 	TreeOp treeop = OP_None;
 	while(true){
 		memcpy(&currentkeyDesc,(char *) page+offset,sizeof(KeyDesc));
 		offset+=sizeof(KeyDesc);
-		memcpy(currentkeyDesc.keyValue,(char *) page+offset,currentkeyDesc.keySize);
+		memcpy(currentkeyValue,(char *) page+offset,currentkeyDesc.keySize);
 		offset+=currentkeyDesc.keySize;
 
-		if(keyCompare(attribute,key,currentkeyDesc.keyValue)<0){
+		if(keyCompare(attribute,key,currentkeyValue)<0){
 			//get the page pointer
 			currentpageNum=currentkeyDesc.leftNode;
 			offset -= sizeof(KeyDesc);//adjust the offset for inserting a  key entry,
@@ -108,12 +108,14 @@ TreeOp IndexManager::TraverseTree(IXFileHandle &ixfileHandle, const Attribute &a
 		returnpageNum=currentpageNum;
 		treeop=OP_None;
 		free(nextpage);
+		free(currentkeyValue);
 		return treeop;
 	}else if(nextnodeDesc.type == NonLeaf){
 
 		TraverseTree(ixfileHandle, attribute, key, nextpage, currentpageNum, returnpageNum);
 		treeop=OP_None;
 		free(nextpage);
+		free(currentkeyValue);
 		return treeop;
 
 	}
@@ -485,7 +487,7 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 			ded.numOfRID++;
 			memcpy( page, &ded, sizeof(DataEntryDesc));
 			assert( sizeof(DataEntryDesc)+ded.keySize+ded.numOfRID*sizeof(RID) < PAGE_SIZE && "overflow page overflowed" );
-			
+
 			rc = ixfileHandle.writePage( ded.overflow , page );
 			assert( rc == SUCCESS && "write overflow page failed");
 			free(ded.keyValue); 
@@ -640,358 +642,282 @@ RC IndexManager::FindOffset(void *page,int size,int &offset,bool IsGreater)
 
 TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, KeyDesc &keyDesc)
 {
-	/*void *bufferpage = malloc(PAGE_SIZE);
-	  void *nextpage = malloc(PAGE_SIZE);
-	  void *leftsibling = malloc(PAGE_SIZE);
-	  void *rightsibling = malloc(PAGE_SIZE);
-	  NodeDesc nodeDesc;
-	  NodeDesc tempnodeDesc;
-	  NodeDesc nextnodeDesc;
-	  memcpy(&nodeDesc,(char *)page+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
+	void *bufferpage = malloc(PAGE_SIZE);
+	void *nextpage = malloc(PAGE_SIZE);
+	void *leftsibling = malloc(PAGE_SIZE);
+	void *rightsibling = malloc(PAGE_SIZE);
+	NodeDesc nodeDesc;
+	NodeDesc tempnodeDesc;
+	NodeDesc nextnodeDesc;
+	memcpy(&nodeDesc,(char *)page+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
 
-	  int pushdownkeysize = keyDesc.keySize;
+	int pushdownkeysize = keyDesc.keySize;
 
-	  PageSize offset=0;
-	  PageSize oldoffset=-1;
-	  KeyDesc siblingkeyDesc;
-	  KeyDesc currentkeyDesc;
-	  KeyDesc deletedkeyDesc;
-	  currentkeyDesc.keyValue = malloc(maxvarchar);
-	  KeyDesc nextkeyDesc;
-	  nextkeyDesc.keyValue = malloc(maxvarchar);
-	  PageNum currentpageNum=-1;
+	PageSize offset=0;
+	PageSize oldoffset=-1;
+	KeyDesc siblingkeyDesc;
+	KeyDesc currentkeyDesc;
+	KeyDesc deletedkeyDesc;
+	currentkeyDesc.keyValue = malloc(maxvarchar);
+	KeyDesc nextkeyDesc;
+	nextkeyDesc.keyValue = malloc(maxvarchar);
+	PageNum currentpageNum=-1;
 
-	  TreeOp treeop = OP_None;
-	  TreeOp nexttreeop = OP_None;
+	TreeOp treeop = OP_None;
+	TreeOp nexttreeop = OP_None;
 
 	//scan to find the desired pointer
 	while(true){
-	memcpy(&currentkeyDesc,(char *) page+offset,sizeof(KeyDesc));
-	offset+=sizeof(KeyDesc);
-	memcpy(currentkeyDesc.keyValue,(char *) page+offset,currentkeyDesc.keySize);
-	offset+=currentkeyDesc.keySize;
+		memcpy(&currentkeyDesc,(char *) page+offset,sizeof(KeyDesc));
+		offset+=sizeof(KeyDesc);
+		memcpy(currentkeyDesc.keyValue,(char *) page+offset,currentkeyDesc.keySize);
+		offset+=currentkeyDesc.keySize;
 
-	if(keyCompare(attribute,key,currentkeyDesc.keyValue)<0){
-	//get the page pointer
-	if(oldoffset == -1){
-	currentpageNum=currentkeyDesc.leftNode;
-	oldoffset = 0;
-	break;
-	}
-	currentpageNum=currentkeyDesc.leftNode;
-	break;
-	}
+		if(keyCompare(attribute,key,currentkeyDesc.keyValue)<0){
+			//get the page pointer
+			if(oldoffset == -1){
+				currentpageNum=currentkeyDesc.leftNode;
+				oldoffset = 0;
+				break;
+			}
+			currentpageNum=currentkeyDesc.leftNode;
+			break;
+		}
 
-	if(offset == nodeDesc.size){
-	//last entry
-	currentpageNum=currentkeyDesc.rightNode;
-	break;
-	}
-	oldoffset = offset ;//adjust the offset for deleting a  key entry,
+		if(offset == nodeDesc.size){
+			//last entry
+			currentpageNum=currentkeyDesc.rightNode;
+			break;
+		}
+		oldoffset = offset ;//adjust the offset for deleting a  key entry,
 
 	}
 	assert( currentpageNum != -1 && "Should find a pageNum");
 	dprintf("after finding currentpageNum,oldoffset is %d\n offset is %d\n",oldoffset,offset);
-
-
-	if(nodeDesc.size < LowerThreshold){
-	//merege or redistribute the page
-	int splitoffset=0;
 	NodeDesc leftnodeDesc;
 	NodeDesc rightnodeDesc;
-	PageSize origsize=nodeDesc.size;
-	int leftrc=-1;
-	int rightrc=-1;
-	PageSize leftsize=0;
-	PageSize rightsize=0;
 
-	if(nodeDesc.prev != -1 || nodeDesc.next != -1){
+	if(nodeDesc.size < LowerThreshold){
+		//merege or redistribute the page
 
+		PageSize origsize=nodeDesc.size;
+		PageSize leftsize=0;
+		PageSize rightsize=0;
 
-
-
-
-	if(nodeDesc.next != -1){
-
-		KeyDesc lastkeyDesc;
-		KeyDesc beginkeyDesc;
-		ixfileHandle.readPage(nodeDesc.next,rightsibling);
-		memcpy(&rightnodeDesc,rightsibling+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
-		dpritnf("rightsize is %d",rightnodeDesc.size);
-		int currentoffset = nodeDesc.size;
-		dprintf("In the begining , nodeDesc.size is %d\n",nodeDesc.size);
-
-		if( (rightnodeDesc.size + nodeDesc.size)> UpperThreshold)){
-			int siblingoffset;
-			FindOffset(rightsibling,LowerThreshold-nodeDesc.size,siblingoffset,true);
-			FindLastKey(page,lastkeyDesc);
-			assert(lastkeyDesc.rightNode != -1 && "rightNode == -1 in Redistribution");
-			memcpy(&beginkeyDesc,rightsibling,sizeof(KeyDesc));
-			keyDesc.leftNode = lastkeyDesc.rightNode;
-			keyDesc.rightNode = beginkeyDesc.leftNode;
-
-			//push down key
-			memcpy((char *)page+currentoffset,&keyDesc,sizeof(KeyDesc));
-			currentoffset += sizeof(KeyDesc);
-			memcpy((char *)page+currentoffset,keyDesc.keyValue,keyDesc.keySize);
-			currentoffset += keyDesc.keySize;
-			memcpy((char *)page+currentoffset,(char *)rightsibling,siblingoffset);//redistribute data from right page
-			currentoffset += siblingoffset;
-			dprintf("siblingoffset is %d\n",siblingoffset);
-			//update nodeDesc
-			nodeDesc.size = currentoffset;
-			dprintf("In the end , nodeDesc.size is %d\n",nodeDesc.size);
-
-			memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),&nodeDesc,sizeof(NodeDesc));
-
-			//modify returned keyDesc
-			memcpy(&keyDesc,(char*)rightsibling+siblingoffset,sizeof(KeyDesc));
-			siblingoffset += sizeof(KeyDesc);
-			memcpy(keyDesc.keyValue,(char*)rightsibling+siblingoffset,keyDesc.keySize);
-			siblingoffset += keyDesc.keySize;
-			//move entry in right sibling
-			memcpy(bufferpage,rightsibling+siblingoffset,rightnodeDesc.size-siblingoffset);
-			memcpy(rightsibling,(char*)bufferpage,rightnodeDesc.size-siblingoffset);
-			//update rightnodeDesc
-			rightnodeDesc.size = rightnodeDesc.size - siblingoffset;
-			dprintf("rightnodeDesc.size is %d\n",rightnodeDesc.size);
-			memcpy((char *)rightsibling+PAGE_SIZE-sizeof(NodeDesc),&rightnodeDesc,sizeof(NodeDesc));
-
-			//update page and rigntsibling to disk
-			ixfileHandle.writePage(pageNum,page);
-			ixfileHandle.writePage(nodeDesc.next,rightsibling);
-			treeop = OP_Dist;
-		}else{
-			//merge, move data from right sibling
-			int tempnext = nodeDesc.next;
-			//push down key
-			findLastKey(page,lastkeyDesc);
-			memcpy(&beginkeyDesc,rightsibling,sizeof(KeyDesc));
-			keyDesc.leftNode = lastkeyDesc.rightNode;
-			keyDesc.rightNOde = beginkeyDesc.leftNode;
-			memcpy((char *)page+nodeDesc.size,&keyDesc,sizeof(keyDesc));
-			nodeDesc.size += sizeof(keyDesc);
-			memcpy((char *)page+nodeDesc.size,keyDesc,keyValue,keyDesc,keySize);
-			nodeDesc.size += keyDesc.keySize;
-
-			memcpy((char *)page+nodeDesc.size,(char *)rightsibling,rightnodeDesc.size);
-			nodeDesc.size += rightnodeDesc.size;
-			nodeDesc.next =rightnodeDesc.next;
-			memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),&nodeDesc,sizeof(NodeDesc));
-			dprintf("Merge, the new nodeDesc.size is %d\n",nodeDesc.size);
-			//write page to disk
-			ixfileHandle.writePage(pageNum,page);
-			ixfileHandle.deletePage(tempnext);
-
-			treeop = OP_Merge;
+		if(nodeDesc.prev != -1 || nodeDesc.next != -1){
 
 
+
+
+
+			if(nodeDesc.next != -1){
+
+				KeyDesc lastkeyDesc;
+				KeyDesc beginkeyDesc;
+				ixfileHandle.readPage(nodeDesc.next,rightsibling);
+				memcpy(&rightnodeDesc,(char*)rightsibling+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
+				dprintf("rightsize is %d",rightnodeDesc.size);
+				int currentoffset = nodeDesc.size;
+				dprintf("In the begining , nodeDesc.size is %d\n",nodeDesc.size);
+
+				if( (rightnodeDesc.size + nodeDesc.size)> UpperThreshold){
+					int siblingoffset;
+					FindOffset(rightsibling,LowerThreshold-nodeDesc.size,siblingoffset,true);
+					FindLastKey(page,lastkeyDesc);
+					assert(lastkeyDesc.rightNode != -1 && "rightNode == -1 in Redistribution");
+					memcpy(&beginkeyDesc,rightsibling,sizeof(KeyDesc));
+					keyDesc.leftNode = lastkeyDesc.rightNode;
+					keyDesc.rightNode = beginkeyDesc.leftNode;
+
+					//push down key
+					memcpy((char *)page+currentoffset,&keyDesc,sizeof(KeyDesc));
+					currentoffset += sizeof(KeyDesc);
+					memcpy((char *)page+currentoffset,keyDesc.keyValue,keyDesc.keySize);
+					currentoffset += keyDesc.keySize;
+					memcpy((char *)page+currentoffset,(char *)rightsibling,siblingoffset);//redistribute data from right page
+					currentoffset += siblingoffset;
+					dprintf("siblingoffset is %d\n",siblingoffset);
+					//update nodeDesc
+					nodeDesc.size = currentoffset;
+					dprintf("In the end , nodeDesc.size is %d\n",nodeDesc.size);
+
+					memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),&nodeDesc,sizeof(NodeDesc));
+
+					//modify returned keyDesc
+					memcpy(&keyDesc,(char*)rightsibling+siblingoffset,sizeof(KeyDesc));
+					siblingoffset += sizeof(KeyDesc);
+					memcpy(keyDesc.keyValue,(char*)rightsibling+siblingoffset,keyDesc.keySize);
+					siblingoffset += keyDesc.keySize;
+					//move entry in right sibling
+					memcpy(bufferpage,(char*)rightsibling+siblingoffset,rightnodeDesc.size-siblingoffset);
+					memcpy(rightsibling,(char*)bufferpage,rightnodeDesc.size-siblingoffset);
+					//update rightnodeDesc
+					rightnodeDesc.size = rightnodeDesc.size - siblingoffset;
+					dprintf("rightnodeDesc.size is %d\n",rightnodeDesc.size);
+					memcpy((char *)rightsibling+PAGE_SIZE-sizeof(NodeDesc),&rightnodeDesc,sizeof(NodeDesc));
+
+					//update page and rigntsibling to disk
+					ixfileHandle.writePage(pageNum,page);
+					ixfileHandle.writePage(nodeDesc.next,rightsibling);
+					treeop = OP_Dist;
+				}else{
+					//merge, move data from right sibling
+					int tempnext = nodeDesc.next;
+					//push down key
+					FindLastKey(page,lastkeyDesc);
+					memcpy(&beginkeyDesc,rightsibling,sizeof(KeyDesc));
+					keyDesc.leftNode = lastkeyDesc.rightNode;
+					keyDesc.rightNode = beginkeyDesc.leftNode;
+					memcpy((char *)page+nodeDesc.size,&keyDesc,sizeof(keyDesc));
+					nodeDesc.size += sizeof(keyDesc);
+					memcpy((char *)page+nodeDesc.size,keyDesc.keyValue,keyDesc.keySize);
+					nodeDesc.size += keyDesc.keySize;
+
+					memcpy((char *)page+nodeDesc.size,(char *)rightsibling,rightnodeDesc.size);
+					nodeDesc.size += rightnodeDesc.size;
+					nodeDesc.next =rightnodeDesc.next;
+					memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),&nodeDesc,sizeof(NodeDesc));
+					dprintf("Merge, the new nodeDesc.size is %d\n",nodeDesc.size);
+					//write page to disk
+					ixfileHandle.writePage(pageNum,page);
+					ixfileHandle.deletePage(tempnext);
+
+					treeop = OP_Merge;
+
+
+				}
+			}else{
+				//If current page is the rightest page, move data from left page
+				KeyDesc lastkeyDesc;
+				KeyDesc beginkeyDesc;
+				int backwardoffset = 0;
+				ixfileHandle.readPage(nodeDesc.prev,leftsibling);
+				memcpy(&leftnodeDesc,(char*)leftsibling+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
+				dprintf("leftsize is %d",leftnodeDesc.size);
+				int currentoffset = nodeDesc.size;
+				dprintf("In the begining , nodeDesc.size is %d\n",nodeDesc.size);
+
+				if( (leftnodeDesc.size + nodeDesc.size)> UpperThreshold){
+					int siblingoffset;
+					//find the begining point in left page to move data
+					FindOffset(leftsibling,leftnodeDesc.size - (LowerThreshold-nodeDesc.size),siblingoffset,false);
+					assert((leftnodeDesc.size - (LowerThreshold-nodeDesc.size))>LowerThreshold && "(leftNode.size - (LowerThreshold-nodeDesc.size))>LowerThreshold");
+					dprintf("siblingoffset is %d\n",siblingoffset);
+					FindLastKey(leftsibling,lastkeyDesc);
+					assert(lastkeyDesc.rightNode != -1 && "rightNode == -1 in Redistribution");
+					memcpy(&beginkeyDesc,page,sizeof(KeyDesc));
+					keyDesc.leftNode = lastkeyDesc.rightNode;
+					keyDesc.rightNode = beginkeyDesc.leftNode;
+
+					//push down key
+
+					backwardoffset = keyDesc.keySize+sizeof(KeyDesc);
+					//move the data in page backward
+					memcpy(bufferpage,page,currentoffset);
+					memcpy((char *)page+backwardoffset,bufferpage,currentoffset);
+					memcpy((char *)page,&keyDesc,sizeof(KeyDesc));
+					currentoffset += sizeof(KeyDesc);
+					oldoffset += backwardoffset;
+					offset += backwardoffset;
+					memcpy((char *)page+sizeof(KeyDesc),keyDesc.keyValue,keyDesc.keySize);
+					currentoffset += keyDesc.keySize;
+
+
+					assert(backwardoffset != (currentoffset - nodeDesc.size) &&"backwardoffset != (sizeof(KeyDesc) + keyDesc.keySize)");
+
+
+					//move the data in page backward
+					backwardoffset = leftnodeDesc.size - siblingoffset;
+					memcpy(bufferpage,page,currentoffset);
+					memcpy((char *)page+backwardoffset,bufferpage,currentoffset);
+
+					memcpy((char *)page,(char *)leftsibling+siblingoffset,backwardoffset);//redistribute data from right page
+					currentoffset += backwardoffset;
+					oldoffset += backwardoffset;
+					offset += backwardoffset;
+					dprintf("siblingoffset is %d\n",siblingoffset);
+					//update nodeDesc
+					nodeDesc.size = currentoffset;
+					dprintf("In the end , nodeDesc.size is %d\n",nodeDesc.size);
+					memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),&nodeDesc,sizeof(NodeDesc));
+
+					//create returned keyDesc
+					leftnodeDesc.size = siblingoffset;
+					memcpy((char *)leftsibling+PAGE_SIZE-sizeof(NodeDesc),&leftnodeDesc,sizeof(NodeDesc));
+					FindLastKey(leftsibling,lastkeyDesc);
+					leftnodeDesc.size -= (sizeof(KeyDesc) + lastkeyDesc.keySize);
+
+					memcpy(&keyDesc,(char*)leftsibling+leftnodeDesc.size,sizeof(KeyDesc));
+					memcpy(keyDesc.keyValue,(char*)leftsibling+leftnodeDesc.size+sizeof(KeyDesc),keyDesc.keySize);
+
+					//update leftnodeDesc
+					dprintf("leftnodeDesc.size is %d\n",leftnodeDesc.size);
+					memcpy((char *)leftsibling+PAGE_SIZE-sizeof(NodeDesc),&leftnodeDesc,sizeof(NodeDesc));
+
+					//update page and rigntsibling to disk
+					ixfileHandle.writePage(pageNum,page);
+					ixfileHandle.writePage(nodeDesc.prev,leftsibling);
+					treeop = OP_Dist;
+					dprintf("oldoffset is %d\n offset is %d\n",oldoffset,offset);
+
+
+				}else{
+					//merge, move data to left sibling
+
+					//push down key
+					FindLastKey(leftsibling,lastkeyDesc);
+					memcpy(&beginkeyDesc,page,sizeof(KeyDesc));
+					keyDesc.leftNode = lastkeyDesc.rightNode;
+					keyDesc.rightNode = beginkeyDesc.leftNode;
+					memcpy((char *)leftsibling+leftnodeDesc.size,&keyDesc,sizeof(keyDesc));
+					leftnodeDesc.size += sizeof(keyDesc);
+					memcpy((char *)leftsibling+leftnodeDesc.size,keyDesc.keyValue,keyDesc.keySize);
+					leftnodeDesc.size += keyDesc.keySize;
+
+
+					memcpy((char *)leftsibling+leftnodeDesc.size,(char *)page,nodeDesc.size);
+					leftnodeDesc.size += nodeDesc.size;
+					leftnodeDesc.next = -1;
+					memcpy((char *)leftsibling+PAGE_SIZE-sizeof(NodeDesc),&leftnodeDesc,sizeof(NodeDesc));
+					dprintf("Merge, the new left nodeDesc.size is %d\n",leftnodeDesc.size);
+					treeop = OP_Merge;
+					ixfileHandle.deletePage(pageNum);
+					//write page to disk
+					ixfileHandle.writePage(nodeDesc.prev,leftsibling);
+
+
+					//the distance to the ending of entries doesn't change
+					oldoffset = leftnodeDesc.size - (nodeDesc.size - oldoffset);
+					offset = leftnodeDesc.size - (nodeDesc.size - offset);
+					dprintf("oldoffset is %d\n offset is %d\n",oldoffset,offset);
+
+				}
+			}
 		}
-	}else{
-		//If current page is the rightest page, move data from left page
-		KeyDesc lastkeyDesc;
-		KeyDesc beginkeyDesc;
-		int backwardoffset = 0;
-		ixfileHandle.readPage(nodeDesc.prev,leftsibling);
-		memcpy(&leftnodeDesc,leftsibling+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
-		dpritnf("leftsize is %d",leftnodeDesc.size);
-		int currentoffset = nodeDesc.size;
-		dprintf("In the begining , nodeDesc.size is %d\n",nodeDesc.size);
 
-		if( (leftnodeDesc.size + nodeDesc.size)> UpperThreshold)){
-			int siblingoffset;
-			//find the begining point in left page to move data
-			FindOffset(leftsibling,leftnodeDesc.size - (LowerThreshold-nodeDesc.size),siblingoffset,false);
-			assert((leftnodeDesc.size - (LowerThreshold-nodeDesc.size))>LowerThreshold && "(leftNode.size - (LowerThreshold-nodeDesc.size))>LowerThreshold");
-			dprintf("siblingoffset is %d\n",siblingoffset);
-			FindLastKey(leftsibling,lastkeyDesc);
-			assert(lastkeyDesc.rightNode != -1 && "rightNode == -1 in Redistribution");
-			memcpy(&beginkeyDesc,page,sizeof(KeyDesc));
-			keyDesc.leftNode = lastkeyDesc.rightNode;
-			keyDesc.rightNode = beginkeyDesc.leftNode;
-
-			//push down key
-
-			backwardoffset = keyDesc.keySize+sizeof(KeyDesc);
-			//move the data in page backward
-			memcpy(bufferpage,page,currentoffset);
-			memcpy((char *)page+backwardoffset,bufferpage,currentoffset);
-			memcpy((char *)page,&keyDesc,sizeof(KeyDesc));
-			currentoffset += sizeof(KeyDesc);
-			oldoffset += backwardoffset;
-			offset += backwardoffset;
-			memcpy((char *)page+sizeof(KeyDesc),keyDesc.keyValue,keyDesc.keySize);
-			currentoffset += keyDesc.keySize;
-
-
-			assert(backwardoffset != (currentoffset - nodeDesc.size) &&"backwardoffset != (sizeof(KeyDesc) + keyDesc.keySize)");
-
-
-			//move the data in page backward
-			backwardoffset = leftnodeDesc.size - siblingoffset;
-			memcpy(bufferpage,page,currentoffset);
-			memcpy((char *)page+backwardoffset,bufferpage,currentoffset);
-
-			memcpy((char *)page,(char *)leftsibling+siblingoffset,backwardoffset);//redistribute data from right page
-			currentoffset += backwardoffset;
-			oldoffset += backwardoffset;
-			offset += backwardoffset;
-			dprintf("siblingoffset is %d\n",siblingoffset);
-			//update nodeDesc
-			nodeDesc.size = currentoffset;
-			dprintf("In the end , nodeDesc.size is %d\n",nodeDesc.size);
-			memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),&nodeDesc,sizeof(NodeDesc));
-
-			//create returned keyDesc
-			leftnodeDesc.size = siblingoffset;
-			memcpy((char *)leftsibling+PAGE_SIZE-sizeof(NodeDesc),&leftnodeDesc,sizeof(NodeDesc));
-			FindLastKey(leftsibling,lastkeyDesc);
-			leftnodeDesc.size -= (sizeof(KeyDesc) + lastkeyDesc.keySize);
-
-			memcpy(&keyDesc,(char*)leftsibling+leftnodeDesc.size,sizeof(KeyDesc));
-			memcpy(keyDesc.keyValue,(char*)leftsibling+leftnodeDesc.size+sizeof(KeyDesc),keyDesc.keySize);
-
-			//update leftnodeDesc
-			dprintf("leftnodeDesc.size is %d\n",leftnodeDesc.size);
-			memcpy((char *)leftsibling+PAGE_SIZE-sizeof(NodeDesc),&leftnodeDesc,sizeof(NodeDesc));
-
-			//update page and rigntsibling to disk
-			ixfileHandle.writePage(pageNum,page);
-			ixfileHandle.writePage(nodeDesc.prev,leftsibling);
-			treeop = OP_Dist;
-			dprintf("oldoffset is %d\n offset is %d\n",oldoffset,offset);
-
-
-		}else{
-			//merge, move data to left sibling
-
-			//push down key
-			findLastKey(leftsibling,lastkeyDesc);
-			memcpy(&beginkeyDesc,page,sizeof(KeyDesc));
-			keyDesc.leftNode = lastkeyDesc.rightNode;
-			keyDesc.rightNOde = beginkeyDesc.leftNode;
-			memcpy((char *)leftsibling+leftnodeDesc.size,&keyDesc,sizeof(keyDesc));
-			leftnodeDesc.size += sizeof(keyDesc);
-			memcpy((char *)leftsibling+leftnodeDesc.size,keyDesc,keyValue,keyDesc,keySize);
-			leftnodeDesc.size += keyDesc.keySize;
-
-
-			memcpy((char *)leftsibling+leftnodeDesc.size,(char *)page,nodeDesc.size));
-			leftnodeDesc.size += nodeDesc.size;
-			leftnodeDesc.next = -1;
-			memcpy((char *)leftsibling+PAGE_SIZE-sizeof(NodeDesc),&leftnodeDesc,sizeof(NodeDesc));
-			dprintf("Merge, the new left nodeDesc.size is %d\n",leftnodeDesc.size);
-			treeop = OP_Merge;
-			ixfileHandle.deletePage(pageNum);
-			//write page to disk
-			ixfileHandle.writePage(nodeDesc.prev,leftsibling);
-
-
-			//the distance to the ending of entries doesn't change
-			oldoffset = leftnodeDesc.size - (nodeDesc.size - oldoffset);
-			offset = leftnodeDesc.size - (nodeDesc.size - offset);
-			dprintf("oldoffset is %d\n offset is %d\n",oldoffset,offset);
-
-		}
 	}
-}
-
-}
 
 
-//recursively call TraverseTreeInsert
-dprintf("currentpageNUm is %d",currentpageNum);
-ixfileHandle.readPage(currentpageNum,nextpage);
-memcpy(&nextnodeDesc,(char *)nextpage+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
-if(nextnodeDesc.type == Leaf){
-	nexttreeop = deleteFromLeaf(ixfileHandle,attribute,key,rid,nextpage,currentpageNum, currentkeyDesc);
+	//recursively call TraverseTreeInsert
+	dprintf("currentpageNUm is %d",currentpageNum);
+	ixfileHandle.readPage(currentpageNum,nextpage);
+	memcpy(&nextnodeDesc,(char *)nextpage+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
+	if(nextnodeDesc.type == Leaf){
+		nexttreeop = deleteFromLeaf(ixfileHandle,attribute,key,rid,nextpage,currentpageNum, currentkeyDesc);
 
-	assert((nexttreeop == OP_Merge || nexttreeop == OP_Dist || nexttreeop == OP_None) && "nexttreeop should be OP_Merge,OP_Dist or OP_None");
+		assert((nexttreeop == OP_Merge || nexttreeop == OP_Dist || nexttreeop == OP_None) && "nexttreeop should be OP_Merge,OP_Dist or OP_None");
 
-}else if(nextnodeDesc.type == NonLeaf){
+	}else if(nextnodeDesc.type == NonLeaf){
 
-	nexttreeop = TraverseTreeInsert(ixfileHandle,attribute,key,rid,nextpage,currentpageNum, currentkeyDesc);
-	assert((nexttreeop == OP_Merge || nexttreeop == OP_Dist || nexttreeop == OP_None) && "nexttreeop should be OP_Merge,OP_Dist or OP_None");
-
-
-}else{
-	assert("page type should be leaf or NonLeaf");
-}
-if(nexttreeop == OP_Merge ){
-	if(nodeDesc.next != -1){
-		//if nodeDesc.next != -1, offset and oldoffset do not change
-		//fetch the deleted key
-		memcpy(&deletedkeyDesc,(char *)page+oldoffset,sizeof(KeyDesc));
-		dprintf("deleted key's leftNode is %d\n",deletedkeyDesc.leftNode);
-
-		//update sibling KeyDesc
-		memcpy(&siblingkeyDesc,(char *)page+offset,sizeof(KeyDesc));
-		siblingkeyDesc.leftNode = deletedkeyDesc.leftNode;
-		memcpy((char *)page+offset,&siblingkeyDesc,sizeof(KeyDesc));
-		//move data to delete the key
-		memcpy(bufferpage,(char *)page+offset,nodeDesc.size-offset);
-		memcpy((char *)page+oldoffset,bufferpage,nodeDesc.size-offset);
-
-		//update page descriptor
-		nodeDesc.size -= (offset - oldoffset);
-		assert((offset - oldoffset)>=0 &&"(offset - oldoffset)>=0");
-		dprintf("offset - oldoffset is %d\n",(offset-oldoffset));
-
-
-		memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),&nodeDesc,sizeof(NodeDesc));
-		//write page to disk
-		ixfileHandle.writePage(pageNum,page);
-
+		nexttreeop = TraverseTreeInsert(ixfileHandle,attribute,key,rid,nextpage,currentpageNum, currentkeyDesc);
+		assert((nexttreeop == OP_Merge || nexttreeop == OP_Dist || nexttreeop == OP_None) && "nexttreeop should be OP_Merge,OP_Dist or OP_None");
 
 
 	}else{
-
-		if(treeop == OP_Dist){
-			//fetch the deleted key
-			memcpy(&deletedkeyDesc,(char *)page+oldoffset,sizeof(KeyDesc));
-			dprintf("deleted key's leftNode is %d\n",deletedkeyDesc.leftNode);
-
-			//update sibling KeyDesc
-			memcpy(&siblingkeyDesc,(char *)page+offset,sizeof(KeyDesc));
-			siblingkeyDesc.leftNode = deletedkeyDesc.leftNode;
-			memcpy((char *)page+offset,&siblingkeyDesc,sizeof(KeyDesc));
-			//move data to delete the key
-			memcpy(bufferpage,(char *)page+offset,nodeDesc.size-offset);
-			memcpy((char *)page+oldoffset,bufferpage,nodeDesc.size-offset);
-
-			//update page descriptor
-			nodeDesc.size -= (offset - oldoffset);
-			assert((offset - oldoffset)>=0 &&"(offset - oldoffset)>=0");
-			dprintf("offset - oldoffset is %d\n",(offset-oldoffset));
-
-
-			memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),&nodeDesc,sizeof(NodeDesc));
-			//write page to disk
-			ixfileHandle.writePage(pageNum,page);
-		}else if(treeop == OP_Merge){
-			//fetch the deleted key
-			memcpy(&deletedkeyDesc,(char *)leftsibling+oldoffset,sizeof(KeyDesc));
-			dprintf("deleted key's leftNode is %d\n",deletedkeyDesc.leftNode);
-
-			//update sibling KeyDesc
-			memcpy(&siblingkeyDesc,(char *)leftsibling+offset,sizeof(KeyDesc));
-			siblingkeyDesc.leftNode = deletedkeyDesc.leftNode;
-			memcpy((char *)leftsibling+offset,&siblingkeyDesc,sizeof(KeyDesc));
-			//move data to delete the key
-			memcpy(bufferpage,(char *)leftsibling+offset,leftnodeDesc.size-offset);
-			memcpy((char *)leftsibling+oldoffset,bufferpage,leftnodeDesc.size-offset);
-
-			//update page descriptor
-			leftnodeDesc.size -= (offset - oldoffset);
-			assert((offset - oldoffset)>=0 &&"(offset - oldoffset)>=0");
-			dprintf("offset - oldoffset is %d\n",(offset-oldoffset));
-
-
-			memcpy((char *)leftsibling+PAGE_SIZE-sizeof(NodeDesc),&leftnodeDesc,sizeof(NodeDesc));
-			//write page to disk
-			ixfileHandle.writePage(nodeDesc.prev,leftsibling);
-		}else if(treeop == OP_None){
-
+		assert("page type should be leaf or NonLeaf");
+	}
+	if(nexttreeop == OP_Merge ){
+		if(nodeDesc.next != -1){
 			//if nodeDesc.next != -1, offset and oldoffset do not change
 			//fetch the deleted key
 			memcpy(&deletedkeyDesc,(char *)page+oldoffset,sizeof(KeyDesc));
@@ -1014,42 +940,85 @@ if(nexttreeop == OP_Merge ){
 			memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),&nodeDesc,sizeof(NodeDesc));
 			//write page to disk
 			ixfileHandle.writePage(pageNum,page);
+
+
+
+		}else{
+
+			if(treeop == OP_Dist){
+				//fetch the deleted key
+				memcpy(&deletedkeyDesc,(char *)page+oldoffset,sizeof(KeyDesc));
+				dprintf("deleted key's leftNode is %d\n",deletedkeyDesc.leftNode);
+
+				//update sibling KeyDesc
+				memcpy(&siblingkeyDesc,(char *)page+offset,sizeof(KeyDesc));
+				siblingkeyDesc.leftNode = deletedkeyDesc.leftNode;
+				memcpy((char *)page+offset,&siblingkeyDesc,sizeof(KeyDesc));
+				//move data to delete the key
+				memcpy(bufferpage,(char *)page+offset,nodeDesc.size-offset);
+				memcpy((char *)page+oldoffset,bufferpage,nodeDesc.size-offset);
+
+				//update page descriptor
+				nodeDesc.size -= (offset - oldoffset);
+				assert((offset - oldoffset)>=0 &&"(offset - oldoffset)>=0");
+				dprintf("offset - oldoffset is %d\n",(offset-oldoffset));
+
+
+				memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),&nodeDesc,sizeof(NodeDesc));
+				//write page to disk
+				ixfileHandle.writePage(pageNum,page);
+			}else if(treeop == OP_Merge){
+				//fetch the deleted key
+				memcpy(&deletedkeyDesc,(char *)leftsibling+oldoffset,sizeof(KeyDesc));
+				dprintf("deleted key's leftNode is %d\n",deletedkeyDesc.leftNode);
+
+				//update sibling KeyDesc
+				memcpy(&siblingkeyDesc,(char *)leftsibling+offset,sizeof(KeyDesc));
+				siblingkeyDesc.leftNode = deletedkeyDesc.leftNode;
+				memcpy((char *)leftsibling+offset,&siblingkeyDesc,sizeof(KeyDesc));
+				//move data to delete the key
+				memcpy(bufferpage,(char *)leftsibling+offset,leftnodeDesc.size-offset);
+				memcpy((char *)leftsibling+oldoffset,bufferpage,leftnodeDesc.size-offset);
+
+				//update page descriptor
+				leftnodeDesc.size -= (offset - oldoffset);
+				assert((offset - oldoffset)>=0 &&"(offset - oldoffset)>=0");
+				dprintf("offset - oldoffset is %d\n",(offset-oldoffset));
+
+
+				memcpy((char *)leftsibling+PAGE_SIZE-sizeof(NodeDesc),&leftnodeDesc,sizeof(NodeDesc));
+				//write page to disk
+				ixfileHandle.writePage(nodeDesc.prev,leftsibling);
+			}else if(treeop == OP_None){
+
+				//if nodeDesc.next != -1, offset and oldoffset do not change
+				//fetch the deleted key
+				memcpy(&deletedkeyDesc,(char *)page+oldoffset,sizeof(KeyDesc));
+				dprintf("deleted key's leftNode is %d\n",deletedkeyDesc.leftNode);
+
+				//update sibling KeyDesc
+				memcpy(&siblingkeyDesc,(char *)page+offset,sizeof(KeyDesc));
+				siblingkeyDesc.leftNode = deletedkeyDesc.leftNode;
+				memcpy((char *)page+offset,&siblingkeyDesc,sizeof(KeyDesc));
+				//move data to delete the key
+				memcpy(bufferpage,(char *)page+offset,nodeDesc.size-offset);
+				memcpy((char *)page+oldoffset,bufferpage,nodeDesc.size-offset);
+
+				//update page descriptor
+				nodeDesc.size -= (offset - oldoffset);
+				assert((offset - oldoffset)>=0 &&"(offset - oldoffset)>=0");
+				dprintf("offset - oldoffset is %d\n",(offset-oldoffset));
+
+
+				memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),&nodeDesc,sizeof(NodeDesc));
+				//write page to disk
+				ixfileHandle.writePage(pageNum,page);
+			}
 		}
-	}
 
-}else if(nexttreeop == OP_Dist){
-	if(nodeDesc.next != -1){
-		//if nodeDesc.next != -1, offset and oldoffset do not change
-		//fetch the to-be-modified key
-		memcpy(&deletedkeyDesc,(char *)page+oldoffset,sizeof(KeyDesc));
-		dprintf("deleted key's leftNode is %d\n",deletedkeyDesc.leftNode);
-
-		//update to-be-modified KeyDesc.keySize
-		deletedkeyDesc.keySize = currentkeyDesc.keySize;
-		memcpy((char *)page+oldoffset,&deletedkeyDesc,sizeof(KeyDesc));
-		oldoffset += sizeof(KeyDesc);
-		//modified the key value
-		memcpy(bufferpage,(char *)page+offset,nodeDesc.size-offset);
-		memcpy((char*)page+oldoffset,currentkeyDesc.keyValue,currentkeyDesc.keySize);
-		oldoffset += currentkeyDesc.keySize;
-		memcpy((char *)page+oldoffset,bufferpage,nodeDesc.size-offset);
-
-		//update page descriptor
-		nodeDesc.size -= ((int)offset - (int)oldoffset);
-		dprintf("nodeDesc.size is %d\n",nodeDesc.size);
-		assert((offset - oldoffset)>=0 &&"(offset - oldoffset)>=0");
-		dprintf("offset - oldoffset is %d\n",(offset-oldoffset));
-
-
-		memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),&nodeDesc,sizeof(NodeDesc));
-		//write page to disk
-		ixfileHandle.writePage(pageNum,page);
-
-
-
-	}else{
-
-		if(treeop == OP_Dist){
+	}else if(nexttreeop == OP_Dist){
+		if(nodeDesc.next != -1){
+			//if nodeDesc.next != -1, offset and oldoffset do not change
 			//fetch the to-be-modified key
 			memcpy(&deletedkeyDesc,(char *)page+oldoffset,sizeof(KeyDesc));
 			dprintf("deleted key's leftNode is %d\n",deletedkeyDesc.leftNode);
@@ -1074,71 +1043,103 @@ if(nexttreeop == OP_Merge ){
 			memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),&nodeDesc,sizeof(NodeDesc));
 			//write page to disk
 			ixfileHandle.writePage(pageNum,page);
-		}else if(treeop == OP_Merge){
-			//fetch the to-be-modified key
-			memcpy(&deletedkeyDesc,(char *)leftsibling+oldoffset,sizeof(KeyDesc));
-			dprintf("deleted key's leftNode is %d\n",deletedkeyDesc.leftNode);
-
-			//update to-be-modified KeyDesc.keySize
-			deletedkeyDesc.keySize = currentkeyDesc.keySize;
-			memcpy((char *)leftsibling+oldoffset,&deletedkeyDesc,sizeof(KeyDesc));
-			oldoffset += sizeof(KeyDesc);
-			//modified the key value
-			memcpy(bufferpage,(char *)leftsibling+offset,leftnodeDesc.size-offset);
-			memcpy((char*)leftsibling+oldoffset,currentkeyDesc.keyValue,currentkeyDesc.keySize);
-			oldoffset += currentkeyDesc.keySize;
-			memcpy((char *)leftsibling+oldoffset,bufferpage,leftnodeDesc.size-offset);
-
-			//update page descriptor
-			leftnodeDesc.size -= ((int)offset - (int)oldoffset);
-			dprintf("nodeDesc.size is %d\n",leftnodeDesc.size);
-			assert((offset - oldoffset)>=0 &&"(offset - oldoffset)>=0");
-			dprintf("offset - oldoffset is %d\n",(offset-oldoffset));
 
 
-			memcpy((char *)leftsibling+PAGE_SIZE-sizeof(NodeDesc),&leftnodeDesc,sizeof(NodeDesc));
-			//write page to disk
-			ixfileHandle.writePage(nodeDesc.prev,leftsibling);
-		}else if(treeop == OP_None){
 
-			//fetch the to-be-modified key
-			memcpy(&deletedkeyDesc,(char *)page+oldoffset,sizeof(KeyDesc));
-			dprintf("deleted key's leftNode is %d\n",deletedkeyDesc.leftNode);
+		}else{
 
-			//update to-be-modified KeyDesc.keySize
-			deletedkeyDesc.keySize = currentkeyDesc.keySize;
-			memcpy((char *)page+oldoffset,&deletedkeyDesc,sizeof(KeyDesc));
-			oldoffset += sizeof(KeyDesc);
-			//modified the key value
-			memcpy(bufferpage,(char *)page+offset,nodeDesc.size-offset);
-			memcpy((char*)page+oldoffset,currentkeyDesc.keyValue,currentkeyDesc.keySize);
-			oldoffset += currentkeyDesc.keySize;
-			memcpy((char *)page+oldoffset,bufferpage,nodeDesc.size-offset);
+			if(treeop == OP_Dist){
+				//fetch the to-be-modified key
+				memcpy(&deletedkeyDesc,(char *)page+oldoffset,sizeof(KeyDesc));
+				dprintf("deleted key's leftNode is %d\n",deletedkeyDesc.leftNode);
 
-			//update page descriptor
-			nodeDesc.size -= ((int)offset - (int)oldoffset);
-			dprintf("nodeDesc.size is %d\n",nodeDesc.size);
-			assert((offset - oldoffset)>=0 &&"(offset - oldoffset)>=0");
-			dprintf("offset - oldoffset is %d\n",(offset-oldoffset));
+				//update to-be-modified KeyDesc.keySize
+				deletedkeyDesc.keySize = currentkeyDesc.keySize;
+				memcpy((char *)page+oldoffset,&deletedkeyDesc,sizeof(KeyDesc));
+				oldoffset += sizeof(KeyDesc);
+				//modified the key value
+				memcpy(bufferpage,(char *)page+offset,nodeDesc.size-offset);
+				memcpy((char*)page+oldoffset,currentkeyDesc.keyValue,currentkeyDesc.keySize);
+				oldoffset += currentkeyDesc.keySize;
+				memcpy((char *)page+oldoffset,bufferpage,nodeDesc.size-offset);
+
+				//update page descriptor
+				nodeDesc.size -= ((int)offset - (int)oldoffset);
+				dprintf("nodeDesc.size is %d\n",nodeDesc.size);
+				assert((offset - oldoffset)>=0 &&"(offset - oldoffset)>=0");
+				dprintf("offset - oldoffset is %d\n",(offset-oldoffset));
 
 
-			memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),&nodeDesc,sizeof(NodeDesc));
-			//write page to disk
-			ixfileHandle.writePage(pageNum,page);
+				memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),&nodeDesc,sizeof(NodeDesc));
+				//write page to disk
+				ixfileHandle.writePage(pageNum,page);
+			}else if(treeop == OP_Merge){
+				//fetch the to-be-modified key
+				memcpy(&deletedkeyDesc,(char *)leftsibling+oldoffset,sizeof(KeyDesc));
+				dprintf("deleted key's leftNode is %d\n",deletedkeyDesc.leftNode);
+
+				//update to-be-modified KeyDesc.keySize
+				deletedkeyDesc.keySize = currentkeyDesc.keySize;
+				memcpy((char *)leftsibling+oldoffset,&deletedkeyDesc,sizeof(KeyDesc));
+				oldoffset += sizeof(KeyDesc);
+				//modified the key value
+				memcpy(bufferpage,(char *)leftsibling+offset,leftnodeDesc.size-offset);
+				memcpy((char*)leftsibling+oldoffset,currentkeyDesc.keyValue,currentkeyDesc.keySize);
+				oldoffset += currentkeyDesc.keySize;
+				memcpy((char *)leftsibling+oldoffset,bufferpage,leftnodeDesc.size-offset);
+
+				//update page descriptor
+				leftnodeDesc.size -= ((int)offset - (int)oldoffset);
+				dprintf("nodeDesc.size is %d\n",leftnodeDesc.size);
+				assert((offset - oldoffset)>=0 &&"(offset - oldoffset)>=0");
+				dprintf("offset - oldoffset is %d\n",(offset-oldoffset));
+
+
+				memcpy((char *)leftsibling+PAGE_SIZE-sizeof(NodeDesc),&leftnodeDesc,sizeof(NodeDesc));
+				//write page to disk
+				ixfileHandle.writePage(nodeDesc.prev,leftsibling);
+			}else if(treeop == OP_None){
+
+				//fetch the to-be-modified key
+				memcpy(&deletedkeyDesc,(char *)page+oldoffset,sizeof(KeyDesc));
+				dprintf("deleted key's leftNode is %d\n",deletedkeyDesc.leftNode);
+
+				//update to-be-modified KeyDesc.keySize
+				deletedkeyDesc.keySize = currentkeyDesc.keySize;
+				memcpy((char *)page+oldoffset,&deletedkeyDesc,sizeof(KeyDesc));
+				oldoffset += sizeof(KeyDesc);
+				//modified the key value
+				memcpy(bufferpage,(char *)page+offset,nodeDesc.size-offset);
+				memcpy((char*)page+oldoffset,currentkeyDesc.keyValue,currentkeyDesc.keySize);
+				oldoffset += currentkeyDesc.keySize;
+				memcpy((char *)page+oldoffset,bufferpage,nodeDesc.size-offset);
+
+				//update page descriptor
+				nodeDesc.size -= ((int)offset - (int)oldoffset);
+				dprintf("nodeDesc.size is %d\n",nodeDesc.size);
+				assert((offset - oldoffset)>=0 &&"(offset - oldoffset)>=0");
+				dprintf("offset - oldoffset is %d\n",(offset-oldoffset));
+
+
+				memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),&nodeDesc,sizeof(NodeDesc));
+				//write page to disk
+				ixfileHandle.writePage(pageNum,page);
+			}
 		}
+
 	}
 
-}
-
-free(leftsibling);
-free(rightsibling);
-free(nextpage);
-free(bufferpage);
-free(currentkeyDesc.keyValue);
-free(nextkeyDesc.keyValue);
-return treeop;*/
+	free(leftsibling);
+	free(rightsibling);
+	free(nextpage);
+	free(bufferpage);
+	free(currentkeyDesc.keyValue);
+	free(nextkeyDesc.keyValue);
+	return treeop;
 
 }
+
+
 RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid)
 {
 	RC rc;
