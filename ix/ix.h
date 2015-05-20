@@ -94,6 +94,8 @@ class IndexManager : public DebugMsg {
 
     private:
         static IndexManager *_index_manager;
+    void FindLastKey(void *page,KeyDesc &keyDesc);
+    RC FindOffset(void *page,int size,int &offset);
 
     TreeOp TraverseTree(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, void *page, PageNum pageNum, PageNum &returnpageNum);
 
