@@ -663,12 +663,12 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 	KeyDesc siblingkeyDesc;
 	KeyDesc currentkeyDesc;
 	KeyDesc deletedkeyDesc;
-	char * keyValue = keyDesc.keyValue;
+	void * keyValue = keyDesc.keyValue;
 	currentkeyDesc.keyValue = malloc(maxvarchar);
-	char * currentkeyValue = currentkeyDesc.keyValue;
+	void * currentkeyValue = currentkeyDesc.keyValue;
 	KeyDesc nextkeyDesc;
 	nextkeyDesc.keyValue = malloc(maxvarchar);
-	nextkeyValue = nextkeyDesc.keyValue;
+	void *nextkeyValue = nextkeyDesc.keyValue;
 	PageNum currentpageNum=-1;
 
 	TreeOp treeop = OP_None;
