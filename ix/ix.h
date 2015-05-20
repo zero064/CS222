@@ -18,6 +18,7 @@ const char Leaf = 1 , NonLeaf = 2;
 
 const int maxvarchar = 54;
 const int THRESHOLD = PAGE_SIZE / 2;
+const PageNum InvalidPage = 0;
 
 typedef enum { OP_Split, OP_Merge , OP_Dist , OP_None , OP_Error }TreeOp; 
 
@@ -42,7 +43,7 @@ typedef struct {
 } KeyDesc;
 
 typedef struct {
-    bool overflow = false;
+    PageNum overflow = InvalidPage;
     short int numOfRID;
     short int keySize;
     void *keyValue;
