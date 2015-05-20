@@ -15,7 +15,7 @@ IndexManager* IndexManager::instance()
 
 IndexManager::IndexManager()
 {
-		debug = true;
+//		debug = true;
 }
 
 IndexManager::~IndexManager()
@@ -1219,7 +1219,6 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 	bool found = false;     
 	while( offset < nodeDesc.size ){
 		DataEntryDesc ded;
-	printf("TYOOWKOPEKPDKWPDKPWKDPWKDOWKPD\n");
 		memcpy( &ded, (char*)page+offset, sizeof(DataEntryDesc) );
 
 		ded.keyValue = malloc(ded.keySize);
@@ -1603,6 +1602,8 @@ RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
         bool		lowKeyInclusive,
         bool        	highKeyInclusive)
 {
+	if( ixfileHandle.isReadable() == -1 ) return FAILURE;
+
     this->ixfileHandle = ixfileHandle;	
     this->attribute = attribute;
     this->lowKey = (char*)lowKey;
@@ -1732,6 +1733,7 @@ RC IX_ScanIterator::close()
 
 IXFileHandle::IXFileHandle()
 {
+	error = -1;
 }
 
 
@@ -1739,14 +1741,21 @@ IXFileHandle::~IXFileHandle()
 {
 }
 
+RC IXFileHandle::isReadable()
+{
+	return error;
+}
 RC IXFileHandle::initFilePointer(const string &fileName)
 {
-	return fileHandle.initFilePointer( fileName );
+	error = fileHandle.initFilePointer( fileName );
+	return error;
 }
 
 RC IXFileHandle::closeFilePointer()
 {
-	return fileHandle.closeFilePointer();
+	RC rc = fileHandle.closeFilePointer();
+	error = -1;
+	return rc;
 }
 
 PageNum IXFileHandle::findFreePage()
