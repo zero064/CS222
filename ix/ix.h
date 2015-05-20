@@ -87,7 +87,7 @@ class IndexManager : public DebugMsg {
 
         // Print the B+ tree JSON record in pre-order
         void printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute);
-        void printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute, int depth, PageNum nodeNum);
+        void printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute, void *page, int depth, PageNum nodeNum);
 	
     protected:
         IndexManager();
@@ -110,7 +110,7 @@ class IndexManager : public DebugMsg {
 
 	int keyCompare(const Attribute &attribute, const void *keyA, const void* keyB); 
 	int getKeySize(const Attribute &attribute, const void *key);
-	void printKey(const attribute &attribute, const void *key);
+	void printKey(const Attribute &attribute, const void *key);
 
 /*
 	splitLeaf()
