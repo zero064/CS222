@@ -1098,9 +1098,9 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 	free(bufferpage);
 	free(currentkeyDesc.keyValue);
 	free(nextkeyDesc.keyValue);
-	return treeop;
+	return treeop;*/
 
-}*/
+}
 RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid)
 {
     RC rc;
