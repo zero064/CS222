@@ -134,7 +134,7 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 	PageSize offset=0;
 	KeyDesc siblingkeyDesc;
 	KeyDesc currentkeyDesc;
-	currentkeyValue = malloc(maxvarchar);
+	char *currentkeyValue = (char *)malloc(maxvarchar);
 	KeyDesc nextkeyDesc;
 	nextkeyDesc.keyValue = malloc(maxvarchar);
 	PageNum currentpageNum=-1;
@@ -602,7 +602,7 @@ RC IndexManager::FindOffset(void *page,int size,int &offset,bool IsGreater)
 
 TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, KeyDesc &keyDesc)
 {
-	void *bufferpage = malloc(PAGE_SIZE);
+	/*void *bufferpage = malloc(PAGE_SIZE);
 	void *nextpage = malloc(PAGE_SIZE);
 	void *leftsibling = malloc(PAGE_SIZE);
 	void *rightsibling = malloc(PAGE_SIZE);
@@ -1100,7 +1100,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 	free(nextkeyDesc.keyValue);
 	return treeop;
 
-}
+}*/
 RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid)
 {
     RC rc;
