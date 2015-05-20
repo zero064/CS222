@@ -337,7 +337,7 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 
     PageNum root = ixfileHandle.findRootPage();
     void *page = malloc(PAGE_SIZE);
-    dprintf("root pageNum is %d",root);
+    dprintf("root pageNum is %d\n",root);
     rc = ixfileHandle.readPage(root,page); 
     
     KeyDesc keyDesc;
@@ -354,7 +354,6 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
     // traverse tree
     if(type==Leaf){
     	//root page is leaf page
-
     	TreeOp treeop=insertToLeaf(ixfileHandle, attribute, key, rid, page, root, keyDesc);
     	assert( ((treeop == OP_Split) || (treeop == OP_None)) && "treeop should be OP_Split or OP_None"  );
     	if(treeop == OP_Split){
@@ -378,12 +377,11 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 
     		rc = ixfileHandle.writePage(newroot,page);
     		assert(rc == SUCCESS && "Fail to write root page as leaf page");
-    		dprintf("Successfully split root page");
+    		dprintf("Successfully split root page\n");
     	}
-
     	free(keyDesc.keyValue);
     	free(page);
-    	dprintf("Original root page is Leaf");
+    	dprintf("Original root page is Leaf yo\n");
     	return 0;
     }else if(type == NonLeaf){
     	//root page is NonLeaf
@@ -414,10 +412,12 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
         		dprintf("Successfully split root page");
         	}
 
+		printf("1 A LO HA\n");
 
-
-    	free(keyDesc.keyValue);
+		printf("2 A LO HA\n");
     	free(page);
+    	free(keyDesc.keyValue);
+		printf("3 A LO HA\n");
     	dprintf("Original root page is NonLeaf");
     	return 0;
     }else{
@@ -548,7 +548,8 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 	memcpy( keyDesc.keyValue, (char*)splitPage+sizeof(DataEntryDesc), nDed.keySize);
     }
     
-    ixfileHandle.writePage(pageNum,page); 
+    ixfileHandle.writePage(pageNum,page);
+	free(splitPage);
     return operation;    
 }
 void IndexManager::FindLastKey(void *page,KeyDesc &keyDesc)
@@ -1104,7 +1105,7 @@ RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 
     PageNum root = ixfileHandle.findRootPage();
     void *page = malloc(PAGE_SIZE);
-    dprintf("root pageNum is %d",root);
+    dprintf("root pageNum is %d\n",root);
     rc = ixfileHandle.readPage(root,page);
 
     KeyDesc keyDesc;
@@ -1361,6 +1362,31 @@ int IndexManager::getKeySize(const Attribute &attribute, const void *key)
 
 }
 
+// print key to screen 
+void IndexManager::printKey(const Attribute &attribute, const void *key)
+{
+    AttrType type = attribute.type;
+    int size = -1;
+    switch( type ){
+	case TypeInt:
+	    printf("%d",(int*)key);
+	    return;
+	case TypeReal:
+	    printf("%f",(float*)key);
+	    return; 
+	case TypeVarChar:
+	    memcpy( &size, key , sizeof(int) );
+	    assert( size >= 0 && "something wrong with getting varchar key size\n");
+	    assert( size < 50 && "something wrong with getting varchar key size\n");
+	    printf("%s",(char*)key+4);
+	    return;
+    }
+
+
+
+}
+
+
 RC IndexManager::scan(IXFileHandle &ixfileHandle,
         const Attribute &attribute,
         const void      *lowKey,
@@ -1371,9 +1397,114 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
 {
     return ix_ScanIterator.init(ixfileHandle,attribute,lowKey,highKey,lowKeyInclusive,highKeyInclusive);
 }
-
 void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute)
 {
+    RC rc;
+    void *page = malloc(PAGE_SIZE);
+    PageNum rootPage = ixfileHandle.findRootPage();
+    ixfileHandle.readPage(rootPage,page);
+
+    NodeDesc nodeDesc;
+    memcpy( &nodeDesc, (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
+    if( nodeDesc.type == Leaf ){
+	int offset = 0;
+	DataEntryDesc ded;
+	printf("{\n\"keys\":[");
+	while( offset < nodeDesc.size ){
+	    if( offset > 0 ) printf(",");
+	    memcpy( &ded, (char*)page+offset, sizeof(DataEntryDesc) );
+	    void *key = malloc( ded.keySize );
+	    memcpy( key , (char*)page+offset+sizeof(DataEntryDesc), ded.keySize);
+	    // print key
+	    printf("\""); printKey( attribute, key ); printf("\"");
+	    free(key);	 
+	    offset += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID * sizeof(RID) ;   
+	}
+	printf("]\n");
+    }    
+
+    if( nodeDesc.type = NonLeaf ){
+
+    }
+
+    printf("}\n");
+    free(page);
+}
+
+
+void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute, void *page, int depth, PageNum nodeNum)
+{
+    RC rc;
+    rc = ixfileHandle.readPage( nodeNum, page );
+    assert( rc == SUCCESS && "Something wrong in read page in printBTree subTree");
+
+    NodeDesc nodeDesc;
+    memcpy( &nodeDesc, (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
+    // print indent based on depth
+    for(int i=0; i<depth; i++) printf("\t");   
+ 
+    if( nodeDesc.type == NonLeaf ){
+		// vector to store all links ( PageNum of sub-tree )
+		vector<PageNum> links;
+		int offset = 0;
+		KeyDesc keyDesc;
+		DataEntryDesc ded;	
+		printf("{\n\"keys\": [");
+		// print key in non-leaf first 
+		while( offset < nodeDesc.size ){
+	    	if( offset > 0 ) printf(","); 
+		    memcpy( &keyDesc, (char*)page+offset, sizeof(KeyDesc));
+		    keyDesc.keyValue = malloc( keyDesc.keySize );
+		    memcpy( keyDesc.keyValue,(char *) page+offset, keyDesc.keySize);
+			// print key
+		    printf("\""); printKey( attribute, keyDesc.keyValue ); printf(":[");
+			// add links to vector ( without last one )
+		    links.push_back( keyDesc.leftNode );
+			free( keyDesc.keyValue);
+		    offset += sizeof(KeyDesc) + keyDesc.keySize;
+		}
+		// add the last link to vectory
+		links.push_back( keyDesc.rightNode );
+
+
+		// start to traverse all children
+		for(int i=0; i<depth; i++) printf("\t");
+		printf("\"children\":[");
+		for( int i=0; i<links.size(); i++){
+			printBtree(ixfileHandle,attribute,page,depth+1,links[i]);
+			if( i < links.size() - 1 ) printf(",\n");
+		}
+		printf("\n");
+		return;
+    }
+    
+    if( nodeDesc.type == Leaf ){
+		int offset = 0;
+		DataEntryDesc ded;
+		printf("{\n\"keys\": [");
+		while( offset < nodeDesc.size ){
+	    	if( offset > 0 ) printf(",");
+		    memcpy( &ded, (char*)page+offset, sizeof(DataEntryDesc) );
+		    void *key = malloc( ded.keySize );
+		    memcpy( key , (char*)page+offset+sizeof(DataEntryDesc), ded.keySize);
+		    // print key
+		    printf("\""); printKey( attribute, key ); printf(":[");
+		    // print RIDs
+		    for(int i=0; i<ded.numOfRID; i++){
+				RID rid;
+				memcpy( &rid, (char*)page+offset+sizeof(DataEntryDesc)+ded.keySize+ i*sizeof(RID), sizeof(RID) );
+				printf("(%d,%d)",rid.pageNum,rid.slotNum);
+				if( i < ded.numOfRID-1 ) printf(","); 
+		    }
+	    	printf("]\"");
+		    free(key);	 
+		    offset += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID * sizeof(RID) ;   
+		}
+		printf("]}\n");
+		return;
+    }
+
+    assert( false && "It should return before this" );    
 }
 
 IX_ScanIterator::IX_ScanIterator()
@@ -1386,65 +1517,81 @@ IX_ScanIterator::~IX_ScanIterator()
 
 
 RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
-        const Attribute &attribute,
-        const void      *lowKey,
-        const void      *highKey,
-        bool		lowKeyInclusive,
-        bool        	highKeyInclusive)
+const Attribute &attribute,
+const void *lowKey,
+const void *highKey,
+bool	lowKeyInclusive,
+bool highKeyInclusive)
 {
-    this->ixfileHandle = ixfileHandle;	
-    this->attribute = attribute;
-    this->lowKey = (char*)lowKey;
-    this->highKey = (char*)highKey;
-    this->lowKeyInclusive = lowKeyInclusive;
-    this->highKeyInclusive = highKeyInclusive;
-    this->page = malloc(PAGE_SIZE);
-    im = IndexManager::instance();    
+	this->ixfileHandle = ixfileHandle;
+	this->attribute = attribute;
+	this->lowKey = (char*)lowKey;
+	this->highKey = (char*)highKey;
+	this->lowKeyInclusive = lowKeyInclusive;
+	this->highKeyInclusive = highKeyInclusive;
+	this->page = malloc(PAGE_SIZE);
+	im = IndexManager::instance();
+	float INF = INFINITY, NINF = -INFINITY;
 
-    RC rc;
-    // find root first 
-    PageNum root = ixfileHandle.findRootPage();
-    void *page = malloc(PAGE_SIZE);
-    rc = ixfileHandle.readPage(root,page); 
-
-    // Get Root Page Info
-    NodeDesc nodeDesc;
-    memcpy( &nodeDesc , (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc));
-
-    if( nodeDesc.type == NonLeaf ){
-
-
-
-    }
-
-	
-    offsetToKey = 0;
-    offsetToRID = 0;
-    while( true ){    
-        DataEntryDesc ded;
-        memcpy( &ded, (char*)page+offsetToKey, sizeof(DataEntryDesc));
-	// retrieve key value
-        void *key = malloc( ded.keySize );
-        memcpy( &ded, (char*)page+offsetToKey+sizeof(DataEntryDesc), ded.keySize );
-        if( lowKeyInclusive ){
-	    if( im->keyCompare( attribute , key , lowKey ) >= 0 ){
-		free(key);
-		return SUCCESS;		
-	    }
-	}else{
-	    if( im->keyCompare( attribute , key , lowKey ) > 0 ){
-		free(key);
-		return SUCCESS;		
-	    }
+	if( lowKey == NULL ){
+		this->lowKey = malloc(sizeof(float));
+		memcpy( this->lowKey , &NINF, sizeof(float));
 	}
-	free(key);
-	offsetToKey += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID);
-    } 
-    
+	if( highKey == NULL ){
+		this->highKey = malloc(sizeof(float));
+		memcpy( this->highKey , &INF, sizeof(float));
+	}
+
+	RC rc;
+	// find root first
+	PageNum root = ixfileHandle.findRootPage();
+	void *page = malloc(PAGE_SIZE);
+	rc = ixfileHandle.readPage(root,page);
+
+	// Get Root Page Info
+	NodeDesc nodeDesc;
+	memcpy( &nodeDesc , (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc));
+
+	// Start Tree Traversal if root is non-leaf
+	PageNum returnPageNum = 0;
+	if( nodeDesc.type == NonLeaf ){
+		im->TraverseTree( ixfileHandle, attribute, lowKey, page, root, returnPageNum);
+		assert( root == returnPageNum && "root should not be leaf in this case" );
+		assert( returnPageNum >=1 && "something went wrong when traversing tree in scan ");
+
+		rc = ixfileHandle.readPage(returnPageNum,page);
+	}
 
 
- 
-    return FAILURE;
+	offsetToKey = 0;
+	offsetToRID = 0;
+	while( true ){
+
+		DataEntryDesc ded;
+		memcpy( &ded, (char*)page+offsetToKey, sizeof(DataEntryDesc));
+		// retrieve key value
+		void *key = malloc( ded.keySize );
+		memcpy( key, (char*)page+offsetToKey+sizeof(DataEntryDesc), ded.keySize );
+
+		if( lowKeyInclusive ){
+
+			if( im->keyCompare( attribute , key , this->lowKey ) >= 0 ){
+
+				free(key);
+				return SUCCESS;
+			}
+		}else{
+			if( im->keyCompare( attribute , key , this->lowKey ) > 0 ){
+				free(key);
+				return SUCCESS;
+			}
+		}
+		free(key);
+
+		offsetToKey += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID);
+	}
+
+	return FAILURE;
 }
 
 
