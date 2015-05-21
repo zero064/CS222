@@ -35,7 +35,6 @@ const int LowerThreshold = (PAGE_SIZE-sizeof(NodeDesc))*0.4;
 
 
 typedef struct {
-	Attribute type;
 	PageNum leftNode;
 	PageNum rightNode;
 	short int keySize;
