@@ -15,7 +15,7 @@ IndexManager* IndexManager::instance()
 
 IndexManager::IndexManager()
 {
-	//	debug = true;
+//		debug = true;
 }
 
 IndexManager::~IndexManager()
@@ -1209,13 +1209,14 @@ RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 		//root page is leaf page
 
 		TreeOp treeop=deleteFromLeaf(ixfileHandle, attribute, key, rid, page, root, keyDesc);
-		assert( ((treeop == OP_Dist) || (treeop == OP_Merge) || (treeop == OP_None)) && "treeop should be OP_Merge, OP_Dist or OP_None"  );
-		if(treeop != OP_Error){
-			free(keyDesc.keyValue);
-			free(page);
-			dprintf("Original root page is Leaf");
-			return 0;
-		}
+		
+	//	assert( ((treeop == OP_Dist) || (treeop == OP_Merge) || (treeop == OP_None)) && "treeop should be OP_Merge, OP_Dist or OP_None"  );
+		free(keyDesc.keyValue);
+		free(page);
+		dprintf("Original root page is Leaf\n");
+		if( treeop == OP_Error ) return FAILURE;
+		return 0;
+		
 	}else if(type == NonLeaf){
 		//root page is NonLeaf
 
@@ -1224,13 +1225,15 @@ RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 		free(keyDesc.keyValue);
 		free(page);
 		dprintf("Original root page is NonLeaf");
+		if( treeop == OP_Error ) return FAILURE;
 		return 0;
 	}else{
 		assert("root page should be Leaf or NonLeaf");
 	}
 	//
 
-	return -1;}
+	return -1;
+}
 
 
 TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page,
@@ -1243,6 +1246,7 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 	int offset = 0 ; 
 	// potential split page buffer
 	void *nextPage = malloc(PAGE_SIZE);
+
 	bool found = false;     
 	while( offset < nodeDesc.size ){
 		DataEntryDesc ded;
@@ -1310,7 +1314,8 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 
 	if( !found ) return OP_Error;
 
-	if( nodeDesc.size < THRESHOLD ){
+	// if this page is root page, dont apply merge / redistribution.
+	if( nodeDesc.size < THRESHOLD && pageNum != ixfileHandle.findRootPage() ){
 		NodeDesc nNodeDesc;
 		// right most leaf case 
 		if( nodeDesc.next == -1 ){
@@ -1401,6 +1406,8 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 
 		}
 
+	}else{
+		ixfileHandle.writePage( pageNum, page );	    
 	}
 
 
@@ -1626,6 +1633,8 @@ RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
         bool		lowKeyInclusive,
         bool        	highKeyInclusive)
 {
+	if( ixfileHandle.isReadable() == -1 ) return FAILURE;
+
     this->ixfileHandle = ixfileHandle;	
     this->attribute = attribute;
     this->lowKey = (char*)lowKey;
@@ -1755,6 +1764,7 @@ RC IX_ScanIterator::close()
 
 IXFileHandle::IXFileHandle()
 {
+	error = -1;
 }
 
 
@@ -1762,14 +1772,21 @@ IXFileHandle::~IXFileHandle()
 {
 }
 
+RC IXFileHandle::isReadable()
+{
+	return error;
+}
 RC IXFileHandle::initFilePointer(const string &fileName)
 {
-	return fileHandle.initFilePointer( fileName );
+	error = fileHandle.initFilePointer( fileName );
+	return error;
 }
 
 RC IXFileHandle::closeFilePointer()
 {
-	return fileHandle.closeFilePointer();
+	RC rc = fileHandle.closeFilePointer();
+	error = -1;
+	return rc;
 }
 
 PageNum IXFileHandle::findFreePage()
