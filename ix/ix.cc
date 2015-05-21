@@ -237,7 +237,7 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 	dprintf("currentpageNUm is %d",currentpageNum);
 	//read the page pointed by currentpageNum to nextpage
 	rc = ixfileHandle.readPage(currentpageNum,nextpage);
-	assert(rc != 0 && "rc != 0 \n");
+	assert(rc == 0 && "rc != 0 \n");
 	memcpy(&nextnodeDesc,(char *)nextpage+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
 	//if it is leaf page call insertToLeat, NonLeaf page recursively call TraverseTreeInsert
 	if(nextnodeDesc.type == Leaf){
@@ -385,7 +385,6 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 	rc = ixfileHandle.readPage(root,page); 
 
 	KeyDesc keyDesc;
-	keyDesc.type=attribute;
 	keyDesc.keyValue=malloc(maxvarchar);
 
 	// check if root needs to be split 
@@ -405,7 +404,7 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 			newroot=ixfileHandle.findFreePage();
 			ixfileHandle.updateRootPage(newroot);
 			NodeDesc newnodeDesc;
-			int keysize = getKeySize(keyDesc.type,keyDesc.keyValue);
+			int keysize = getKeySize(attribute,keyDesc.keyValue);
 
 			newnodeDesc.next=-1;
 			newnodeDesc.type=NonLeaf;
@@ -437,7 +436,7 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 			newroot=ixfileHandle.findFreePage();
 			ixfileHandle.updateRootPage(newroot);
 			NodeDesc newnodeDesc;
-			int keysize = getKeySize(keyDesc.type,keyDesc.keyValue);
+			int keysize = getKeySize(attribute,keyDesc.keyValue);
 
 			newnodeDesc.next=-1;
 			newnodeDesc.type=NonLeaf;
@@ -1194,7 +1193,7 @@ RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 	rc = ixfileHandle.readPage(root,page);
 
 	KeyDesc keyDesc;
-	keyDesc.type=attribute;
+
 	keyDesc.keyValue=malloc(maxvarchar);
 
 	// check if root needs to be split
