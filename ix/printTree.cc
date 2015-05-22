@@ -22,26 +22,31 @@ int printTree(const string &indexFileName)
     assertCreateIndexFile(fail, indexManager, indexFileName);
 
     Attribute attribute;
+    /*
     attribute.length = 50;
     attribute.name = "sup";
     attribute.type = TypeVarChar;
+    */
+    attribute.length = 4;
+    attribute.name = "sup";
+    attribute.type = TypeReal;
 
-	void *key = malloc( 4 + 1);
-	char k = 'a'; int s = 1;
+//	void *key = malloc( 4 + 1);
+//	char k = 'a'; int s = 1;
 	RID rid;
-	for( int i = 0 ; i< 26; i++){
+	for( int i = 0 ; i< 5000; i++){
 		rid.pageNum = i;
-
-		memcpy( key, &s, 4 );
-		memcpy( (char*)key+4, &k, 1 );
+		float key = (float)i;
+//		memcpy( key, &s, 4 );
+//		memcpy( (char*)key+4, &k, 1 );
 		for(int j=0; j< 25; j++){
 			rid.slotNum = j;
-			indexManager->insertEntry(fileHandle, attribute, key, rid);
+			indexManager->insertEntry(fileHandle, attribute, &key, rid);
 		} 
-
-		k++;
+		printf("%d\n",i);
+//		k++;
 	}
-	free(key);
+//	free(key);
 
 	printf("\n\n Print B Tree \n\n");
 	indexManager->printBtree(fileHandle,attribute);
