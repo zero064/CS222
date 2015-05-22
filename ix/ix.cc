@@ -1750,7 +1750,7 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 	//dprintf("RID %d %d %d\n",rid.pageNum,rid.slotNum, ded.numOfRID);
 	
 	offsetToRID++;
-	printf("offsetToRID %d \n", offsetToRID);
+	//printf("offsetToRID %d \n", offsetToRID);
 
 	if( offsetToRID == ded.numOfRID ){
 		offsetToKey += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID) ;
