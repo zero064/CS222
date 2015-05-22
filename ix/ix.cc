@@ -412,7 +412,7 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 			NodeDesc newnodeDesc;
 			int keysize = getKeySize(attribute,keyDesc.keyValue);
 
-			newnodeDesc.next=-1;
+			newnodeDesc.next=InvalidPage;
 			newnodeDesc.type=NonLeaf;
 			newnodeDesc.size=0;
 
@@ -444,7 +444,7 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 			NodeDesc newnodeDesc;
 			int keysize = getKeySize(attribute,keyDesc.keyValue);
 
-			newnodeDesc.next=-1;
+			newnodeDesc.next=InvalidPage;
 			newnodeDesc.type=NonLeaf;
 			newnodeDesc.size=0;
 
@@ -749,13 +749,13 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 		PageSize leftsize=0;
 		PageSize rightsize=0;
 
-		if(nodeDesc.prev != -1 || nodeDesc.next != -1){
+		if(nodeDesc.prev != -1 || nodeDesc.next != InvalidPage){
 
 
 
 
 
-			if(nodeDesc.next != -1){
+			if(nodeDesc.next != InvalidPage){
 
 				KeyDesc lastkeyDesc;
 				KeyDesc beginkeyDesc;
@@ -924,7 +924,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 
 					memcpy((char *)leftsibling+leftnodeDesc.size,(char *)page,nodeDesc.size);
 					leftnodeDesc.size += nodeDesc.size;
-					leftnodeDesc.next = -1;
+					leftnodeDesc.next = InvalidPage;
 					memcpy((char *)leftsibling+PAGE_SIZE-sizeof(NodeDesc),&leftnodeDesc,sizeof(NodeDesc));
 					dprintf("Merge, the new left nodeDesc.size is %d\n",leftnodeDesc.size);
 					treeop = OP_Merge;
@@ -964,7 +964,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 		assert("page type should be leaf or NonLeaf");
 	}
 	if(nexttreeop == OP_Merge ){
-		if(nodeDesc.next != -1){
+		if(nodeDesc.next != InvalidPage){
 			//if nodeDesc.next != -1, offset and oldoffset do not change
 			//fetch the deleted key
 			memcpy(&deletedkeyDesc,(char *)page+oldoffset,sizeof(KeyDesc));
@@ -1064,7 +1064,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 		}
 
 	}else if(nexttreeop == OP_Dist){
-		if(nodeDesc.next != -1){
+		if(nodeDesc.next != InvalidPage){
 			//if nodeDesc.next != -1, offset and oldoffset do not change
 			//fetch the to-be-modified key
 			memcpy(&deletedkeyDesc,(char *)page+oldoffset,sizeof(KeyDesc));
@@ -1323,7 +1323,7 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 	if( nodeDesc.size < THRESHOLD && pageNum != ixfileHandle.findRootPage() ){
 		NodeDesc nNodeDesc;
 		// right most leaf case
-		if( nodeDesc.next == -1 ){
+		if( nodeDesc.next == InvalidPage ){
 			ixfileHandle.readPage( nodeDesc.prev, nextPage );
 			memcpy( &nNodeDesc, (char*)nextPage+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
 
@@ -1482,10 +1482,10 @@ void IndexManager::printKey(const Attribute &attribute, const void *key)
 	int size = -1;
 	switch( type ){
 		case TypeInt:
-			printf("%d",(int*)key);
+			printf("%d",*((int*)key));
 			return;
 		case TypeReal:
-			printf("%f",(float*)key);
+			printf("%f",*((float*)key));
 			return;
 		case TypeVarChar:
 			memcpy( &size, key , sizeof(int) );
@@ -1647,14 +1647,18 @@ RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
 	this->lowKeyInclusive = lowKeyInclusive;
 	this->highKeyInclusive = highKeyInclusive;
 	this->page = malloc(PAGE_SIZE);
+	this->lowKeyNull = false;
+	this->highKeyNull = false;
 	im = IndexManager::instance();
 	float INF = INFINITY, NINF = -INFINITY;
 
 	if( lowKey == NULL ){
+		this->lowKeyNull = true;
 		this->lowKey = malloc(sizeof(float));
 		memcpy( this->lowKey , &NINF, sizeof(float));
 	}
 	if( highKey == NULL ){
+		this->highKeyNull = true;
 		this->highKey = malloc(sizeof(float));
 		memcpy( this->highKey , &INF, sizeof(float));
 	}
@@ -1693,7 +1697,6 @@ RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
 		if( lowKeyInclusive ){
 
 			if( im->keyCompare( attribute , key , this->lowKey ) >= 0 ){
-
 				free(key);
 				return SUCCESS;
 			}
@@ -1720,9 +1723,11 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 	// check if the offset exceeds the page size
 	NodeDesc nodeDesc;
 	memcpy( &nodeDesc, (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
-	
+
 	if( offsetToKey >= nodeDesc.size ){
-		if( nodeDesc.next == -1 ) return IX_EOF;
+		printf("YOLO %d\n",nodeDesc.next);
+		if( nodeDesc.next == InvalidPage ) return IX_EOF;
+		printf("YOLO %d\n",nodeDesc.next);
 		rc = ixfileHandle.readPage( nodeDesc.next, page );
 		assert( rc == SUCCESS && "something wrong in readpage in getNextEntry" );
 		// Reset all offets for new pages;
@@ -1730,6 +1735,7 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 		offsetToRID = 0;
 		memcpy( &nodeDesc, (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
 	}
+
 
 
 	DataEntryDesc ded;
@@ -1747,7 +1753,7 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 
 	// Read rid and return
 	memcpy( &rid, (char*)page+offsetToKey+sizeof(DataEntryDesc)+ded.keySize+offsetToRID*sizeof(RID), sizeof(RID) );
-	//dprintf("RID %d %d %d\n",rid.pageNum,rid.slotNum, ded.numOfRID);
+	printf("RID %d %d %d\n",rid.pageNum,rid.slotNum, ded.numOfRID);
 	
 	offsetToRID++;
 	//printf("offsetToRID %d \n", offsetToRID);
@@ -1763,9 +1769,10 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 
 RC IX_ScanIterator::close()
 {
+
 	free(page);
-	free(lowKey);
-	free(highKey);
+	if( lowKeyNull ) free(lowKey);
+	if( highKeyNull ) free(highKey);
 	return SUCCESS;
 }
 
@@ -1875,7 +1882,7 @@ PageNum IXFileHandle::findRootPage()
 		assert( rc == SUCCESS && "write root page failed" );
 
 		NodeDesc nodeDesc;
-		nodeDesc.next=-1;
+		nodeDesc.next=InvalidPage;
 		nodeDesc.type=Leaf;
 		nodeDesc.size=0;
 		memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),&nodeDesc,sizeof(NodeDesc));

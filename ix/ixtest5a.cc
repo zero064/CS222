@@ -57,7 +57,7 @@ int testCase_5a(const string &indexFileName, const Attribute &attribute)
 
         inRidPageNumSum += rid.pageNum;
     }
-
+    
     // Test Open Scan
     assertInitalizeScan(success, indexManager, ixfileHandle, attribute, 
             &value, NULL, true, true, ix_ScanIterator);
@@ -65,9 +65,9 @@ int testCase_5a(const string &indexFileName, const Attribute &attribute)
     // Test IndexScan iterator
     while(ix_ScanIterator.getNextEntry(rid, &key) == success)
     {
-        if (rid.pageNum % 100 == 0) {
+    //    if (rid.pageNum % 100 == 0) {
             cerr << "returned rid: " << rid.pageNum << " " << rid.slotNum << endl;
-        }
+    //    }
         if (rid.pageNum < value || rid.slotNum < value + 1)
         {
             cerr << "Wrong entries output...failure" << endl;
