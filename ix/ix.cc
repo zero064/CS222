@@ -1227,7 +1227,7 @@ RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 	}else if(type == NonLeaf){
 		//root page is NonLeaf
 
-		TreeOp treeop=TraverseTreeInsert(ixfileHandle, attribute, key, rid, page, root, keyDesc);
+		TreeOp treeop=TraverseTreeDelete(ixfileHandle, attribute, key, rid, page, root, keyDesc);
 		assert( ((treeop == OP_Split) || (treeop == OP_None)) && "treeop should be OP_Split or OP_None"  );
 		free(keyDesc.keyValue);
 		free(page);

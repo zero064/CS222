@@ -89,7 +89,7 @@ int testCase_LargeDataSet(const string &indexFileName, const Attribute &attribut
         assertDeleteEntry(success, indexManager, ixfileHandle, attribute, &key, rid);
         deletedRecord += 1;
     }
-
+    printf("deletedRecord %d\n", deletedRecord);
     // scan 
     rc = assertScanVailid(ixfileHandle, attribute, ix_ScanIterator, 
             inRecordNum - deletedRecord);
