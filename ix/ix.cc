@@ -15,7 +15,7 @@ IndexManager* IndexManager::instance()
 
 IndexManager::IndexManager()
 {
-	//		debug = true;
+		debug = true;
 }
 
 IndexManager::~IndexManager()
@@ -86,8 +86,10 @@ TreeOp IndexManager::TraverseTree(IXFileHandle &ixfileHandle, const Attribute &a
 	while(true){
 		memcpy(&currentkeyDesc,(char *) page+offset,sizeof(KeyDesc));
 		offset+=sizeof(KeyDesc);
+		dprintf("currentkeyDesc.keySize is %d\n currentkeyDesc.leftNode is %d\n currentkeyDesc.rightNode is %d\n",currentkeyDesc.keySize,currentkeyDesc.leftNode,currentkeyDesc.rightNode);
 		memcpy(currentkeyValue,(char *) page+offset,currentkeyDesc.keySize);
 		offset+=currentkeyDesc.keySize;
+		dprintf("currentkeyValue is %d\n key is %d\n",currentkeyValue,key);
 
 		if(keyCompare(attribute,key,currentkeyValue)<0){
 			//get the page pointer
@@ -154,7 +156,7 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 		offset+=sizeof(KeyDesc);
 		memcpy(currentkeyValue,(char *) page+offset,currentkeyDesc.keySize);
 		offset+=currentkeyDesc.keySize;
-
+		dprintf("currentkeyValue is %d\n key is %d\n",currentkeyValue,key);
 		if(keyCompare(attribute,key,currentkeyValue)<0){
 			//get the page pointer
 			currentpageNum=currentkeyDesc.leftNode;
