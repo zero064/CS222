@@ -15,7 +15,7 @@ int assertScanVailid(IXFileHandle &ixfileHandle, const Attribute &attribute,
     unsigned key;
     while(ix_ScanIterator.getNextEntry(rid, &key) == success)
     {
-
+	//printf("p%d s%d k%d\n",rid.pageNum,rid.slotNum,key);
         if (rid.pageNum != key +1 ||  rid.slotNum != key + 2){
             cerr << "Wrong entries output...failure" << endl;
             ix_ScanIterator.close();
@@ -23,7 +23,7 @@ int assertScanVailid(IXFileHandle &ixfileHandle, const Attribute &attribute,
         }
         outRecordNum += 1;
     }
-
+    cerr << inRecordNum <<" "<< outRecordNum << endl;
     if (inRecordNum != outRecordNum)
     {
         cerr << "Wrong entries output...failure" << endl;
@@ -70,7 +70,7 @@ int testCase_LargeDataSet(const string &indexFileName, const Attribute &attribut
         assertInsertEntry(success, indexManager, ixfileHandle, attribute, &key, rid);
         inRecordNum += 1;
     }
-
+    printf("%d\n",inRecordNum);
     // scan
     int rc = assertScanVailid(ixfileHandle, attribute, ix_ScanIterator, inRecordNum);
     if (rc != success){

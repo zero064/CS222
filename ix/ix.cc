@@ -537,6 +537,7 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 		// check if the RID list is too big so that we need to move it to a overflow page.
 		// the condition depends on RID list's size bigger than LowerThreshold Bound
 		if( result == 0 && ded.numOfRID*sizeof(RID) > LowerThreshold ){
+			assert(false);
 			// find over flow page and update the current ded's overflow page indicator
 			PageNum link = ixfileHandle.findFreePage();
 			ded.overflow = link; // update overflow indicator
@@ -1182,6 +1183,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 	free(bufferpage);
 	free(currentkeyDesc.keyValue);
 	free(nextkeyDesc.keyValue);
+
 	return treeop;
 
 }
@@ -1441,7 +1443,7 @@ int IndexManager::keyCompare(const Attribute &attribute, const void *keyA, const
 			float f_a, f_b;
 			memcpy( &f_a , keyA , sizeof(float));
 			memcpy( &f_b , keyB , sizeof(float));
-			f_a = (f_a-f_b) * 100000;
+			f_a = (f_a-f_b) * 100000; 
 			return (int)f_a;
 			break;
 		case TypeVarChar:
@@ -1650,7 +1652,7 @@ RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
 	this->lowKeyNull = false;
 	this->highKeyNull = false;
 	im = IndexManager::instance();
-	float INF = INFINITY, NINF = -INFINITY;
+	float INF = INFINITY/2, NINF = -INFINITY/2;
 
 	if( lowKey == NULL ){
 		this->lowKeyNull = true;
@@ -1693,7 +1695,11 @@ RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
 		// retrieve key value
 		void *key = malloc( ded.keySize );
 		memcpy( key, (char*)page+offsetToKey+sizeof(DataEntryDesc), ded.keySize );
-
+	//	printf("%d di %f low %f\n", im->keyCompare( attribute , key , this->lowKey ), *(float*)key, *(float*)this->lowKey );
+		if( this->lowKeyNull ){
+		    free(key);
+		    return SUCCESS;
+		}
 		if( lowKeyInclusive ){
 
 			if( im->keyCompare( attribute , key , this->lowKey ) >= 0 ){
@@ -1725,9 +1731,7 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 	memcpy( &nodeDesc, (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
 
 	if( offsetToKey >= nodeDesc.size ){
-		printf("YOLO %d\n",nodeDesc.next);
 		if( nodeDesc.next == InvalidPage ) return IX_EOF;
-		printf("YOLO %d\n",nodeDesc.next);
 		rc = ixfileHandle.readPage( nodeDesc.next, page );
 		assert( rc == SUCCESS && "something wrong in readpage in getNextEntry" );
 		// Reset all offets for new pages;
@@ -1745,15 +1749,15 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 	memcpy( key, (char*)page+offsetToKey+sizeof(DataEntryDesc), ded.keySize);
 
 	int result = im->keyCompare( attribute, key , highKey );
-	if( highKeyInclusive ){
+	if( highKeyInclusive ){ 
 		if( result > 0 ) return IX_EOF;
-	}else{
-		if( result == 0 ) return IX_EOF;
+	}else{ 
+		if( result >= 0 ) return IX_EOF;
 	}
 
 	// Read rid and return
 	memcpy( &rid, (char*)page+offsetToKey+sizeof(DataEntryDesc)+ded.keySize+offsetToRID*sizeof(RID), sizeof(RID) );
-	printf("RID %d %d %d\n",rid.pageNum,rid.slotNum, ded.numOfRID);
+	//printf("RID %d %d %d\n",rid.pageNum,rid.slotNum, ded.numOfRID);
 	
 	offsetToRID++;
 	//printf("offsetToRID %d \n", offsetToRID);
