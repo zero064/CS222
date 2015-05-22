@@ -1673,7 +1673,7 @@ RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
 	PageNum returnPageNum = 0;
 	if( nodeDesc.type == NonLeaf ){
 		im->TraverseTree( ixfileHandle, attribute, this->lowKey, page, root, returnPageNum);
-		assert( root == returnPageNum && "root should not be leaf in this case" );
+		assert( root != returnPageNum && "root should not be leaf in this case" );
 		assert( returnPageNum >=1 && "something went wrong when traversing tree in scan ");
 
 		rc = ixfileHandle.readPage(returnPageNum,page);
