@@ -25,8 +25,8 @@ typedef enum { OP_Split, OP_Merge , OP_Dist , OP_None , OP_Error }TreeOp;
 typedef struct {
 	NodeType type;
 	PageSize size;
-	PageNum next = -1;
-	PageNum prev = -1;
+	PageNum next = InvalidPage;
+	PageNum prev = InvalidPage;
 } NodeDesc;
 
 const int UpperThreshold = (PAGE_SIZE-sizeof(NodeDesc))*0.85;
@@ -182,7 +182,7 @@ class IX_ScanIterator {
 		IXFileHandle ixfileHandle;
 		IndexManager *im;
 		Attribute attribute;
-		void *lowKey;
+		void *lowKey; bool lowKeyNull , highKeyNull;
 		void *highKey;
 		bool lowKeyInclusive, highKeyInclusive;
 		void *page;
