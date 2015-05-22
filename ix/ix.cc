@@ -80,16 +80,16 @@ TreeOp IndexManager::TraverseTree(IXFileHandle &ixfileHandle, const Attribute &a
 	PageSize offset=0;
 	KeyDesc currentkeyDesc;
 	char *currentkeyValue = (char*)malloc(maxvarchar);
-	PageNum currentpageNum=-1;
+	PageNum currentpageNum=0;
 
 	TreeOp treeop = OP_None;
 	while(true){
 		memcpy(&currentkeyDesc,(char *) page+offset,sizeof(KeyDesc));
 		offset+=sizeof(KeyDesc);
-		dprintf("currentkeyDesc.keySize is %d\n currentkeyDesc.leftNode is %d\n currentkeyDesc.rightNode is %d\n",currentkeyDesc.keySize,currentkeyDesc.leftNode,currentkeyDesc.rightNode);
+		//dprintf("currentkeyDesc.keySize is %d\n currentkeyDesc.leftNode is %d\n currentkeyDesc.rightNode is %d\n",currentkeyDesc.keySize,currentkeyDesc.leftNode,currentkeyDesc.rightNode);
 		memcpy(currentkeyValue,(char *) page+offset,currentkeyDesc.keySize);
 		offset+=currentkeyDesc.keySize;
-		dprintf("currentkeyValue is %d\n key is %d\n",currentkeyValue,key);
+		//dprintf("currentkeyValue is %d\n key is %d\n",currentkeyValue,key);
 
 		if(keyCompare(attribute,key,currentkeyValue)<0){
 			//get the page pointer
@@ -144,7 +144,7 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 	char *currentkeyValue = (char *)malloc(maxvarchar);
 	KeyDesc nextkeyDesc;
 	nextkeyDesc.keyValue = malloc(maxvarchar);
-	PageNum currentpageNum=-1;
+	PageNum currentpageNum=0;
 
 
 	TreeOp treeop = OP_None;
@@ -156,7 +156,7 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 		offset+=sizeof(KeyDesc);
 		memcpy(currentkeyValue,(char *) page+offset,currentkeyDesc.keySize);
 		offset+=currentkeyDesc.keySize;
-		dprintf("currentkeyValue is %d\n key is %d\n",currentkeyValue,key);
+		//dprintf("currentkeyValue is %d\n key is %d\n",currentkeyValue,key);
 		if(keyCompare(attribute,key,currentkeyValue)<0){
 			//get the page pointer
 			currentpageNum=currentkeyDesc.leftNode;
@@ -171,7 +171,7 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 		}
 	}
 	currentkeyDesc.keyValue = currentkeyValue;
-	assert( currentpageNum != -1 && "Should find a pageNum\n");
+	assert( currentpageNum != 0 && "Should find a pageNum\n");
 
 
 	int splitoffset=0;
@@ -465,7 +465,7 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 
 		free(page);
 		free(keyDesc.keyValue);
-		dprintf("Original root page is NonLeaf");
+		dprintf("Original root page is NonLeaf\n");
 		return 0;
 	}else{
 		assert("root page should be Leaf or NonLeaf");
@@ -698,7 +698,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 	int pushdownkeysize = keyDesc.keySize;
 
 	PageSize offset=0;
-	PageSize oldoffset=-1;
+	PageSize oldoffset= 65535;
 	KeyDesc siblingkeyDesc;
 	KeyDesc currentkeyDesc;
 	KeyDesc deletedkeyDesc;
@@ -708,7 +708,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 	KeyDesc nextkeyDesc;
 	nextkeyDesc.keyValue = malloc(maxvarchar);
 	void *nextkeyValue = nextkeyDesc.keyValue;
-	PageNum currentpageNum=-1;
+	PageNum currentpageNum=0;
 
 	TreeOp treeop = OP_None;
 	TreeOp nexttreeop = OP_None;
@@ -722,7 +722,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 
 		if(keyCompare(attribute,key,currentkeyValue)<0){
 			//get the page pointer
-			if(oldoffset == -1){
+			if(oldoffset == 65535){
 				currentpageNum=currentkeyDesc.leftNode;
 				oldoffset = 0;
 				break;
@@ -740,7 +740,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 
 	}
 	currentkeyDesc.keyValue = currentkeyValue;
-	assert( currentpageNum != -1 && "Should find a pageNum");
+	assert( currentpageNum != 0 && "Should find a pageNum");
 	dprintf("after finding currentpageNum,oldoffset is %d\n offset is %d\n",oldoffset,offset);
 	NodeDesc leftnodeDesc;
 	NodeDesc rightnodeDesc;
@@ -755,7 +755,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 		//merege or redistribute the page
 
 
-		if(nodeDesc.prev != -1 || nodeDesc.next != InvalidPage){
+		if(nodeDesc.prev != InvalidPage || nodeDesc.next != InvalidPage){
 
 
 
@@ -772,10 +772,10 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 					int siblingoffset;
 					//find the position in sibling page to move data
 					FindOffset(rightsibling,LowerThreshold-nodeDesc.size,siblingoffset,true);
-					dpintf("nodeDesc.size is %d\nsiblingoffset is %d\n",nodeDesc.size,siblingoffset);
+					dprintf("nodeDesc.size is %d\nsiblingoffset is %d\n",nodeDesc.size,siblingoffset);
 					//find the last key in original page and the first key in sibling page
 					FindLastKey(page,lastkeyDesc);
-					assert(lastkeyDesc.rightNode != -1 && "rightNode == -1 in Redistribution");
+					assert(lastkeyDesc.rightNode != InvalidPage && "rightNode == InvalidPage in Redistribution");
 					memcpy(&beginkeyDesc,rightsibling,sizeof(KeyDesc));
 					//update the leftNode and rightNode for push down key
 					keyDesc.leftNode = lastkeyDesc.rightNode;
@@ -851,7 +851,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 				//get the leftnodeDesc from leftsibling
 				ixfileHandle.readPage(nodeDesc.prev,leftsibling);
 				memcpy(&leftnodeDesc,(char*)leftsibling+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
-				dprintf("leftsize is %d",leftnodeDesc.size);
+				dprintf("leftsize is %d\n",leftnodeDesc.size);
 				dprintf("In the begining , nodeDesc.size is %d\n",nodeDesc.size);
 
 				if( (leftnodeDesc.size + nodeDesc.size)> UpperThreshold){
@@ -860,11 +860,11 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 					FindOffset(leftsibling,leftnodeDesc.size - (LowerThreshold-nodeDesc.size),siblingoffset,false);
 					assert((leftnodeDesc.size - (LowerThreshold-nodeDesc.size))>LowerThreshold && "(leftNode.size - (LowerThreshold-nodeDesc.size))>LowerThreshold");
 					dprintf("nodeDesc.size is %d\n",nodeDesc.size);
-					dprintf("leftNode.size is %d\n",leftNode.size);
+					dprintf("leftNode.size is %d\n",leftnodeDesc.size);
 					dprintf("siblingoffset is %d\n",siblingoffset);
 					//find the last key in original page and the first key in sibling page
 					FindLastKey(leftsibling,lastkeyDesc);
-					assert(lastkeyDesc.rightNode != -1 && "rightNode == -1 in Redistribution");
+					assert(lastkeyDesc.rightNode != InvalidPage && "rightNode == InvalidPage in Redistribution");
 					memcpy(&beginkeyDesc,page,sizeof(KeyDesc));
 					keyDesc.leftNode = lastkeyDesc.rightNode;
 					keyDesc.rightNode = beginkeyDesc.leftNode;
@@ -896,7 +896,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 					oldoffset += backwardoffset;
 					offset += backwardoffset;
 					dprintf("nodeDesc.size is %d\n",nodeDesc.size);
-					dprintf("leftNode.size is %d\n",leftNode.size);
+					dprintf("leftNode.size is %d\n",leftnodeDesc.size);
 					dprintf("siblingoffset is %d\n",siblingoffset);
 					//update nodeDesc
 					nodeDesc.size = currentoffset;
@@ -934,6 +934,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 					memcpy(&beginkeyDesc,page,sizeof(KeyDesc));
 					keyDesc.leftNode = lastkeyDesc.rightNode;
 					keyDesc.rightNode = beginkeyDesc.leftNode;
+					//copy push down key to lefsibling
 					memcpy((char *)leftsibling+leftnodeDesc.size,&keyDesc,sizeof(keyDesc));
 					leftnodeDesc.size += sizeof(keyDesc);
 					memcpy((char *)leftsibling+leftnodeDesc.size,keyDesc.keyValue,keyDesc.keySize);
@@ -943,6 +944,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 					memcpy((char *)leftsibling+leftnodeDesc.size,(char *)page,nodeDesc.size);
 					leftnodeDesc.size += nodeDesc.size;
 					leftnodeDesc.next = InvalidPage;
+					//update leftnodeDesc to leftsibling
 					memcpy((char *)leftsibling+PAGE_SIZE-sizeof(NodeDesc),&leftnodeDesc,sizeof(NodeDesc));
 					dprintf("Merge, the new left nodeDesc.size is %d\n",leftnodeDesc.size);
 					treeop = OP_Merge;
@@ -964,31 +966,31 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 
 
 	//recursively call TraverseTreeInsert
-	dprintf("currentpageNUm is %d",currentpageNum);
+	dprintf("currentpageNUm is %d\n",currentpageNum);
 	ixfileHandle.readPage(currentpageNum,nextpage);
 	memcpy(&nextnodeDesc,(char *)nextpage+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
 	if(nextnodeDesc.type == Leaf){
 		nexttreeop = deleteFromLeaf(ixfileHandle,attribute,key,rid,nextpage,currentpageNum, currentkeyDesc);
 
-		assert((nexttreeop == OP_Merge || nexttreeop == OP_Dist || nexttreeop == OP_None) && "nexttreeop should be OP_Merge,OP_Dist or OP_None");
+		//assert((nexttreeop == OP_Merge || nexttreeop == OP_Dist || nexttreeop == OP_None) && "nexttreeop should be OP_Merge,OP_Dist or OP_None");
 
 	}else if(nextnodeDesc.type == NonLeaf){
 
-		nexttreeop = TraverseTreeInsert(ixfileHandle,attribute,key,rid,nextpage,currentpageNum, currentkeyDesc);
-		assert((nexttreeop == OP_Merge || nexttreeop == OP_Dist || nexttreeop == OP_None) && "nexttreeop should be OP_Merge,OP_Dist or OP_None");
+		nexttreeop = TraverseTreeDelete(ixfileHandle,attribute,key,rid,nextpage,currentpageNum, currentkeyDesc);
+		//assert((nexttreeop == OP_Merge || nexttreeop == OP_Dist || nexttreeop == OP_None) && "nexttreeop should be OP_Merge,OP_Dist or OP_None");
 
 
 	}else{
-		assert("page type should be leaf or NonLeaf");
+		assert("page type should be leaf or NonLeaf\n");
 	}
 	if(nexttreeop == OP_Merge ){
 		if(nodeDesc.next != InvalidPage){
-			//if nodeDesc.next != -1, offset and oldoffset do not change
+			//if nodeDesc.next != InvalidPage, offset and oldoffset do not change
 			//fetch the deleted key
 			memcpy(&deletedkeyDesc,(char *)page+oldoffset,sizeof(KeyDesc));
 			dprintf("deleted key's leftNode is %d\n",deletedkeyDesc.leftNode);
 
-			//update sibling KeyDesc
+			//update sibling KeyDesc's leftnode to  keep link-list
 			memcpy(&siblingkeyDesc,(char *)page+offset,sizeof(KeyDesc));
 			siblingkeyDesc.leftNode = deletedkeyDesc.leftNode;
 			memcpy((char *)page+offset,&siblingkeyDesc,sizeof(KeyDesc));
@@ -997,9 +999,9 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 			memcpy((char *)page+oldoffset,bufferpage,nodeDesc.size-offset);
 
 			//update page descriptor
-			nodeDesc.size -= (offset - oldoffset);
+			nodeDesc.size -= ((int)offset - (int)oldoffset);
 			assert((offset - oldoffset)>=0 &&"(offset - oldoffset)>=0");
-			dprintf("offset - oldoffset is %d\n",(offset-oldoffset));
+			dprintf("offset - oldoffset is %d\n",((int)offset-(int)oldoffset));
 
 
 			memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),&nodeDesc,sizeof(NodeDesc));
@@ -1024,9 +1026,9 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 				memcpy((char *)page+oldoffset,bufferpage,nodeDesc.size-offset);
 
 				//update page descriptor
-				nodeDesc.size -= (offset - oldoffset);
+				nodeDesc.size -= ((int)offset - (int)oldoffset);
 				assert((offset - oldoffset)>=0 &&"(offset - oldoffset)>=0");
-				dprintf("offset - oldoffset is %d\n",(offset-oldoffset));
+				dprintf("offset - oldoffset is %d\n",((int)offset-(int)oldoffset));
 
 
 				memcpy((char *)page+PAGE_SIZE-sizeof(NodeDesc),&nodeDesc,sizeof(NodeDesc));
@@ -1046,9 +1048,9 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 				memcpy((char *)leftsibling+oldoffset,bufferpage,leftnodeDesc.size-offset);
 
 				//update page descriptor
-				leftnodeDesc.size -= (offset - oldoffset);
+				leftnodeDesc.size -= ((int)offset - (int)oldoffset);
 				assert((offset - oldoffset)>=0 &&"(offset - oldoffset)>=0");
-				dprintf("offset - oldoffset is %d\n",(offset-oldoffset));
+				dprintf("offset - oldoffset is %d\n",((int)offset-(int)oldoffset));
 
 
 				memcpy((char *)leftsibling+PAGE_SIZE-sizeof(NodeDesc),&leftnodeDesc,sizeof(NodeDesc));
@@ -1056,7 +1058,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 				ixfileHandle.writePage(nodeDesc.prev,leftsibling);
 			}else if(treeop == OP_None){
 
-				//if nodeDesc.next != -1, offset and oldoffset do not change
+				//if nodeDesc.next != InvalidPage, offset and oldoffset do not change
 				//fetch the deleted key
 				memcpy(&deletedkeyDesc,(char *)page+oldoffset,sizeof(KeyDesc));
 				dprintf("deleted key's leftNode is %d\n",deletedkeyDesc.leftNode);
@@ -1070,7 +1072,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 				memcpy((char *)page+oldoffset,bufferpage,nodeDesc.size-offset);
 
 				//update page descriptor
-				nodeDesc.size -= (offset - oldoffset);
+				nodeDesc.size -= ((int)offset - (int)oldoffset);
 				assert((offset - oldoffset)>=0 &&"(offset - oldoffset)>=0");
 				dprintf("offset - oldoffset is %d\n",(offset-oldoffset));
 
@@ -1083,7 +1085,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 
 	}else if(nexttreeop == OP_Dist){
 		if(nodeDesc.next != InvalidPage){
-			//if nodeDesc.next != -1, offset and oldoffset do not change
+			//if nodeDesc.next != InvalidPage, offset and oldoffset do not change
 			//fetch the to-be-modified key
 			memcpy(&deletedkeyDesc,(char *)page+oldoffset,sizeof(KeyDesc));
 			dprintf("deleted key's leftNode is %d\n",deletedkeyDesc.leftNode);
@@ -1201,6 +1203,11 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 	free(currentkeyDesc.keyValue);
 	free(nextkeyDesc.keyValue);
 
+	if(nexttreeop == OP_Error){
+		treeop = nexttreeop;
+	}
+	assert( keyValue == keyDesc.keyValue && "keyValue should equal to keyDesc.keyValue ");
+
 	return treeop;
 
 }
@@ -1245,7 +1252,7 @@ RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 		//root page is NonLeaf
 
 		TreeOp treeop=TraverseTreeDelete(ixfileHandle, attribute, key, rid, page, root, keyDesc);
-		assert( ((treeop == OP_Split) || (treeop == OP_None)) && "treeop should be OP_Split or OP_None"  );
+		//assert( ((treeop == OP_Split) || (treeop == OP_None)) && "treeop should be OP_Split or OP_None"  );
 		free(keyDesc.keyValue);
 		free(page);
 		dprintf("Original root page is NonLeaf");
