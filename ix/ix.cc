@@ -1720,7 +1720,7 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 	// check if the offset exceeds the page size
 	NodeDesc nodeDesc;
 	memcpy( &nodeDesc, (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
-
+	
 	if( offsetToKey >= nodeDesc.size ){
 		if( nodeDesc.next == -1 ) return IX_EOF;
 		rc = ixfileHandle.readPage( nodeDesc.next, page );
@@ -1747,11 +1747,14 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 
 	// Read rid and return
 	memcpy( &rid, (char*)page+offsetToKey+sizeof(DataEntryDesc)+ded.keySize+offsetToRID*sizeof(RID), sizeof(RID) );
-	printf("RID %d %d %d\n",rid.pageNum,rid.slotNum, ded.numOfRID);
-
+	//dprintf("RID %d %d %d\n",rid.pageNum,rid.slotNum, ded.numOfRID);
+	
 	offsetToRID++;
+	printf("offsetToRID %d \n", offsetToRID);
+
 	if( offsetToRID == ded.numOfRID ){
 		offsetToKey += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID) ;
+		offsetToRID = 0;
 	}
 
 
