@@ -696,7 +696,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 	int pushdownkeysize = keyDesc.keySize;
 
 	PageSize offset=0;
-	PageSize oldoffset=-1;
+	PageSize oldoffset=0;
 	KeyDesc siblingkeyDesc;
 	KeyDesc currentkeyDesc;
 	KeyDesc deletedkeyDesc;
@@ -710,21 +710,15 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 
 	TreeOp treeop = OP_None;
 	TreeOp nexttreeop = OP_None;
-
+	
 	//scan to find the desired pointer
 	while(true){
 		memcpy(&currentkeyDesc,(char *) page+offset,sizeof(KeyDesc));
 		offset+=sizeof(KeyDesc);
 		memcpy(currentkeyValue,(char *) page+offset,currentkeyDesc.keySize);
 		offset+=currentkeyDesc.keySize;
-
 		if(keyCompare(attribute,key,currentkeyValue)<0){
 			//get the page pointer
-			if(oldoffset == -1){
-				currentpageNum=currentkeyDesc.leftNode;
-				oldoffset = 0;
-				break;
-			}
 			currentpageNum=currentkeyDesc.leftNode;
 			break;
 		}
@@ -734,12 +728,15 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 			currentpageNum=currentkeyDesc.rightNode;
 			break;
 		}
+
 		oldoffset = offset ;//adjust the offset for deleting a  key entry,
 
 	}
+	oldoffset = offset - sizeof(KeyDesc) - currentkeyDesc.keySize;
 	currentkeyDesc.keyValue = currentkeyValue;
 	assert( currentpageNum != -1 && "Should find a pageNum");
-	dprintf("after finding currentpageNum,oldoffset is %d\n offset is %d\n",oldoffset,offset);
+//	printf("after finding currentpageNum,oldoffset is %d\n offset is %d\n",oldoffset,offset); 
+	//assert(false);
 	NodeDesc leftnodeDesc;
 	NodeDesc rightnodeDesc;
 
@@ -750,10 +747,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 		PageSize leftsize=0;
 		PageSize rightsize=0;
 
-		if(nodeDesc.prev != -1 || nodeDesc.next != InvalidPage){
-
-
-
+		if(nodeDesc.prev != InvalidPage || nodeDesc.next != InvalidPage){
 
 
 			if(nodeDesc.next != InvalidPage){
@@ -827,8 +821,8 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 					dprintf("Merge, the new nodeDesc.size is %d\n",nodeDesc.size);
 					//write page to disk
 					ixfileHandle.writePage(pageNum,page);
+					assert( ixfileHandle.findRootPage() != tempnext && "shouldn't delete root page");
 					ixfileHandle.deletePage(tempnext);
-
 					treeop = OP_Merge;
 
 
@@ -957,7 +951,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 
 	}else if(nextnodeDesc.type == NonLeaf){
 
-		nexttreeop = TraverseTreeInsert(ixfileHandle,attribute,key,rid,nextpage,currentpageNum, currentkeyDesc);
+		nexttreeop = TraverseTreeDelete(ixfileHandle,attribute,key,rid,nextpage,currentpageNum, currentkeyDesc);
 		assert((nexttreeop == OP_Merge || nexttreeop == OP_Dist || nexttreeop == OP_None) && "nexttreeop should be OP_Merge,OP_Dist or OP_None");
 
 
@@ -981,6 +975,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 
 			//update page descriptor
 			nodeDesc.size -= (offset - oldoffset);
+//			printf("offset - oldoffset is %d %d %d\n",(offset-oldoffset),offset,oldoffset);
 			assert((offset - oldoffset)>=0 &&"(offset - oldoffset)>=0");
 			dprintf("offset - oldoffset is %d\n",(offset-oldoffset));
 
@@ -1226,9 +1221,8 @@ RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 
 	}else if(type == NonLeaf){
 		//root page is NonLeaf
-
 		TreeOp treeop=TraverseTreeDelete(ixfileHandle, attribute, key, rid, page, root, keyDesc);
-		assert( ((treeop == OP_Split) || (treeop == OP_None)) && "treeop should be OP_Split or OP_None"  );
+//		assert( ((treeop == OP_Split) || (treeop == OP_None) ) && "treeop should be OP_Split or OP_None"  );
 		free(keyDesc.keyValue);
 		free(page);
 		dprintf("Original root page is NonLeaf");
@@ -1416,7 +1410,6 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 	}else{
 		ixfileHandle.writePage( pageNum, page );
 	}
-
 
 
 
@@ -1849,6 +1842,7 @@ PageNum IXFileHandle::findFreePage()
 
 RC IXFileHandle::updateRootPage(PageNum pageNum)
 {
+	assert ( pageNum > 0 && "root can not be zero\n");
 	void *page = malloc(PAGE_SIZE);
 	// read root directory
 	if( readPage(0, page) == FAILURE ) {
@@ -1897,7 +1891,6 @@ PageNum IXFileHandle::findRootPage()
 		// read 1st directory's 1st entry
 		memcpy( &root , (char*)page+sizeof(PageNum) , sizeof(PageNum) );
 	}
-
 	assert( root > 0 && "Root can not be page zero" );
 	free(page);
 	return root;
@@ -1911,6 +1904,7 @@ RC IXFileHandle::readPage(PageNum pageNum, void *data)
 
 RC IXFileHandle::writePage(PageNum pageNum, const void *data)
 {
+//	if( root_debug ){ assert( findRootPage() != pageNum && "WTF, Root can not be deleted\n"); }
 	this->writePageCount++;
 	return fileHandle.writePage(pageNum,data);
 }
@@ -1918,15 +1912,19 @@ RC IXFileHandle::writePage(PageNum pageNum, const void *data)
 RC IXFileHandle::deletePage(PageNum pageNum)
 {
 	PageNum dir = pageNum / IXDirectorySize;
-	assert( dir % IXDirectorySize == 0 && "Not valid directory index\n" );
+//	printf("deletePage Num %u\n",pageNum );
+//	assert( dir % IXDirectorySize != 0 && "Not valid directory index\n" );
+
+	//printf("root %u pageNum %u dir %u \n",findRootPage(),pageNum, dir);
 	int pageIndex = pageNum % IXDirectorySize;
 	assert( pageIndex >= 1 && pageIndex < 1024 && "Not valid page index \n");
+	assert( findRootPage() != pageNum && "WTF, Root can not be deleted\n");
 
 	void *page = malloc(PAGE_SIZE);
 	fileHandle.readPage( dir, page );
 	// mark the slot as empty
 	PageNum empty = 0;
-	memcpy( (char*)page+pageIndex , &empty , sizeof(PageNum) );
+	memcpy( (char*)page+pageIndex*sizeof(PageNum) , &empty , sizeof(PageNum) );
 	fileHandle.writePage( dir, page );
 	free(page);
 	return SUCCESS;

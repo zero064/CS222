@@ -34,6 +34,7 @@ const int LowerThreshold = (PAGE_SIZE-sizeof(NodeDesc))*0.4;
 
 
 
+
 typedef struct {
 	PageNum leftNode;
 	PageNum rightNode;
@@ -149,6 +150,7 @@ class IXFileHandle : public DebugMsg {
 		RC writePage(PageNum pageNum, const void *data);
 		RC deletePage(PageNum pageNum);
 
+		bool root_debug = false;
 		PageNum findFreePage();
 		PageNum findRootPage();
 		RC updateRootPage(PageNum pageNum);
@@ -156,6 +158,7 @@ class IXFileHandle : public DebugMsg {
 	private:
 		FileHandle fileHandle;
 		RC error;
+
 };
 
 
