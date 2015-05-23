@@ -52,7 +52,9 @@ int testCase_LargeDataSet(const string &indexFileName, const Attribute &attribut
     IX_ScanIterator ix_ScanIterator;
     unsigned key;
     int inRecordNum = 0;
-    unsigned numOfTuples = 1000 * 1000;
+    //unsigned numOfTuples = 1000 * 1000;
+    unsigned numOfTuples = 100 * 100;
+
 
     // create index file
     assertCreateIndexFile(success, indexManager, indexFileName);
@@ -77,8 +79,11 @@ int testCase_LargeDataSet(const string &indexFileName, const Attribute &attribut
         cerr << "Scan inserted results failed" << endl;
         return fail;
     }
-ixfileHandle.root_debug = true;
+    //indexManager->printBtree(ixfileHandle,attribute);
+    ixfileHandle.root_debug = true;
     // Delete some 
+	//indexManager->printBtree(ixfileHandle, attribute);
+	//assert(false);
     int deletedRecord = 0;
     for(unsigned i = 0; i <= numOfTuples; i+=10)
     {
@@ -90,6 +95,7 @@ ixfileHandle.root_debug = true;
         deletedRecord += 1;
     }
     printf("deletedRecord %d\n", deletedRecord);
+
     // scan 
     rc = assertScanVailid(ixfileHandle, attribute, ix_ScanIterator, 
             inRecordNum - deletedRecord);
