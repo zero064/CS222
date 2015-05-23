@@ -83,12 +83,10 @@ int testCase_LargeDataSet(const string &indexFileName, const Attribute &attribut
     //indexManager->printBtree(ixfileHandle,attribute);
     ixfileHandle.root_debug = true;
     // Delete some 
-<<<<<<< HEAD
+
 	//indexManager->printBtree(ixfileHandle, attribute);
 	//assert(false);
-=======
 
->>>>>>> 3511764edd6165ce01a49abe3d0a18ee04a7aa76
     int deletedRecord = 0;
     for(unsigned i = 0; i <= numOfTuples; i+=10)
     {
