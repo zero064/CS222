@@ -1436,14 +1436,14 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 		// compare the key to find the deleted record
 		int result = keyCompare(attribute, ded.keyValue, key);
 
-		//printf("pageNum %u key %d result %d offset %d nodeDesc.size %d",pageNum,*(int*)key, *(int*)ded.keyValue, offset, nodeDesc.size);
-		//printf(" entry size %d\n", sizeof(DataEntryDesc)+ded.keySize+ded.numOfRID*sizeof(RID) );
+		printf("pageNum %u key %d result %d offset %d nodeDesc.size %d",pageNum,*(int*)key, *(int*)ded.keyValue, offset, nodeDesc.size);
+		printf(" entry size %d\n", sizeof(DataEntryDesc)+ded.keySize+ded.numOfRID*sizeof(RID) );
 		// if it only contains 1 RID , remove whole entries
 		if( result == 0 && ded.numOfRID == 1){
 			// use nextPage as temp buffer
-			dprintf("result ==0\n offset is %d\n rid.pageNum is %d\n rid.slotNum is %d\n",offset,rid.pageNum,rid.slotNum);
+			//dprintf("result ==0\n offset is %d\n rid.pageNum is %d\n rid.slotNum is %d\n",offset,rid.pageNum,rid.slotNum);
 			int entrySize = sizeof(DataEntryDesc) + ded.keySize + sizeof(RID);
-			dprintf("entrySize is %d\n ded.keySize is %d\nnodeDesc.size is  %d\n",entrySize,ded.keySize,nodeDesc.size);
+			//dprintf("entrySize is %d\n ded.keySize is %d\nnodeDesc.size is  %d\n",entrySize,ded.keySize,nodeDesc.size);
 			memcpy( nextPage, (char*)page+offset+entrySize , nodeDesc.size - ( offset + entrySize ) );
 			memcpy( (char*)page+offset , nextPage, nodeDesc.size - ( offset + entrySize ) );
 
@@ -1452,7 +1452,7 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 			found = true;
 			break;
 		}else if( result == 0 && ded.overflow != InvalidPage ){
-			dprintf("result == 0 && ded.overflow != InvalidPage\n offset is %d\n rid.pageNum is %d\n rid.slotNum is %d\n",offset,rid.pageNum,rid.slotNum);
+			//dprintf("result == 0 && ded.overflow != InvalidPage\n offset is %d\n rid.pageNum is %d\n rid.slotNum is %d\n",offset,rid.pageNum,rid.slotNum);
 
 			RC rc;
 			rc = ixfileHandle.readPage( ded.overflow , page );
@@ -1506,7 +1506,7 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 		return OP_Error; }
 
 	// if this page is root page, dont apply merge / redistribution.
-	if( nodeDesc.size < THRESHOLD && pageNum != ixfileHandle.findRootPage() ){
+	if( nodeDesc.size < LowerThreshold && pageNum != ixfileHandle.findRootPage() ){
 		printf("merge / des case %d \n", *(int*)key); 
 		NodeDesc nNodeDesc; // next node ( could be previous )
 		// right most leaf case
@@ -1516,7 +1516,7 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 			memcpy( &nNodeDesc, (char*)nextPage+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
 
 			// re-distribution case , else it needs to merge
-			if( nodeDesc.size + nNodeDesc.size > PAGE_SIZE ){
+			if( nodeDesc.size + nNodeDesc.size > UpperThreshold ){
 				offset = 0;
 				while( offset < nNodeDesc.size / 3 ){
 					DataEntryDesc ded;
@@ -1553,6 +1553,7 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 //				nodeDesc.size += nNodeDesc.size;
 			
 //				ixfileHandle.deletePage( nodeDesc.prev );
+
 				ixfileHandle.deletePage( pageNum );
 //				nodeDesc.prev = nNodeDesc.prev;
 				nNodeDesc.next = InvalidPage; 
@@ -1602,8 +1603,19 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 			}else{
 				// merge case
 				memcpy( (char*)page+nodeDesc.size, nextPage, nNodeDesc.size );
-
+				// update info to the next two page 
+				if( nNodeDesc.next != InvalidPage ){
+				    // overwrite nextPage with next 2 Page, since we've already merge it to our page
+				    ixfileHandle.readPage( nextPage, nNodeDesc.next );
+				    NodeDesc ntNodeDesc;
+				    memcpy( &ntNodeDesc, (char*)nextPage+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc));
+				    ntNodeDesc.prev = pageNum;
+				    memcpy( (char*)nextPage+PAGE_SIZE-sizeof(NodeDesc), &ntNodeDesc, sizeof(NodeDesc));
+				    ixfileHandle.writePage( nNodeDesc.next, nextPage );
+				}
+				// delete the next page
 				ixfileHandle.deletePage( nodeDesc.next );
+				// update the current page info
 				// write page info back
 				nodeDesc.size += nNodeDesc.size;
 				nodeDesc.next = nNodeDesc.next;
