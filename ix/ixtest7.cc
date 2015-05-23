@@ -15,7 +15,7 @@ int assertScanVailid(IXFileHandle &ixfileHandle, const Attribute &attribute,
     unsigned key;
     while(ix_ScanIterator.getNextEntry(rid, &key) == success)
     {
-	//printf("p%d s%d k%d\n",rid.pageNum,rid.slotNum,key);
+	printf("p%d s%d k%d\n",rid.pageNum,rid.slotNum,key);
         if (rid.pageNum != key +1 ||  rid.slotNum != key + 2){
             cerr << "Wrong entries output...failure" << endl;
             ix_ScanIterator.close();
@@ -77,7 +77,7 @@ int testCase_LargeDataSet(const string &indexFileName, const Attribute &attribut
         cerr << "Scan inserted results failed" << endl;
         return fail;
     }
-
+ixfileHandle.root_debug = true;
     // Delete some 
     int deletedRecord = 0;
     for(unsigned i = 0; i <= numOfTuples; i+=10)

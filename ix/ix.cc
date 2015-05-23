@@ -698,7 +698,9 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 	int pushdownkeysize = keyDesc.keySize;
 
 	PageSize offset=0;
-	PageSize oldoffset= 65535;
+
+
+	PageSize oldoffset=0;
 	KeyDesc siblingkeyDesc;
 	KeyDesc currentkeyDesc;
 	KeyDesc deletedkeyDesc;
@@ -709,39 +711,48 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 	nextkeyDesc.keyValue = malloc(maxvarchar);
 	void *nextkeyValue = nextkeyDesc.keyValue;
 	PageNum currentpageNum=0;
+	//initialize rightnode
+	PageNum rightnode;
+	KeyDesc checkkeyDesc;
+	memcpy(&checkkeyDesc,page,sizeof(KeyDesc));
+	rightnode = checkkeyDesc.leftNode;
 
 	TreeOp treeop = OP_None;
 	TreeOp nexttreeop = OP_None;
-
+	
 	//scan to find the desired pointer
 	while(true){
 		memcpy(&currentkeyDesc,(char *) page+offset,sizeof(KeyDesc));
 		offset+=sizeof(KeyDesc);
 		memcpy(currentkeyValue,(char *) page+offset,currentkeyDesc.keySize);
 		offset+=currentkeyDesc.keySize;
-
 		if(keyCompare(attribute,key,currentkeyValue)<0){
 			//get the page pointer
-			if(oldoffset == 65535){
-				currentpageNum=currentkeyDesc.leftNode;
-				oldoffset = 0;
-				break;
-			}
+
 			currentpageNum=currentkeyDesc.leftNode;
+
+			assert(rightnode == currentkeyDesc.leftNode && "compare < 0,currentpageNum=currentkeyDesc.leftNode");
 			break;
 		}
 
 		if(offset == nodeDesc.size){
 			//last entry
 			currentpageNum=currentkeyDesc.rightNode;
+			assert(rightnode == currentkeyDesc.leftNode && "In the end,currentpageNum=currentkeyDesc.leftNode");
+
 			break;
 		}
-		oldoffset = offset ;//adjust the offset for deleting a  key entry,
 
+		oldoffset = offset ;//adjust the offset for deleting a  key entry,
+		rightnode = currentkeyDesc.rightNode;
 	}
+	oldoffset = offset - sizeof(KeyDesc) - currentkeyDesc.keySize;
 	currentkeyDesc.keyValue = currentkeyValue;
-	assert( currentpageNum != 0 && "Should find a pageNum");
-	dprintf("after finding currentpageNum,oldoffset is %d\n offset is %d\n",oldoffset,offset);
+
+	assert( currentpageNum != -1 && "Should find a pageNum");
+//	printf("after finding currentpageNum,oldoffset is %d\n offset is %d\n",oldoffset,offset); 
+	//assert(false);
+
 	NodeDesc leftnodeDesc;
 	NodeDesc rightnodeDesc;
 	PageSize origsize=nodeDesc.size;
@@ -759,7 +770,9 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 
 
 
+
 			if(nodeDesc.next != InvalidPage){
+
 
 
 
@@ -839,8 +852,8 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 					dprintf("Merge, the new nodeDesc.size is %d\n",nodeDesc.size);
 					//write page to disk and delete the rightsibling in disk
 					ixfileHandle.writePage(pageNum,page);
+					assert( ixfileHandle.findRootPage() != tempnext && "shouldn't delete root page");
 					ixfileHandle.deletePage(tempnext);
-
 					treeop = OP_Merge;
 
 
@@ -966,7 +979,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 
 
 	//recursively call TraverseTreeInsert
-	dprintf("currentpageNUm is %d\n",currentpageNum);
+	dprintf("rightnode is %d\ncurrentpageNUm is %d\n",rightnode,currentpageNum);
 	ixfileHandle.readPage(currentpageNum,nextpage);
 	memcpy(&nextnodeDesc,(char *)nextpage+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
 	if(nextnodeDesc.type == Leaf){
@@ -977,7 +990,9 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 	}else if(nextnodeDesc.type == NonLeaf){
 
 		nexttreeop = TraverseTreeDelete(ixfileHandle,attribute,key,rid,nextpage,currentpageNum, currentkeyDesc);
+
 		//assert((nexttreeop == OP_Merge || nexttreeop == OP_Dist || nexttreeop == OP_None) && "nexttreeop should be OP_Merge,OP_Dist or OP_None");
+
 
 
 	}else{
@@ -999,7 +1014,9 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 			memcpy((char *)page+oldoffset,bufferpage,nodeDesc.size-offset);
 
 			//update page descriptor
+
 			nodeDesc.size -= ((int)offset - (int)oldoffset);
+
 			assert((offset - oldoffset)>=0 &&"(offset - oldoffset)>=0");
 			dprintf("offset - oldoffset is %d\n",((int)offset-(int)oldoffset));
 
@@ -1250,9 +1267,8 @@ RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 
 	}else if(type == NonLeaf){
 		//root page is NonLeaf
-
 		TreeOp treeop=TraverseTreeDelete(ixfileHandle, attribute, key, rid, page, root, keyDesc);
-		//assert( ((treeop == OP_Split) || (treeop == OP_None)) && "treeop should be OP_Split or OP_None"  );
+
 		free(keyDesc.keyValue);
 		free(page);
 		dprintf("Original root page is NonLeaf");
@@ -1292,7 +1308,9 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 		// if it only contains 1 RID , remove whole entries
 		if( result == 0 && ded.numOfRID == 1){
 			// use nextPage as temp buffer
+			dprintf("result ==0\n offset is %d\n rid.pageNum is %d\n rid.slotNum is %d\n",offset,rid.pageNum,rid.slotNum);
 			int entrySize = sizeof(DataEntryDesc) + ded.keySize + sizeof(RID);
+			dprintf("entrySize is %d\n ded.keySize is %d\nnodeDesc.size is  %d\n",entrySize,ded.keySize,nodeDesc.size);
 			memcpy( nextPage, (char*)page+offset+entrySize , nodeDesc.size - ( offset + entrySize ) );
 			memcpy( (char*)page+offset , nextPage, nodeDesc.size - ( offset + entrySize ) );
 
@@ -1301,6 +1319,8 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 			found = true;
 			break;
 		}else if( result == 0 && ded.overflow != InvalidPage ){
+			dprintf("result == 0 && ded.overflow != InvalidPage\n offset is %d\n rid.pageNum is %d\n rid.slotNum is %d\n",offset,rid.pageNum,rid.slotNum);
+
 			RC rc;
 			rc = ixfileHandle.readPage( ded.overflow , page );
 			assert( rc == SUCCESS && "Error in reading overflow page in deletion");
@@ -1316,8 +1336,9 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 			memcpy(page, &ded, sizeof(DataEntryDesc) );
 			free(page);
 			return operation;
-		}else {
+		}else if(result == 0 && ded.numOfRID >1){
 			// if it has more than two RIDs, remove the one in the list
+			dprintf("RID List\n offset is %d\n rid.pageNum is %d\n rid.slotNum is %d\n",offset,rid.pageNum,rid.slotNum);
 
 			for( int i=0; i<ded.numOfRID; i++){
 				RID t_rid;
@@ -1342,7 +1363,7 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 		offset += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID);
 
 	}
-
+	dprintf("found is %d\n",found);
 	if( !found ) return OP_Error;
 
 	// if this page is root page, dont apply merge / redistribution.
@@ -1440,7 +1461,6 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 	}else{
 		ixfileHandle.writePage( pageNum, page );
 	}
-
 
 
 
@@ -1873,6 +1893,7 @@ PageNum IXFileHandle::findFreePage()
 
 RC IXFileHandle::updateRootPage(PageNum pageNum)
 {
+	assert ( pageNum > 0 && "root can not be zero\n");
 	void *page = malloc(PAGE_SIZE);
 	// read root directory
 	if( readPage(0, page) == FAILURE ) {
@@ -1921,7 +1942,6 @@ PageNum IXFileHandle::findRootPage()
 		// read 1st directory's 1st entry
 		memcpy( &root , (char*)page+sizeof(PageNum) , sizeof(PageNum) );
 	}
-
 	assert( root > 0 && "Root can not be page zero" );
 	free(page);
 	return root;
@@ -1935,6 +1955,7 @@ RC IXFileHandle::readPage(PageNum pageNum, void *data)
 
 RC IXFileHandle::writePage(PageNum pageNum, const void *data)
 {
+//	if( root_debug ){ assert( findRootPage() != pageNum && "WTF, Root can not be deleted\n"); }
 	this->writePageCount++;
 	return fileHandle.writePage(pageNum,data);
 }
@@ -1942,15 +1963,19 @@ RC IXFileHandle::writePage(PageNum pageNum, const void *data)
 RC IXFileHandle::deletePage(PageNum pageNum)
 {
 	PageNum dir = pageNum / IXDirectorySize;
-	assert( dir % IXDirectorySize == 0 && "Not valid directory index\n" );
+//	printf("deletePage Num %u\n",pageNum );
+//	assert( dir % IXDirectorySize != 0 && "Not valid directory index\n" );
+
+	//printf("root %u pageNum %u dir %u \n",findRootPage(),pageNum, dir);
 	int pageIndex = pageNum % IXDirectorySize;
 	assert( pageIndex >= 1 && pageIndex < 1024 && "Not valid page index \n");
+	assert( findRootPage() != pageNum && "WTF, Root can not be deleted\n");
 
 	void *page = malloc(PAGE_SIZE);
 	fileHandle.readPage( dir, page );
 	// mark the slot as empty
 	PageNum empty = 0;
-	memcpy( (char*)page+pageIndex , &empty , sizeof(PageNum) );
+	memcpy( (char*)page+pageIndex*sizeof(PageNum) , &empty , sizeof(PageNum) );
 	fileHandle.writePage( dir, page );
 	free(page);
 	return SUCCESS;
