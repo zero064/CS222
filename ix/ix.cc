@@ -730,6 +730,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 			//get the page pointer
 
 			currentpageNum=currentkeyDesc.leftNode;
+			dprintf("rightnode is %d\ncurrentpageNUm is %d\n",rightnode,currentpageNum);
 
 			assert(rightnode == currentkeyDesc.leftNode && "compare < 0,currentpageNum=currentkeyDesc.leftNode");
 			break;
@@ -738,6 +739,8 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 		if(offset == nodeDesc.size){
 			//last entry
 			currentpageNum=currentkeyDesc.rightNode;
+			dprintf("rightnode is %d\ncurrentpageNUm is %d\n",rightnode,currentpageNum);
+
 			assert(rightnode == currentkeyDesc.leftNode && "In the end,currentpageNum=currentkeyDesc.leftNode");
 
 			break;
@@ -1305,6 +1308,8 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 		// compare the key to find the deleted record
 		int result = keyCompare(attribute, ded.keyValue, key);
 
+		printf("pageNum %u key %d result %d offset %d nodeDesc.size %d",pageNum,*(int*)key, *(int*)ded.keyValue, offset, nodeDesc.size);
+		printf(" entry size %d\n", sizeof(DataEntryDesc)+ded.keySize+ded.numOfRID*sizeof(RID) );
 		// if it only contains 1 RID , remove whole entries
 		if( result == 0 && ded.numOfRID == 1){
 			// use nextPage as temp buffer
@@ -1336,7 +1341,8 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 			memcpy(page, &ded, sizeof(DataEntryDesc) );
 			free(page);
 			return operation;
-		}else if(result == 0 && ded.numOfRID >1){
+
+		}else if( result == 0 && ded.numOfRID > 1) {
 			// if it has more than two RIDs, remove the one in the list
 			dprintf("RID List\n offset is %d\n rid.pageNum is %d\n rid.slotNum is %d\n",offset,rid.pageNum,rid.slotNum);
 
@@ -1363,34 +1369,41 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 		offset += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID);
 
 	}
-	dprintf("found is %d\n",found);
-	if( !found ) return OP_Error;
+
+
+
+	if( !found ) {
+	    //printf("%d\n",*(int*)key);
+	 assert(false) ;return OP_Error; }
 
 	// if this page is root page, dont apply merge / redistribution.
 	if( nodeDesc.size < THRESHOLD && pageNum != ixfileHandle.findRootPage() ){
-		NodeDesc nNodeDesc;
+		printf("merge / des case %d \n", *(int*)key); 
+		NodeDesc nNodeDesc; // next node ( could be previous )
 		// right most leaf case
 		if( nodeDesc.next == InvalidPage ){
+			// read previous page since there is no next page
 			ixfileHandle.readPage( nodeDesc.prev, nextPage );
 			memcpy( &nNodeDesc, (char*)nextPage+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
 
 			// re-distribution case , else it needs to merge
 			if( nodeDesc.size + nNodeDesc.size > PAGE_SIZE ){
 				offset = 0;
-				while( offset < nNodeDesc.size / 3 * 2 ){
+				while( offset < nNodeDesc.size / 3 ){
 					DataEntryDesc ded;
 					memcpy( &ded, (char*)nextPage+offset, sizeof(DataEntryDesc) );
 					offset += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID);
 				}
-
+				// move next page stuff to current page
+				// and push current page stuff back
 				void *temp = malloc(PAGE_SIZE);
 				memcpy( temp, page, nodeDesc.size );
 				memcpy( page, (char*)nextPage+offset, nNodeDesc.size - offset );
-				memcpy( (char*)page+offset, temp, nodeDesc.size );
+//				memcpy( (char*)page+offset, temp, nodeDesc.size );
+				memcpy( (char*)page+( nNodeDesc.size - offset), temp, nodeDesc.size );
 				nodeDesc.size += ( nNodeDesc.size - offset );
 				nNodeDesc.size = offset;
 				free(temp);
-
 
 
 				DataEntryDesc newKeyEntry;
@@ -1400,17 +1413,24 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 				keyDesc.rightNode = pageNum;
 				keyDesc.leftNode = nodeDesc.prev;
 				keyDesc.keySize = newKeyEntry.keySize;
+				ixfileHandle.writePage( pageNum, page );
+				ixfileHandle.writePage( nodeDesc.prev, nextPage );
 
 			}else{
 				// merge case, nextPage is actually previous page
-				memcpy( (char*)page+nodeDesc.size, nextPage, nNodeDesc.size );
-				nodeDesc.size += nNodeDesc.size;
-
-				ixfileHandle.deletePage( nodeDesc.prev );
-				nodeDesc.prev = nNodeDesc.prev;
-				memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc), &nodeDesc, sizeof(NodeDesc) );
+				memcpy( (char*)nextPage+nNodeDesc.size, page, nodeDesc.size);
+				nNodeDesc.size += nodeDesc.size;
+//				memcpy( (char*)page+nodeDesc.size, nextPage, nNodeDesc.size );
+//				nodeDesc.size += nNodeDesc.size;
+			
+//				ixfileHandle.deletePage( nodeDesc.prev );
+				ixfileHandle.deletePage( pageNum );
+//				nodeDesc.prev = nNodeDesc.prev;
+				nNodeDesc.next = InvalidPage; 
+				memcpy( (char*)nextPage+PAGE_SIZE-sizeof(NodeDesc), &nNodeDesc, sizeof(NodeDesc));
+//				memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc), &nodeDesc, sizeof(NodeDesc) );
 				operation = OP_Merge;
-				ixfileHandle.writePage( pageNum , page );
+				ixfileHandle.writePage( nodeDesc.prev , nextPage );
 
 			}
 
@@ -1436,6 +1456,11 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 				nNodeDesc.size -= offset;
 				nodeDesc.size += offset;
 				free(temp);
+
+				// write NodeDesc back 
+				memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc), &nodeDesc, sizeof(NodeDesc));
+				memcpy( (char*)nextPage+PAGE_SIZE-sizeof(NodeDesc), &nNodeDesc, sizeof(NodeDesc));
+
 				DataEntryDesc newKeyEntry;
 				memcpy( &newKeyEntry, nextPage, sizeof(DataEntryDesc) );
 				memcpy( keyDesc.keyValue, (char*)nextPage+sizeof(DataEntryDesc), newKeyEntry.keySize);
@@ -1443,12 +1468,15 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 				keyDesc.rightNode = nodeDesc.next;
 				keyDesc.keySize = newKeyEntry.keySize;
 
+				ixfileHandle.writePage( pageNum, page );
+				ixfileHandle.writePage( nodeDesc.next, nextPage );
 			}else{
 				// merge case
 				memcpy( (char*)page+nodeDesc.size, nextPage, nNodeDesc.size );
-				nodeDesc.size += nNodeDesc.size;
 
 				ixfileHandle.deletePage( nodeDesc.next );
+				// write page info back
+				nodeDesc.size += nNodeDesc.size;
 				nodeDesc.next = nNodeDesc.next;
 				memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc), &nodeDesc, sizeof(NodeDesc) );
 				operation = OP_Merge;
