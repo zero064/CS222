@@ -15,7 +15,7 @@ int assertScanVailid(IXFileHandle &ixfileHandle, const Attribute &attribute,
     unsigned key;
     while(ix_ScanIterator.getNextEntry(rid, &key) == success)
     {
-	printf("p%d s%d k%d\n",rid.pageNum,rid.slotNum,key);
+//	printf("p%d s%d k%d\n",rid.pageNum,rid.slotNum,key);
         if (rid.pageNum != key +1 ||  rid.slotNum != key + 2){
             cerr << "Wrong entries output...failure" << endl;
             ix_ScanIterator.close();
@@ -23,7 +23,7 @@ int assertScanVailid(IXFileHandle &ixfileHandle, const Attribute &attribute,
         }
         outRecordNum += 1;
     }
-    cerr << inRecordNum <<" "<< outRecordNum << endl;
+    cerr << inRecordNum <<":"<< outRecordNum << endl;
     if (inRecordNum != outRecordNum)
     {
         cerr << "Wrong entries output...failure" << endl;
@@ -71,6 +71,7 @@ int testCase_LargeDataSet(const string &indexFileName, const Attribute &attribut
         inRecordNum += 1;
     }
     printf("%d\n",inRecordNum);
+//    indexManager->printBtree(ixfileHandle,attribute);
     // scan
     int rc = assertScanVailid(ixfileHandle, attribute, ix_ScanIterator, inRecordNum);
     if (rc != success){
@@ -79,6 +80,7 @@ int testCase_LargeDataSet(const string &indexFileName, const Attribute &attribut
     }
 ixfileHandle.root_debug = true;
     // Delete some 
+
     int deletedRecord = 0;
     for(unsigned i = 0; i <= numOfTuples; i+=10)
     {
@@ -90,6 +92,7 @@ ixfileHandle.root_debug = true;
         deletedRecord += 1;
     }
     printf("deletedRecord %d\n", deletedRecord);
+
     // scan 
     rc = assertScanVailid(ixfileHandle, attribute, ix_ScanIterator, 
             inRecordNum - deletedRecord);
