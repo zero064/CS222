@@ -15,7 +15,7 @@ IndexManager* IndexManager::instance()
 
 IndexManager::IndexManager()
 {
-		debug = true;
+//		debug = true;
 }
 
 IndexManager::~IndexManager()
@@ -1561,6 +1561,7 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 			nodeDesc.size -= entrySize;
 			memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc), &nodeDesc, sizeof(NodeDesc) );
 			found = true;
+			free(ded.keyValue);		
 			break;
 		}else if( result == 0 && ded.overflow != InvalidPage ){
 			//dprintf("result == 0 && ded.overflow != InvalidPage\n offset is %d\n rid.pageNum is %d\n rid.slotNum is %d\n",offset,rid.pageNum,rid.slotNum);
@@ -1578,7 +1579,8 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 				}
 			}
 			memcpy(page, &ded, sizeof(DataEntryDesc) );
-			free(page);
+			free(nextPage);
+			free(ded.keyValue);		
 			return operation;
 
 		}else if( result == 0 && ded.numOfRID > 1) {
@@ -1601,10 +1603,12 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 				}
 
 			}
+			free(ded.keyValue);		
 			found = true;
 			break; // break while loop
 		}
 
+		free(ded.keyValue);		
 		offset += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID);
 
 	}
@@ -1619,7 +1623,7 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 	// if this page is root page, dont apply merge / redistribution.
 
 	if( nodeDesc.size < LowerThreshold && pageNum != ixfileHandle.findRootPage() ){
-		printf("merge / des case %d \n", *(int*)key); 
+//		printf("merge / des case %d \n", *(int*)key); 
 		NodeDesc nNodeDesc; // next node ( could be previous )
 		// right most leaf case
 		if( nodeDesc.next == InvalidPage ){
