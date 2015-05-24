@@ -624,8 +624,10 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 		// key value smaller than rest of the data
 		// insert new key,rid pair right here
 		if( result > 0 ){
+//			printf("%d %d\n",*(int*)key,*(int*)ded.keyValue);
 			// use splitpage buffer as temp buffer, copy the rest of the key and rid lists
-			memcpy( splitPage , (char*)page+offset , nodeDesc.size - offset );
+			int restDataSize = nodeDesc.size - offset;
+			memcpy( splitPage , (char*)page+offset , restDataSize );
 			// insert a new <key,rid> pair
 			DataEntryDesc nDed;
 			nDed.numOfRID = 1;
@@ -636,7 +638,7 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 			memcpy( (char*)page+offset+DataEntryKeyOffset+nDed.keySize, &rid , sizeof(RID) );
 			// update offset and copy rest of the data back
 			offset += sizeof(DataEntryDesc) + nDed.keySize + nDed.numOfRID * sizeof(RID);
-			memcpy( (char*)page+offset, splitPage, nodeDesc.size - offset );
+			memcpy( (char*)page+offset, splitPage, restDataSize );
 			// update the node descriptor's size info
 			nodeDesc.size += sizeof(DataEntryDesc) + nDed.keySize + nDed.numOfRID * sizeof(RID);
 			memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc), &nodeDesc, sizeof(NodeDesc) );
@@ -664,7 +666,7 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 		// check if the RID list is too big so that we need to move it to a overflow page.
 		// the condition depends on RID list's size bigger than LowerThreshold Bound
 		if( result == 0 && ded.numOfRID*sizeof(RID) > LowerThreshold ){
-			assert(false);
+
 			// find over flow page and update the current ded's overflow page indicator
 			PageNum link = ixfileHandle.findFreePage();
 			ded.overflow = link; // update overflow indicator
@@ -711,6 +713,7 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 
 	// if the key is the biggest in the page, append it
 	if( !insert ){
+		//printf("%d %d %d\n",*(int*)key,offset,nodeDesc.size);
 		// insert a new <key,rid> pair
 		DataEntryDesc nDed;
 		nDed.numOfRID = 1;
@@ -1657,6 +1660,7 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 				nodeDesc.size += ( nNodeDesc.size - offset );
 				memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc), &nodeDesc, sizeof(NodeDesc));
 				nNodeDesc.size = offset;
+				memcpy( (char*)nextPage+PAGE_SIZE-sizeof(NodeDesc), &nNodeDesc, sizeof(NodeDesc));
 				free(temp);
 
 
@@ -1697,7 +1701,7 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 			memcpy( &nNodeDesc, (char*)nextPage+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
 
 			// re-distribution case , else it needs to merge
-			if( nodeDesc.size + nNodeDesc.size > PAGE_SIZE ){
+			if( nodeDesc.size + nNodeDesc.size > UpperThreshold ){
 				offset = 0;
 				while( offset < nNodeDesc.size / 3 ){
 					DataEntryDesc ded;
@@ -1823,16 +1827,16 @@ void IndexManager::printKey(const Attribute &attribute, const void *key)
 	int size = -1;
 	switch( type ){
 		case TypeInt:
-			printf("%d\n",*((int*)key));
+			printf("%d",*((int*)key));
 			return;
 		case TypeReal:
-			printf("%f\n",*((float*)key));
+			printf("%f",*((float*)key));
 			return;
 		case TypeVarChar:
 			memcpy( &size, key , sizeof(int) );
 			assert( size >= 0 && "something wrong with getting varchar key size\n");
 			assert( size < 50 && "something wrong with getting varchar key size\n");
-			printf("%s\n",(char*)key+4);
+			printf("%s",(char*)key+4);
 			return;
 	}
 
