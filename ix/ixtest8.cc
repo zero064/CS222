@@ -67,8 +67,10 @@ int testCase_VerifyTopDownInsert(const string &indexFileName,
     // insert the 9th
     fillUpKeyRid(count, i++, key, rid);
     assertInsertEntry(success, indexManager, ixfileHandle, attribute, key, rid);
+
     // print BTree, by this time the BTree should have 3 level
     indexManager->printBtree(ixfileHandle, attribute);
+
 
     //close index file
     assertCloseIndexFile(success, indexManager, ixfileHandle);
