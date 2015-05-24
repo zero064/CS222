@@ -650,6 +650,7 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 		// if the keypair is overflowed, insert it to overflow page
 		if( result == 0 && ded.overflow != InvalidPage ){
 			RC rc;
+	    printf("Hi\n"); assert(false);
 			rc = ixfileHandle.readPage( ded.overflow , page );
 			assert( rc == SUCCESS && "read overflow page failed");
 			memcpy( &ded, page, sizeof(DataEntryDesc));
@@ -657,7 +658,6 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 			ded.numOfRID++;
 			memcpy( page, &ded, sizeof(DataEntryDesc));
 			assert( sizeof(DataEntryDesc)+ded.keySize+ded.numOfRID*sizeof(RID) < PAGE_SIZE && "overflow page overflowed" );
-
 			rc = ixfileHandle.writePage( ded.overflow , page );
 			assert( rc == SUCCESS && "write overflow page failed");
 			free(ded.keyValue);
@@ -665,19 +665,20 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 		}
 		// check if the RID list is too big so that we need to move it to a overflow page.
 		// the condition depends on RID list's size bigger than LowerThreshold Bound
+
 		if( result == 0 && ded.numOfRID*sizeof(RID) > LowerThreshold ){
 
 			// find over flow page and update the current ded's overflow page indicator
-			PageNum link = ixfileHandle.findFreePage();
+			PageNum link = ixfileHandle.findFreePage(); 
 			ded.overflow = link; // update overflow indicator
 			memcpy( (char*)page+offset, &ded , sizeof(DataEntryDesc) ); // update ded to original page
 			// put new key,rid pair into over flow page
 			void *overflowPage = malloc(PAGE_SIZE); // create another overflow page
-			ded.numOfRID = 1; ded.overflow = InvalidPage; // same ded but different size of RID list,
+			ded.numOfRID = 1; ded.overflow = link; // same ded but different size of RID list,
 			// insert RID and ded to overflow page
 			memcpy( overflowPage, &ded, sizeof(DataEntryDesc) );
 			memcpy( (char*)overflowPage+sizeof(DataEntryDesc)+ded.keySize, &rid ,sizeof(RID));
-			RC rc;
+			RC rc; 
 			rc = ixfileHandle.writePage( ded.overflow , overflowPage );
 			assert( rc == SUCCESS && "write overflow page failed");
 
@@ -696,6 +697,7 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 			memcpy( (char*)page+offset + sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID) , &rid , sizeof(RID));
 			memcpy( (char*)page+offset + sizeof(DataEntryDesc) + ded.keySize + (ded.numOfRID+1)*sizeof(RID) , splitPage , nodeDesc.size - (offset + pairSize ) );
 			// increase number of rid by 1 , write it back
+
 			ded.numOfRID++;
 			memcpy( (char*)page+offset, &ded , sizeof(DataEntryDesc) );
 			// update page descriptor
@@ -771,10 +773,11 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 		keyDesc.leftNode = pageNum;
 		keyDesc.keySize = nDed.keySize;
 		memcpy( keyDesc.keyValue, (char*)splitPage+sizeof(DataEntryDesc), nDed.keySize);
+
 	}
 
 	ixfileHandle.writePage(pageNum,page);
-	free(splitPage);
+	free(splitPage); 
 	return operation;
 }
 void IndexManager::FindLastKey(void *page,KeyDesc &keyDesc)
@@ -1814,7 +1817,7 @@ int IndexManager::getKeySize(const Attribute &attribute, const void *key)
 		case TypeVarChar:
 			memcpy( &size, key , sizeof(int) );
 			assert( size >= 0 && "something wrong with getting varchar key size\n");
-			assert( size < 50 && "something wrong with getting varchar key size\n");
+			//assert( size < 50 && "something wrong with getting varchar key size\n");
 			return size+sizeof(int);
 	}
 
@@ -1835,7 +1838,7 @@ void IndexManager::printKey(const Attribute &attribute, const void *key)
 		case TypeVarChar:
 			memcpy( &size, key , sizeof(int) );
 			assert( size >= 0 && "something wrong with getting varchar key size\n");
-			assert( size < 50 && "something wrong with getting varchar key size\n");
+			//assert( size < 50 && "something wrong with getting varchar key size\n");
 			printf("%s",(char*)key+4);
 			return;
 	}
@@ -2214,7 +2217,6 @@ PageNum IXFileHandle::findRootPage()
 	// A directory can have (4096 / 4) - 1 = 1023 cells to describe pages ( leaf & non-leaf );
 	// Each directory start with index 1, where use 0 or 1 to indicate empty or full
 	// The first directory is a specical case where 1st entry stores root node's pagenum ( positive integer )
-	debug = true;
 
 	int directorySize = PAGE_SIZE / sizeof( PageNum );
 	void *page = malloc(PAGE_SIZE);

@@ -16,7 +16,7 @@ typedef unsigned short int PageSize;
 typedef char NodeType;
 const char Leaf = 1 , NonLeaf = 2;
 
-const int maxvarchar = 54;
+const int maxvarchar = PAGE_SIZE;
 const int THRESHOLD = PAGE_SIZE / 2;
 const PageNum InvalidPage = 0;
 
