@@ -1555,8 +1555,8 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 		// compare the key to find the deleted record
 		int result = keyCompare(attribute, ded.keyValue, key);
 
-		printf("pageNum %u key %d result %d offset %d nodeDesc.size %d",pageNum,*(int*)key, *(int*)ded.keyValue, offset, nodeDesc.size);
-		printf(" entry size %d\n", sizeof(DataEntryDesc)+ded.keySize+ded.numOfRID*sizeof(RID) );
+//		printf("pageNum %u key %d result %d offset %d nodeDesc.size %d",pageNum,*(int*)key, *(int*)ded.keyValue, offset, nodeDesc.size);
+//		printf(" entry size %d\n", sizeof(DataEntryDesc)+ded.keySize+ded.numOfRID*sizeof(RID) );
 		// if it only contains 1 RID , remove whole entries
 		if( result == 0 && ded.numOfRID == 1){
 			// use nextPage as temp buffer
@@ -1655,6 +1655,7 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 //				memcpy( (char*)page+offset, temp, nodeDesc.size );
 				memcpy( (char*)page+( nNodeDesc.size - offset), temp, nodeDesc.size );
 				nodeDesc.size += ( nNodeDesc.size - offset );
+				memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc), &nodeDesc, sizeof(NodeDesc));
 				nNodeDesc.size = offset;
 				free(temp);
 
