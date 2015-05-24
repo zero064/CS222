@@ -53,7 +53,7 @@ int testCase_LargeDataSet(const string &indexFileName, const Attribute &attribut
     unsigned key;
     int inRecordNum = 0;
     //unsigned numOfTuples = 1000 * 1000;
-    unsigned numOfTuples = 20*100 * 100;
+    unsigned numOfTuples = 5*100 * 100;
 
 
     // create index file
@@ -84,8 +84,7 @@ int testCase_LargeDataSet(const string &indexFileName, const Attribute &attribut
     ixfileHandle.root_debug = true;
     // Delete some 
 
-	//indexManager->printBtree(ixfileHandle, attribute);
-	//assert(false);
+
 
     int deletedRecord = 0;
     for(unsigned i = 0; i <= numOfTuples; i+=10)
@@ -98,7 +97,7 @@ int testCase_LargeDataSet(const string &indexFileName, const Attribute &attribut
         deletedRecord += 1;
     }
     printf("deletedRecord %d\n", deletedRecord);
-
+    //assert(false);
     // scan 
     rc = assertScanVailid(ixfileHandle, attribute, ix_ScanIterator, 
             inRecordNum - deletedRecord);
