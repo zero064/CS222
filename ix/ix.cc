@@ -15,7 +15,7 @@ IndexManager* IndexManager::instance()
 
 IndexManager::IndexManager()
 {
-		debug = true;
+//		debug = true;
 }
 
 IndexManager::~IndexManager()
@@ -97,14 +97,14 @@ TreeOp IndexManager::TraverseTree(IXFileHandle &ixfileHandle, const Attribute &a
 			offset -= sizeof(KeyDesc);//adjust the offset for inserting a  key entry,
 			offset -= currentkeyDesc.keySize;
 			dprintf("keyCompare(attribute,key,currentkeyValue)<0\n currentpageNum is %d\n",currentpageNum);
-			printKey(attribute,currentkeyValue);
+			//printKey(attribute,currentkeyValue);
 			break;
 		}
 		if(offset == nodeDesc.size){
 			//last entry
 			currentpageNum=currentkeyDesc.rightNode;
 			dprintf("offset == nodeDesc.size\n currentpageNum is %d\n",currentpageNum);
-			printKey(attribute,currentkeyValue);
+			//printKey(attribute,currentkeyValue);
 			break;
 		}
 	}
@@ -488,7 +488,7 @@ void IndexManager::checkKeyInt(IXFileHandle &ixfileHandle, const Attribute &attr
 		memcpy(currentkeyValue,(char *) page+offset,currentkeyDesc.keySize);
 		offset+=currentkeyDesc.keySize;
 		if(rightnode != currentkeyDesc.leftNode){
-			printKey(attribute,currentkeyValue);
+			//printKey(attribute,currentkeyValue);
 			dprintf("rightnode is %d\n curentkeyDesc.leftNode is %d\n oldoffset is %d\n",rightnode,currentkeyDesc.leftNode,oldoffset);
 			assert(rightnode == currentkeyDesc.leftNode && "rightnode ==currentkeyDesc.leftNode");
 		}
@@ -872,7 +872,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 
 			currentpageNum=currentkeyDesc.leftNode;
 			dprintf("keyCompare(attribute,key,currentkeyValue)<0,\nrightnode is %d\ncurrentpageNUm is %d\n",rightnode,currentpageNum);
-			printKey(attribute,currentkeyValue);
+		//	printKey(attribute,currentkeyValue);
 			assert(rightnode == currentkeyDesc.leftNode && "compare < 0,currentpageNum=currentkeyDesc.leftNode");
 			break;
 		}
@@ -881,7 +881,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 			//last entry
 			currentpageNum=currentkeyDesc.rightNode;
 			dprintf("offset == nodeDesc.size,\nrightnode is %d\ncurrentpageNUm is %d\n",rightnode,currentpageNum);
-			printKey(attribute,currentkeyValue);
+			//printKey(attribute,currentkeyValue);
 
 			assert(rightnode == currentkeyDesc.leftNode && "In the end,currentpageNum=currentkeyDesc.leftNode");
 			IsRightest = true;
@@ -948,7 +948,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 					keyDesc.leftNode = lastkeyDesc.rightNode;
 					keyDesc.rightNode = beginkeyDesc.leftNode;
 					dprintf("keyDesc.leftNode is %d\nkeyDesc.righttNode is %d\n",keyDesc.leftNode,keyDesc.rightNode);
-					printKey(attribute,keyValue);
+					//printKey(attribute,keyValue);
 					//push down key
 					memcpy((char *)page+currentoffset,&keyDesc,sizeof(KeyDesc));
 					currentoffset += sizeof(KeyDesc);
@@ -1555,8 +1555,8 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 		// compare the key to find the deleted record
 		int result = keyCompare(attribute, ded.keyValue, key);
 
-		//printf("pageNum %u key %d result %d offset %d nodeDesc.size %d",pageNum,*(int*)key, *(int*)ded.keyValue, offset, nodeDesc.size);
-		//printf(" entry size %d\n", sizeof(DataEntryDesc)+ded.keySize+ded.numOfRID*sizeof(RID) );
+		printf("pageNum %u key %d result %d offset %d nodeDesc.size %d",pageNum,*(int*)key, *(int*)ded.keyValue, offset, nodeDesc.size);
+		printf(" entry size %d\n", sizeof(DataEntryDesc)+ded.keySize+ded.numOfRID*sizeof(RID) );
 		// if it only contains 1 RID , remove whole entries
 		if( result == 0 && ded.numOfRID == 1){
 			// use nextPage as temp buffer
@@ -1668,7 +1668,7 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 				keyDesc.keySize = newKeyEntry.keySize;
 				ixfileHandle.writePage( pageNum, page );
 				ixfileHandle.writePage( nodeDesc.prev, nextPage );
-
+				operation = OP_Dist;
 			}else{
 				// merge case, nextPage is actually previous page
 				memcpy( (char*)nextPage+nNodeDesc.size, page, nodeDesc.size);
@@ -1724,6 +1724,7 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 
 				ixfileHandle.writePage( pageNum, page );
 				ixfileHandle.writePage( nodeDesc.next, nextPage );
+				operation = OP_Dist;
 			}else{
 				// merge case
 				memcpy( (char*)page+nodeDesc.size, nextPage, nNodeDesc.size );
