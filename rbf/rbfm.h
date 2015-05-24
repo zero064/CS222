@@ -47,7 +47,7 @@ struct Attribute {
     string   name;     // attribute name
     AttrType type;     // attribute type
     AttrLength length; // attribute length
-    AttrPosition position; // attribute position
+    AttrPosition position = 0; // attribute position
 };
 
 // Comparison Operator (NOT needed for part 1 of the project)

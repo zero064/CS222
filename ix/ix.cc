@@ -538,6 +538,7 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 		if(treeop == OP_Split){
 			PageNum newroot;
 			newroot=ixfileHandle.findFreePage();
+			dprintf("in insert Entry Leaf\n newroot is %d\n",newroot);
 			ixfileHandle.updateRootPage(newroot);
 			NodeDesc newnodeDesc;
 			int keysize = getKeySize(attribute,keyDesc.keyValue);
@@ -570,6 +571,7 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 		if(treeop == OP_Split){
 			PageNum newroot;
 			newroot=ixfileHandle.findFreePage();
+			dprintf("in insert Entry NonLeaf\n newroot is %d\n",newroot);
 			ixfileHandle.updateRootPage(newroot);
 			NodeDesc newnodeDesc;
 			int keysize = getKeySize(attribute,keyDesc.keyValue);
@@ -1313,6 +1315,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 						//currentpageNum is rightNode
 						dprintf("Empty root page\n IsRightest is 1\n");
 						//update root page number
+						dprintf("in TraverseTreeDelete\n newroot is %d\n",templeftNode);
 						ixfileHandle.updateRootPage(templeftNode);
 						//delete this empty page
 						ixfileHandle.deletePage(pageNum);
@@ -1322,6 +1325,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 						//currentpageNum is leftNode
 						dprintf("Empty root page\n IsRightest is 0\n");
 						//update root page number
+						dprintf("in TraverseTreeDelete\n newroot is %d\n",templeftNode);
 						ixfileHandle.updateRootPage(templeftNode);
 						//delete this empty page
 						ixfileHandle.deletePage(pageNum);
@@ -1818,7 +1822,7 @@ int IndexManager::getKeySize(const Attribute &attribute, const void *key)
 		case TypeVarChar:
 			memcpy( &size, key , sizeof(int) );
 			assert( size >= 0 && "something wrong with getting varchar key size\n");
-			assert( size < 50 && "something wrong with getting varchar key size\n");
+			//assert( size < 50 && "something wrong with getting varchar key size\n");
 			return size+sizeof(int);
 	}
 
@@ -1839,7 +1843,7 @@ void IndexManager::printKey(const Attribute &attribute, const void *key)
 		case TypeVarChar:
 			memcpy( &size, key , sizeof(int) );
 			assert( size >= 0 && "something wrong with getting varchar key size\n");
-			assert( size < 50 && "something wrong with getting varchar key size\n");
+			//assert( size < 50 && "something wrong with getting varchar key size\n");
 			printf("%s",(char*)key+4);
 			return;
 	}

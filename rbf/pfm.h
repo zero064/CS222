@@ -26,7 +26,7 @@ struct DirectoryDesc{
 };
 
 
-#define PAGE_SIZE 4096
+#define PAGE_SIZE 512
 #define SUCCESS 0
 #define FAILURE -1
 
