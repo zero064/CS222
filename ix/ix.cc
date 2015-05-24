@@ -15,7 +15,7 @@ IndexManager* IndexManager::instance()
 
 IndexManager::IndexManager()
 {
-//		debug = true;
+		debug = true;
 }
 
 IndexManager::~IndexManager()
@@ -829,7 +829,8 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 	NodeDesc nextnodeDesc;
 	NodeDesc extranodeDesc;
 	memcpy(&nodeDesc,(char *)page+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
-
+	int tempnext = nodeDesc.next;
+	int tempprev = nodeDesc.prev;
 	int pushdownkeysize = keyDesc.keySize;
 
 	PageSize offset=0;
@@ -1455,7 +1456,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 	assert( keyValue == keyDesc.keyValue && "keyValue should equal to keyDesc.keyValue ");
 	checkKeyInt(ixfileHandle, attribute, page);
 	//if this page is merged, check integrity from leftsibling
-	if(nodeDesc.next == InvalidPage && treeop == OP_Merge){
+	if(tempnext == InvalidPage && treeop == OP_Merge){
 		checkPageInt(ixfileHandle, leftsibling, nodeDesc.prev);
 	}else{
 		checkPageInt(ixfileHandle, page, pageNum);
