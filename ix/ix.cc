@@ -15,7 +15,7 @@ IndexManager* IndexManager::instance()
 
 IndexManager::IndexManager()
 {
-//		debug = true;
+		debug = true;
 }
 
 IndexManager::~IndexManager()
@@ -97,14 +97,17 @@ TreeOp IndexManager::TraverseTree(IXFileHandle &ixfileHandle, const Attribute &a
 			offset -= sizeof(KeyDesc);//adjust the offset for inserting a  key entry,
 			offset -= currentkeyDesc.keySize;
 			dprintf("keyCompare(attribute,key,currentkeyValue)<0\n currentpageNum is %d\n",currentpageNum);
-			//printKey(attribute,currentkeyValue);
+			printKey(attribute,currentkeyValue);
+			dprintf("\n");
 			break;
 		}
 		if(offset == nodeDesc.size){
 			//last entry
 			currentpageNum=currentkeyDesc.rightNode;
 			dprintf("offset == nodeDesc.size\n currentpageNum is %d\n",currentpageNum);
-			//printKey(attribute,currentkeyValue);
+			printKey(attribute,currentkeyValue);
+			dprintf("\n");
+
 			break;
 		}
 	}
@@ -872,7 +875,8 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 
 			currentpageNum=currentkeyDesc.leftNode;
 			dprintf("keyCompare(attribute,key,currentkeyValue)<0,\nrightnode is %d\ncurrentpageNUm is %d\n",rightnode,currentpageNum);
-		//	printKey(attribute,currentkeyValue);
+			printKey(attribute,currentkeyValue);
+			dprintf("\n");
 			assert(rightnode == currentkeyDesc.leftNode && "compare < 0,currentpageNum=currentkeyDesc.leftNode");
 			break;
 		}
@@ -881,8 +885,8 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 			//last entry
 			currentpageNum=currentkeyDesc.rightNode;
 			dprintf("offset == nodeDesc.size,\nrightnode is %d\ncurrentpageNUm is %d\n",rightnode,currentpageNum);
-			//printKey(attribute,currentkeyValue);
-
+			printKey(attribute,currentkeyValue);
+			dprintf("\n");
 			assert(rightnode == currentkeyDesc.leftNode && "In the end,currentpageNum=currentkeyDesc.leftNode");
 			IsRightest = true;
 
