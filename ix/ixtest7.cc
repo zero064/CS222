@@ -4,7 +4,7 @@
 #include "ixtest_util.h"
 
 IndexManager *indexManager;
-
+bool test = false;
 int assertScanVailid(IXFileHandle &ixfileHandle, const Attribute &attribute, 
         IX_ScanIterator & ix_ScanIterator, const int inRecordNum){
     // Scan
@@ -13,17 +13,26 @@ int assertScanVailid(IXFileHandle &ixfileHandle, const Attribute &attribute,
     int outRecordNum = 0;
     RID rid;
     unsigned key;
+    bool temp[5*100 * 100];
+    memset( temp , false , sizeof(bool)*5*100 * 100);
+  
     while(ix_ScanIterator.getNextEntry(rid, &key) == success)
     {
 //	printf("p%d s%d k%d\n",rid.pageNum,rid.slotNum,key);
+/*
+	if( temp[key] && test ){ printf("%d\n",key); }
+	temp[key] = true;
+*/
         if (rid.pageNum != key +1 ||  rid.slotNum != key + 2){
-            cerr << "Wrong entries output...failure" << endl;
+//	printf("p%d s%d k%d\n",rid.pageNum,rid.slotNum,key);
+            cerr << "Wrong entries output...failure "<< outRecordNum << endl;
             ix_ScanIterator.close();
             return fail;
         }
         outRecordNum += 1;
     }
-    cerr << inRecordNum <<":"<< outRecordNum << endl;
+//    indexManager->printBtree(ixfileHandle,attribute);
+ //   cerr << inRecordNum <<":"<< outRecordNum << endl;
     if (inRecordNum != outRecordNum)
     {
         cerr << "Wrong entries output...failure" << endl;
@@ -52,9 +61,9 @@ int testCase_LargeDataSet(const string &indexFileName, const Attribute &attribut
     IX_ScanIterator ix_ScanIterator;
     unsigned key;
     int inRecordNum = 0;
-    //unsigned numOfTuples = 1000 * 1000;
+    unsigned numOfTuples = 1000 * 1000;
 
-    unsigned numOfTuples = 5*100 * 100;
+    //unsigned numOfTuples = 5*100 * 100;
 
 
 
@@ -74,8 +83,7 @@ int testCase_LargeDataSet(const string &indexFileName, const Attribute &attribut
         assertInsertEntry(success, indexManager, ixfileHandle, attribute, &key, rid);
         inRecordNum += 1;
     }
-    printf("%d\n",inRecordNum);
-//    indexManager->printBtree(ixfileHandle,attribute);
+test=true;
     // scan
     int rc = assertScanVailid(ixfileHandle, attribute, ix_ScanIterator, inRecordNum);
     if (rc != success){
@@ -107,7 +115,6 @@ int testCase_LargeDataSet(const string &indexFileName, const Attribute &attribut
         cerr << "Scan inserted results after deletion failed" << endl;
         return fail;
     }
-
     // Insert again
     for(unsigned i = 0; i <= numOfTuples; i+=10)
     {
