@@ -668,7 +668,16 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 		memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc), &nodeDesc, sizeof(NodeDesc) );
 
 		ixfileHandle.writePage(freePageID,splitPage);
-
+		// update right leaf's left node to split page number 
+		// if it's not empty
+		if( splitNodeDesc.next != InvalidPage ){
+		    NodeDesc ntNodeDesc;
+		    ixfileHandle.readPage( splitNodeDesc.next, splitPage);
+		    memcpy( &ntNodeDesc, (char*)splitPage+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc));
+		    ntNodeDesc.prev = freePageID; 
+		    memcpy( (char*)splitPage+PAGE_SIZE-sizeof(NodeDesc), &ntNodeDesc, sizeof(NodeDesc));
+		    ixfileHandle.writePage( splitNodeDesc.next, splitPage);
+		}
 		// get First entry key value
 		DataEntryDesc nDed;
 		memcpy( &nDed, (char*)splitPage, sizeof(DataEntryDesc));
@@ -1606,7 +1615,7 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 				// update info to the next two page 
 				if( nNodeDesc.next != InvalidPage ){
 				    // overwrite nextPage with next 2 Page, since we've already merge it to our page
-				    ixfileHandle.readPage( nextPage, nNodeDesc.next );
+				    ixfileHandle.readPage(nNodeDesc.next, nextPage );
 				    NodeDesc ntNodeDesc;
 				    memcpy( &ntNodeDesc, (char*)nextPage+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc));
 				    ntNodeDesc.prev = pageNum;
