@@ -53,7 +53,7 @@ int testCase_LargeDataSet(const string &indexFileName, const Attribute &attribut
     unsigned key;
     int inRecordNum = 0;
     //unsigned numOfTuples = 1000 * 1000;
-    unsigned numOfTuples = 100 * 100;
+    unsigned numOfTuples = 20*100 * 100;
 
 
     // create index file

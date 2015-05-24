@@ -442,7 +442,7 @@ void IndexManager::checkPageInt(IXFileHandle &ixfileHandle, void *page,PageNum p
 
 		//compare prev to currentpageNum
 		if(currentpageNum != leftnodeDesc.next){
-			dprintf("currentpageNum is %d\nprevpageNum is %d\nlefttnodeDesc.prev is %d\n",currentpageNum,currentnodeDesc.prev,leftnodeDesc.next);
+			dprintf("currentpageNum is %d\nprevpageNum is %d\nlefttnodeDesc.next is %d\n",currentpageNum,currentnodeDesc.prev,leftnodeDesc.next);
 			assert(currentpageNum == leftnodeDesc.next);
 		}
 		//updata the current nodeDesc as the sibling nodeDesc
@@ -902,6 +902,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 	KeyDesc lastkeyDesc;
 	KeyDesc beginkeyDesc;
 	int currentoffset = nodeDesc.size;
+	bool Emptyflag = false;
 
 	if(nodeDesc.size < LowerThreshold){
 		//merege or redistribute the page
@@ -1441,6 +1442,20 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 		}
 
 	}
+
+
+
+	assert( keyValue == keyDesc.keyValue && "keyValue should equal to keyDesc.keyValue ");
+	checkKeyInt(ixfileHandle, attribute, page);
+	//if this page is merged, check integrity from leftsibling
+	if(nodeDesc.next == InvalidPage && treeop == OP_Merge){
+		checkPageInt(ixfileHandle, leftsibling, nodeDesc.prev);
+	}else{
+		checkPageInt(ixfileHandle, page, pageNum);
+	}
+	if(nexttreeop == OP_Error){
+		treeop = nexttreeop;
+	}
 	free(extrapage);
 	free(leftsibling);
 	free(rightsibling);
@@ -1448,13 +1463,6 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 	free(bufferpage);
 	free(currentkeyDesc.keyValue);
 	free(nextkeyDesc.keyValue);
-
-	if(nexttreeop == OP_Error){
-		treeop = nexttreeop;
-	}
-	assert( keyValue == keyDesc.keyValue && "keyValue should equal to keyDesc.keyValue ");
-	checkKeyInt(ixfileHandle, attribute, page);
-	checkPageInt(ixfileHandle, page, pageNum);
 
 	return treeop;
 
@@ -1539,8 +1547,8 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 		// compare the key to find the deleted record
 		int result = keyCompare(attribute, ded.keyValue, key);
 
-		printf("pageNum %u key %d result %d offset %d nodeDesc.size %d",pageNum,*(int*)key, *(int*)ded.keyValue, offset, nodeDesc.size);
-		printf(" entry size %d\n", sizeof(DataEntryDesc)+ded.keySize+ded.numOfRID*sizeof(RID) );
+		//printf("pageNum %u key %d result %d offset %d nodeDesc.size %d",pageNum,*(int*)key, *(int*)ded.keyValue, offset, nodeDesc.size);
+		//printf(" entry size %d\n", sizeof(DataEntryDesc)+ded.keySize+ded.numOfRID*sizeof(RID) );
 		// if it only contains 1 RID , remove whole entries
 		if( result == 0 && ded.numOfRID == 1){
 			// use nextPage as temp buffer
