@@ -100,6 +100,8 @@ class IndexManager : public DebugMsg {
 
 	void checkKeyInt(IXFileHandle &ixfileHandle, const Attribute &attribute, void *page);
 
+	void checkPageInt(IXFileHandle &ixfileHandle, void *page, PageNum pageNum);
+
 
 	RC FindOffset(void *page,int size,int &offset,bool IsGreater);
 

@@ -133,11 +133,12 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 	void *nextpage = malloc(PAGE_SIZE);
 	void *buffer = malloc(PAGE_SIZE);
 	void *keyValue = keyDesc.keyValue;
+	void *extrapage = malloc(PAGE_SIZE);
 	assert( keyValue == keyDesc.keyValue && " begining keyValue should equal to keyDesc.keyValue \n");
 	NodeDesc nodeDesc;
 	NodeDesc nextnodeDesc;
 	memcpy(&nodeDesc,(char *)page+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
-
+	NodeDesc extranodeDesc;
 	PageSize offset=0;
 	KeyDesc siblingkeyDesc;
 	KeyDesc currentkeyDesc;
@@ -232,6 +233,18 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 		ixfileHandle.writePage(nodeDesc.next,bufferpage);
 		treeop = OP_Split;
 		dprintf("treeop is split\nafter split, nodeDesc.size is %d\n",nodeDesc.size);
+		if( tempnodeDesc.next != InvalidPage ){
+			//read new right sibling page
+			ixfileHandle.readPage(tempnodeDesc.next,extrapage);
+			//update nodeDesc in new right sibling
+			memcpy(&extranodeDesc,(char *)extrapage+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
+			extranodeDesc.prev = nodeDesc.next;
+			memcpy((char *)extrapage+PAGE_SIZE-sizeof(NodeDesc),&extranodeDesc,sizeof(NodeDesc));
+			//write page to disk
+			ixfileHandle.writePage(tempnodeDesc.next,extrapage);
+
+
+		}
 
 
 	}
@@ -367,7 +380,7 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 		}
 	}
 
-
+	free(extrapage);
 	free(buffer);
 	free(nextpage);
 	free(bufferpage);
@@ -378,8 +391,71 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 	}
 	assert( keyValue == keyDesc.keyValue && "keyValue should equal to keyDesc.keyValue ");
 	checkKeyInt(ixfileHandle, attribute, page);
+	checkPageInt(ixfileHandle, page, pageNum);
 	return treeop;
 }
+void IndexManager::checkPageInt(IXFileHandle &ixfileHandle, void *page,PageNum pageNum)
+{
+	void *rightsibling = malloc(PAGE_SIZE);
+	void *leftsibling = malloc(PAGE_SIZE);
+	PageNum prevpageNum = InvalidPage;
+	//initialize pageNum
+	PageNum currentpageNum = pageNum;
+	PageNum nextpageNum = InvalidPage;
+	//initialize currentnodeDesc
+	NodeDesc currentnodeDesc;
+	memcpy(&currentnodeDesc,(char *)page+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
+	NodeDesc rightnodeDesc;
+	NodeDesc leftnodeDesc;
+
+
+	//To right way to check double link list
+	while(currentnodeDesc.next != InvalidPage){
+
+		//read the right sibling page
+		ixfileHandle.readPage(currentnodeDesc.next,rightsibling);
+
+		//get the sibling nodeDesc
+		memcpy(&rightnodeDesc,(char *)rightsibling+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
+
+		//compare prev to currentpageNum
+		if(currentpageNum != rightnodeDesc.prev){
+			dprintf("currentpageNum is %d\nnextpageNum is %d\nrightnodeDesc.prev is %d\n",currentpageNum,currentnodeDesc.next,rightnodeDesc.prev);
+			assert(currentpageNum == rightnodeDesc.prev);
+		}
+		//updata the current nodeDesc as the sibling nodeDesc
+		currentpageNum = currentnodeDesc.next;
+		currentnodeDesc = rightnodeDesc;
+
+	}
+	//reinitialize currentnodeDesc and currentpageNum
+	memcpy(&currentnodeDesc,(char *)page+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
+	currentpageNum = pageNum;
+	//To left way to check double link list
+	while(currentnodeDesc.prev != InvalidPage){
+
+		//read the left sibling page
+		ixfileHandle.readPage(currentnodeDesc.prev,leftsibling);
+
+		//get the sibling nodeDesc
+		memcpy(&leftnodeDesc,(char *)leftsibling+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
+
+		//compare prev to currentpageNum
+		if(currentpageNum != leftnodeDesc.next){
+			dprintf("currentpageNum is %d\nprevpageNum is %d\nlefttnodeDesc.prev is %d\n",currentpageNum,currentnodeDesc.prev,leftnodeDesc.next);
+			assert(currentpageNum == leftnodeDesc.next);
+		}
+		//updata the current nodeDesc as the sibling nodeDesc
+		currentpageNum = currentnodeDesc.prev;
+		currentnodeDesc = leftnodeDesc;
+
+	}
+
+	free(rightsibling);
+	free(leftsibling);
+
+}
+
 void IndexManager::checkKeyInt(IXFileHandle &ixfileHandle, const Attribute &attribute, void *page)
 {
 	KeyDesc currentkeyDesc;
@@ -731,9 +807,11 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 	void *nextpage = malloc(PAGE_SIZE);
 	void *leftsibling = malloc(PAGE_SIZE);
 	void *rightsibling = malloc(PAGE_SIZE);
+	void *extrapage = malloc(PAGE_SIZE);
 	NodeDesc nodeDesc;
 	NodeDesc tempnodeDesc;
 	NodeDesc nextnodeDesc;
+	NodeDesc extranodeDesc;
 	memcpy(&nodeDesc,(char *)page+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
 
 	int pushdownkeysize = keyDesc.keySize;
@@ -776,7 +854,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 			//get the page pointer
 
 			currentpageNum=currentkeyDesc.leftNode;
-			dprintf("keyCompare(attribute,key\n,currentkeyValue)<0,rightnode is %d\ncurrentpageNUm is %d\n",rightnode,currentpageNum);
+			dprintf("keyCompare(attribute,key,currentkeyValue)<0,\nrightnode is %d\ncurrentpageNUm is %d\n",rightnode,currentpageNum);
 			printKey(attribute,currentkeyValue);
 			assert(rightnode == currentkeyDesc.leftNode && "compare < 0,currentpageNum=currentkeyDesc.leftNode");
 			break;
@@ -836,6 +914,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 				dprintf("In the begining , nodeDesc.size is %d\n",nodeDesc.size);
 
 				if( (rightnodeDesc.size + nodeDesc.size)> UpperThreshold){
+					//redistribute data from rightsibling
 					checkKeyInt(ixfileHandle, attribute, page);
 					dprintf("IN begining\n");
 
@@ -916,6 +995,19 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 					ixfileHandle.deletePage(tempnext);
 					treeop = OP_Merge;
 					dprintf("treeop is OP_Merge, Not the rightest one\n");
+					//update nodeDesc of new right sibling page
+					if( nodeDesc.next != InvalidPage ){
+						//read new right sibling page
+						ixfileHandle.readPage(nodeDesc.next,extrapage);
+						//update nodeDesc in new right sibling
+						memcpy(&extranodeDesc,(char *)extrapage+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
+						extranodeDesc.prev = pageNum;
+						memcpy((char *)extrapage+PAGE_SIZE-sizeof(NodeDesc),&extranodeDesc,sizeof(NodeDesc));
+						//write page to disk
+						ixfileHandle.writePage(nodeDesc.next,extrapage);
+
+
+					}
 
 
 				}
@@ -1340,7 +1432,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 		}
 
 	}
-
+	free(extrapage);
 	free(leftsibling);
 	free(rightsibling);
 	free(nextpage);
@@ -1353,6 +1445,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 	}
 	assert( keyValue == keyDesc.keyValue && "keyValue should equal to keyDesc.keyValue ");
 	checkKeyInt(ixfileHandle, attribute, page);
+	checkPageInt(ixfileHandle, page, pageNum);
 
 	return treeop;
 
@@ -1417,6 +1510,7 @@ RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page,
 		PageNum pageNum, KeyDesc &keyDesc)
 {
+	checkPageInt(ixfileHandle, page, pageNum);
 	TreeOp operation = OP_None;
 	// retrieve node info
 	NodeDesc nodeDesc;
@@ -1507,7 +1601,8 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 
 	// if this page is root page, dont apply merge / redistribution.
 	if( nodeDesc.size < THRESHOLD && pageNum != ixfileHandle.findRootPage() ){
-		printf("merge / des case %d \n", *(int*)key); 
+		printf("merge / des case %d \n", *(int*)key);
+		dprintf("leftpage is %d\n rightpage is %d\n",nodeDesc.prev,nodeDesc.next);
 		NodeDesc nNodeDesc; // next node ( could be previous )
 		// right most leaf case
 		if( nodeDesc.next == InvalidPage ){
