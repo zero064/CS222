@@ -96,7 +96,7 @@ int testCase_extra_1(const string &indexFileName, const Attribute &attribute)
         count1++;
     }
     cerr << endl;
-assert(false);
+
     if (count1 != numOfTuplesTobeScanned) {
         cerr << "Wrong entry output... Test failed..." << endl;
         ix_ScanIterator.close();
