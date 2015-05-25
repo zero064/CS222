@@ -57,14 +57,13 @@ int testCase_extra_1(const string &indexFileName, const Attribute &attribute)
 
         rid.pageNum = i;
         rid.slotNum = i;
-
         assertInsertEntry(success, indexManager, ixfileHandle, attribute, key, rid);
 
         if (count == 20) {
             numOfTuplesTobeScanned++;
         }
     }
-
+//    indexManager->printBtree(ixfileHandle,attribute);
     // collect counter
     // we will eyeball those numbers to see if they are reasonable.
     unsigned readPageCount, writePageCount, appendPageCount;
@@ -88,7 +87,8 @@ int testCase_extra_1(const string &indexFileName, const Attribute &attribute)
     //iterate
     while(ix_ScanIterator.getNextEntry(rid, &key) == success)
     {
-        cerr << "returned rid: " << rid.pageNum << " " << rid.slotNum << endl;
+        cerr << "returned rid: " << rid.pageNum << " " << rid.slotNum <<" " << count1<<" "<< numOfTuplesTobeScanned;//<<endl;
+	printf(" %d\n",*(int*)key);
         if ( ((rid.pageNum - 1) % 26 + 1) != offset) {
             cerr << "Wrong entry output... Test failed..." << endl;
             return fail;
@@ -96,7 +96,7 @@ int testCase_extra_1(const string &indexFileName, const Attribute &attribute)
         count1++;
     }
     cerr << endl;
-
+assert(false);
     if (count1 != numOfTuplesTobeScanned) {
         cerr << "Wrong entry output... Test failed..." << endl;
         ix_ScanIterator.close();
