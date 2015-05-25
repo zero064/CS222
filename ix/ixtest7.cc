@@ -52,8 +52,8 @@ int testCase_LargeDataSet(const string &indexFileName, const Attribute &attribut
     IX_ScanIterator ix_ScanIterator;
     unsigned key;
     int inRecordNum = 0;
-    unsigned numOfTuples = 1000 * 1000;
-    //unsigned numOfTuples = 12.5*100 * 100;
+    //unsigned numOfTuples = 1000 * 1000;
+    unsigned numOfTuples = 1*100 * 100;
 
     // create index file
     assertCreateIndexFile(success, indexManager, indexFileName);

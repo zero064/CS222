@@ -169,6 +169,11 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 		offset+=sizeof(KeyDesc);
 		memcpy(currentkeyValue,(char *) page+offset,currentkeyDesc.keySize);
 		offset+=currentkeyDesc.keySize;
+
+
+		printKey(attribute,currentkeyValue);
+		dprintf("\n");
+		dprintf("currentkeyDesc.leftNode is %d\n currentkeyDesc.rightNode is %d\n",currentkeyDesc.leftNode,currentkeyDesc.rightNode);
 		//dprintf("currentkeyValue is %d\n key is %d\n",currentkeyValue,key);
 		if(keyCompare(attribute,key,currentkeyValue)<0){
 			//get the page pointer
@@ -296,6 +301,10 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 	assert( keyValue == keyDesc.keyValue && "after recursive call, keyValue should equal to keyDesc.keyValue \n");
 	if(nexttreeop == OP_Split){
 		dprintf("nextteeop is OP_Split\n");
+		dprintf("the return key is \n");
+		printKey(attribute,nextkeyDesc.keyValue);
+		dprintf("\n");
+		dprintf("nextkeyDesc.leftNode is %d\nnextkeyDesc.rightNode is %d\n",nextkeyDesc.leftNode,nextkeyDesc.rightNode);
 		if(treeop == OP_Split ){
 
 			dprintf("teeop is OP_Split\n");
@@ -621,6 +630,8 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, KeyDesc &keyDesc)
 {
     
+	checkPageInt(ixfileHandle, page, pageNum,false);
+
 	TreeOp operation = OP_None;
 	// retrieve node info
 	NodeDesc nodeDesc;
