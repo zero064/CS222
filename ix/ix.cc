@@ -828,7 +828,7 @@ RC IndexManager::FindOffset(void *page,int size,int &offset,bool IsGreater)
 }
 
 
-TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, KeyDesc &keyDesc, int Rightmost )
+TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, KeyDesc &keyDesc, int  rightMost )
 {
 	void *bufferpage = malloc(PAGE_SIZE);
 	void *nextpage = malloc(PAGE_SIZE);
@@ -934,12 +934,12 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 		//merege or redistribute the page
 
 
-		if(nodeDesc.prev != InvalidPage || Rightmost != 1){
+		if(nodeDesc.prev != InvalidPage || rightMost != 1){
 
 			//not root page
 
 
-			if(Rightmost != 1){
+			if(rightMost != 1){
 
 
 
@@ -1205,8 +1205,8 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 	if(nexttreeop == OP_Merge ){
 		dprintf("nexttreeop is OP_Merge\n");
 
-		if(Rightmost != 1){
-				dprintf("Rightmost != 1\n");
+		if(rightMost != 1){
+				dprintf("rightMost != 1\n");
 				dprintf("offset is  %d\noldoffset is %d\n",offset,oldoffset);
 				//if nodeDesc.next != InvalidPage, offset and oldoffset do not change
 				//fetch the deleted key
@@ -1236,7 +1236,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 
 		}else{
 
-			dprintf("Rightmost == 1\n");
+			dprintf("rightMost == 1\n");
 
 			if(treeop == OP_Dist){
 				dprintf("treeop is OP_Dist\n");
@@ -1350,8 +1350,8 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 	}else if(nexttreeop == OP_Dist){
 		dprintf("nexttreeop is OP_Dist\n");
 
-		if(Rightmost != 1){
-			dprintf("Rightmost != 1\n");
+		if(rightMost != 1){
+			dprintf("rightMost != 1\n");
 			dprintf("offset is  %d\noldoffset is %d\n",offset,oldoffset);
 
 			//if nodeDesc.next != InvalidPage, offset and oldoffset do not change
@@ -1383,7 +1383,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 
 
 		}else{
-			dprintf("Rightmost == 1\n");
+			dprintf("rightMost == 1\n");
 			if(treeop == OP_Dist){
 				dprintf("treeop is OP_Dist\n");
 				dprintf("offset is  %d\noldoffset is %d\n",offset,oldoffset);
@@ -1478,7 +1478,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 	assert( keyValue == keyDesc.keyValue && "keyValue should equal to keyDesc.keyValue ");
 	checkKeyInt(ixfileHandle, attribute, page);
 	//if this page is merged, check integrity from leftsibling
-	if(Rightmost == 1 && treeop == OP_Merge){
+	if(rightMost == 1 && treeop == OP_Merge){
 		checkPageInt(ixfileHandle, leftsibling, nodeDesc.prev);
 	}else{
 		checkPageInt(ixfileHandle, page, pageNum);
@@ -1557,7 +1557,9 @@ RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 
 
 TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page,
-		PageNum pageNum, KeyDesc &keyDesc,int Rightmost)
+
+		PageNum pageNum, KeyDesc &keyDesc, int rightMost)
+
 {
 	checkPageInt(ixfileHandle, page, pageNum);
 	TreeOp operation = OP_None;
@@ -1595,8 +1597,11 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 			found = true;
 			free(ded.keyValue);		
 			break;
-		}else if( result == 0 && ded.overflow != InvalidPage ){
-			dprintf("result == 0 && ded.overflow != InvalidPage\n offset is %d\n rid.pageNum is %d\n rid.slotNum is %d\n",offset,rid.pageNum,rid.slotNum);
+		}
+/*
+		else if( result == 0 && ded.overflow != InvalidPage ){
+			dprintf("result == 0 && ded.overflow != InvalidPage\n offset is %d\n
+				 rid.pageNum is %d\n rid.slotNum is %d\n",offset,rid.pageNum,rid.slotNum);
 
 			RC rc;
 			rc = ixfileHandle.readPage( ded.overflow , page );
@@ -1615,7 +1620,9 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 			free(ded.keyValue);		
 			return operation;
 
-		}else if( result == 0 && ded.numOfRID > 1) {
+		}
+*/
+		else if( result == 0 && ded.numOfRID > 1) {
 			// if it has more than two RIDs, remove the one in the list
 			dprintf("RID List\n offset is %d\n rid.pageNum is %d\n rid.slotNum is %d\n",offset,rid.pageNum,rid.slotNum);
 
@@ -1631,12 +1638,31 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 					memcpy( (char*)page+offset, &ded, sizeof(DataEntryDesc) );
 					nodeDesc.size -= sizeof(RID);
 					memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc), &nodeDesc, sizeof(NodeDesc) );
+					found = true;
 					break; // break for loop
 				}
 
 			}
+			if( !found && ded.overflow != InvalidPage ){
+
+			    RC rc;
+			    rc = ixfileHandle.readPage( ded.overflow , page );
+			    assert( rc == SUCCESS && "Error in reading overflow page in deletion");
+			    memcpy( &ded, page , sizeof(DataEntryDesc) );
+			    for( int i=0; i< ded.numOfRID; i++){
+				RID t_rid;
+				memcpy( &t_rid, (char*)page+sizeof(DataEntryDesc)+ded.keySize + sizeof(RID)*i, sizeof(RID) );
+				if( rid.pageNum == t_rid.pageNum && rid.slotNum == t_rid.slotNum ){
+					ded.numOfRID -= 1;
+					found = true;
+					break;
+				}
+			    }
+			    memcpy(page, &ded, sizeof(DataEntryDesc) );
+			    free(nextPage);
+			}
+
 			free(ded.keyValue);		
-			found = true;
 			break; // break while loop
 		}
 
@@ -1659,7 +1685,7 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 		dprintf("nodeDesc.prev is %d\nnodeDesc.next is %d\n",nodeDesc.prev,nodeDesc.next);
 		NodeDesc nNodeDesc; // next node ( could be previous )
 		// right most leaf case
-		if( nodeDesc.next == InvalidPage ){
+		if( nodeDesc.next == InvalidPage || rightMost == 1){
 			// read previous page since there is no next page
 			ixfileHandle.readPage( nodeDesc.prev, nextPage );
 			memcpy( &nNodeDesc, (char*)nextPage+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
@@ -1700,16 +1726,12 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 				// merge case, nextPage is actually previous page
 				memcpy( (char*)nextPage+nNodeDesc.size, page, nodeDesc.size);
 				nNodeDesc.size += nodeDesc.size;
-//				memcpy( (char*)page+nodeDesc.size, nextPage, nNodeDesc.size );
-//				nodeDesc.size += nNodeDesc.size;
 			
-//				ixfileHandle.deletePage( nodeDesc.prev );
-
 				ixfileHandle.deletePage( pageNum );
 //				nodeDesc.prev = nNodeDesc.prev;
-				nNodeDesc.next = InvalidPage; 
+				nNodeDesc.next = nodeDesc.next;
+
 				memcpy( (char*)nextPage+PAGE_SIZE-sizeof(NodeDesc), &nNodeDesc, sizeof(NodeDesc));
-//				memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc), &nodeDesc, sizeof(NodeDesc) );
 				operation = OP_Merge;
 				ixfileHandle.writePage( nodeDesc.prev , nextPage );
 

@@ -107,7 +107,7 @@ class IndexManager : public DebugMsg {
 
 	TreeOp TraverseTree(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, void *page, PageNum pageNum, PageNum &returnpageNum);
 
-	TreeOp TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, KeyDesc &keyDesc,int Rightmost);
+	TreeOp TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, KeyDesc &keyDesc,int rightMost);
 
 	TreeOp TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, KeyDesc &keyDesc);
 
@@ -116,7 +116,9 @@ class IndexManager : public DebugMsg {
 
 
 	TreeOp deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page,
-			PageNum pageNum, KeyDesc &keyDesc, int Rightmost);
+
+			PageNum pageNum, KeyDesc &keyDesc, int rightMost);
+
 
 	int keyCompare(const Attribute &attribute, const void *keyA, const void* keyB); 
 	int getKeySize(const Attribute &attribute, const void *key);
