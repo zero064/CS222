@@ -160,7 +160,9 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 
 	TreeOp treeop = OP_None;
 	TreeOp nexttreeop = OP_None;
-
+	dprintf("the inserted key\n");
+	printKey(attribute,key);
+	dprintf("\n'");
 	//scan to find the desired pointer
 	while(true){
 		memcpy(&currentkeyDesc,(char *) page+offset,sizeof(KeyDesc));
@@ -170,6 +172,9 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 		//dprintf("currentkeyValue is %d\n key is %d\n",currentkeyValue,key);
 		if(keyCompare(attribute,key,currentkeyValue)<0){
 			//get the page pointer
+			dprintf("keyCompare(attribute,key,currentkeyValue)<0\n");
+			printKey(attribute,currentkeyValue);
+			dprintf("\n'");
 			currentpageNum=currentkeyDesc.leftNode;
 			offset -= sizeof(KeyDesc);//adjust the offset for inserting a  key entry,
 			offset -= currentkeyDesc.keySize;
@@ -177,13 +182,16 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 		}
 		if(offset == nodeDesc.size){
 			//last entry
+			dprintf("offset == nodeDesc.size\n");
+			printKey(attribute,currentkeyValue);
+			dprintf("\n'");
 			currentpageNum=currentkeyDesc.rightNode;
 			break;
 		}
 	}
 	currentkeyDesc.keyValue = currentkeyValue;
 	assert( currentpageNum != 0 && "Should find a pageNum\n");
-
+	dprintf("after while loop,\ncurrentpageNum is %d\noffset is %d\n",currentpageNum,offset);
 
 	int splitoffset=0;
 	NodeDesc tempnodeDesc;
@@ -208,7 +216,7 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 				break;
 			}
 		}
-
+		dprintf("at beginning,splitoffset is %d\n",splitoffset);
 		//create nodeDesc for original page
 
 		nodeDesc.size = splitoffset;
@@ -261,7 +269,7 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 
 	RC rc;
 	//recursively call TraverseTreeInsert
-	dprintf("currentpageNUm is %d\n",currentpageNum);
+	dprintf("before entering next level,\ncurrentpageNUm is %d\n",currentpageNum);
 	//read the page pointed by currentpageNum to nextpage
 	rc = ixfileHandle.readPage(currentpageNum,nextpage);
 	assert(rc == 0 && "rc != 0 \n");
@@ -269,11 +277,13 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 	//if it is leaf page call insertToLeat, NonLeaf page recursively call TraverseTreeInsert
 
 	if(nextnodeDesc.type == Leaf){
+		dprintf("nextnodeDesc.type == Leaf\n");
 		nexttreeop = insertToLeaf(ixfileHandle,attribute,key,rid,nextpage,currentpageNum, nextkeyDesc);
 
 		assert((nexttreeop == OP_Split || nexttreeop == OP_None) && "nexttreeop should be OP_split or OP_None");
 
 	}else if(nextnodeDesc.type == NonLeaf){
+		dprintf("nextnodeDesc.type == NonLeaf\n");
 
 		nexttreeop = TraverseTreeInsert(ixfileHandle,attribute,key,rid,nextpage,currentpageNum, nextkeyDesc);
 		assert((nexttreeop == OP_Split || nexttreeop == OP_None) && "nexttreeop should be OP_split or OP_None");
