@@ -116,7 +116,7 @@ class IndexManager : public DebugMsg {
 
 
 	TreeOp deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page,
-			PageNum pageNum, KeyDesc &keyDesc);
+			PageNum pageNum, KeyDesc &keyDesc, int rightMost);
 
 	int keyCompare(const Attribute &attribute, const void *keyA, const void* keyB); 
 	int getKeySize(const Attribute &attribute, const void *key);
