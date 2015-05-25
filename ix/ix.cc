@@ -15,7 +15,7 @@ IndexManager* IndexManager::instance()
 
 IndexManager::IndexManager()
 {
-		debug = true;
+//		debug = true;
 }
 
 IndexManager::~IndexManager()
@@ -737,7 +737,7 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 			// update page descriptor
 			nodeDesc.size += sizeof(RID);
 			memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc) , &nodeDesc , sizeof(NodeDesc) );
-if( *(int*)key == 20 ) printf("%d %d %d %d\n", rid.pageNum, ded.numOfRID, pageNum, nodeDesc.size);
+if( *(int*)key == 20 ){ printKey(attribute,key); printf(" %d %d %d %d %d\n", rid.pageNum, ded.numOfRID, pageNum, offset, nodeDesc.size); }
 			free(ded.keyValue);
 			insert = true;
 			break;
@@ -777,7 +777,9 @@ if( ded.numOfRID > 110 ) printf("Hiiii %d\n",ded.keySize);
 		}
 		// allocate new page to insert splitted nodes
 		PageNum freePageID = ixfileHandle.findFreePage();
-		// form a new page, fill up the information
+		// form a new page, fill up the informatio
+//printf("%d %d\n",offset, nodeDesc.size/2);
+//assert( offset > nodeDesc.size/2 && "WTF");
 		memcpy(splitPage, (char*)page+offset, nodeDesc.size - offset );
 		NodeDesc splitNodeDesc;
 		splitNodeDesc.type = Leaf;
@@ -788,6 +790,16 @@ if( ded.numOfRID > 110 ) printf("Hiiii %d\n",ded.keySize);
 		nodeDesc.size = offset;
 		nodeDesc.next = freePageID;
 		memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc), &nodeDesc, sizeof(NodeDesc) );
+
+		// get First entry key value
+		DataEntryDesc nDed;
+		memcpy( &nDed, (char*)splitPage, sizeof(DataEntryDesc));
+		keyDesc.rightNode = freePageID;
+		keyDesc.leftNode = pageNum;
+		keyDesc.keySize = nDed.keySize;
+		memcpy( keyDesc.keyValue, (char*)splitPage+sizeof(DataEntryDesc), nDed.keySize);
+
+
 
 		ixfileHandle.writePage(freePageID,splitPage);
 		// update right leaf's left node to split page number 
@@ -800,14 +812,7 @@ if( ded.numOfRID > 110 ) printf("Hiiii %d\n",ded.keySize);
 		    memcpy( (char*)splitPage+PAGE_SIZE-sizeof(NodeDesc), &ntNodeDesc, sizeof(NodeDesc));
 		    ixfileHandle.writePage( splitNodeDesc.next, splitPage);
 		}
-		// get First entry key value
-		DataEntryDesc nDed;
-		memcpy( &nDed, (char*)splitPage, sizeof(DataEntryDesc));
-		keyDesc.rightNode = freePageID;
-		keyDesc.leftNode = pageNum;
-		keyDesc.keySize = nDed.keySize;
-		memcpy( keyDesc.keyValue, (char*)splitPage+sizeof(DataEntryDesc), nDed.keySize);
-
+	
 	}
 
 	ixfileHandle.writePage(pageNum,page);
