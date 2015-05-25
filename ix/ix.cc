@@ -1561,6 +1561,7 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 		PageNum pageNum, KeyDesc &keyDesc, int rightMost)
 
 {
+	dprintf("in deleteFromLeaf\n pageNum is %d\n",pageNum);
 	checkPageInt(ixfileHandle, page, pageNum);
 	TreeOp operation = OP_None;
 	// retrieve node info
