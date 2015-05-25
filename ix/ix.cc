@@ -15,7 +15,7 @@ IndexManager* IndexManager::instance()
 
 IndexManager::IndexManager()
 {
-//		debug = true;
+		debug = true;
 }
 
 IndexManager::~IndexManager()
