@@ -15,7 +15,7 @@ IndexManager* IndexManager::instance()
 
 IndexManager::IndexManager()
 {
-		debug = true;
+//		debug = true;
 }
 
 IndexManager::~IndexManager()
@@ -1728,10 +1728,21 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 				memcpy( (char*)nextPage+nNodeDesc.size, page, nodeDesc.size);
 				nNodeDesc.size += nodeDesc.size;
 			
-				ixfileHandle.deletePage( pageNum );
-//				nodeDesc.prev = nNodeDesc.prev;
-				nNodeDesc.next = nodeDesc.next;
 
+				// if it's not the real right most leaf, after merge and deletion
+				// append next page's prev link to current page's left page
+				if( nodeDesc.next != InvalidPage ){
+				    void *nnPage = malloc(PAGE_SIZE);
+				    ixfileHandle.readPage( nodeDesc.next, nnPage );
+				    NodeDesc ntNodeDesc;
+				    memcpy( &ntNodeDesc, (char*)nnPage+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
+				    ntNodeDesc.prev = nodeDesc.prev;
+				    memcpy( (char*)nnPage+PAGE_SIZE-sizeof(NodeDesc), &ntNodeDesc, sizeof(NodeDesc) );
+				    ixfileHandle.writePage( nodeDesc.next, nnPage );
+				    free(nnPage);
+				}
+				nNodeDesc.next = nodeDesc.next;
+				ixfileHandle.deletePage( pageNum );
 				memcpy( (char*)nextPage+PAGE_SIZE-sizeof(NodeDesc), &nNodeDesc, sizeof(NodeDesc));
 				operation = OP_Merge;
 				ixfileHandle.writePage( nodeDesc.prev , nextPage );
