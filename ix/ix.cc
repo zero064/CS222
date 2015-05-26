@@ -171,7 +171,7 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 		offset+=currentkeyDesc.keySize;
 
 
-		printKey(attribute,currentkeyValue);
+		//printKey(attribute,currentkeyValue);
 		dprintf("\n");
 		dprintf("currentkeyDesc.leftNode is %d\n currentkeyDesc.rightNode is %d\n",currentkeyDesc.leftNode,currentkeyDesc.rightNode);
 		//dprintf("currentkeyValue is %d\n key is %d\n",currentkeyValue,key);
@@ -203,6 +203,7 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 	PageSize origsize=nodeDesc.size;
 	KeyDesc tempkeyDesc;
 	int tempnext=nodeDesc.next;
+	dprintf("before check\n nodeDesc.size is  %d\nUpperThreshold is %d\n",nodeDesc.size,UpperThreshold);
 	if(nodeDesc.size >= UpperThreshold){
 		//split the page
 		dprintf("before split, nodeDesc.size is %d\n",nodeDesc.size);
