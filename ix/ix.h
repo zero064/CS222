@@ -27,7 +27,7 @@ typedef struct {
 	PageSize size;
 	PageNum next = InvalidPage;
 	PageNum prev = InvalidPage;
-} NodeDesc;
+}NodeDesc;
 
 const int UpperThreshold = (PAGE_SIZE-sizeof(NodeDesc))*0.85;
 const int LowerThreshold = (PAGE_SIZE-sizeof(NodeDesc))*0.4;
@@ -123,7 +123,7 @@ class IndexManager : public DebugMsg {
 	int keyCompare(const Attribute &attribute, const void *keyA, const void* keyB); 
 	int getKeySize(const Attribute &attribute, const void *key);
 	void printKey(const Attribute &attribute, const void *key);
-
+	bool unsync; // deletion sync flag
 	/*
 	   splitLeaf()
 	   splitNonLeaf()
