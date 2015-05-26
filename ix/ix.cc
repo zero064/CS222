@@ -2071,7 +2071,7 @@ RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
 		bool        	highKeyInclusive)
 {
 	if( ixfileHandle.isReadable() == -1 ) return FAILURE;
-
+	this->overflow = false;
 	this->ixfileHandle = ixfileHandle;
 	this->attribute = attribute;
 //	this->lowKey = (char*)lowKey;

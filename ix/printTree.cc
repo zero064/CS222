@@ -34,7 +34,7 @@ int printTree(const string &indexFileName)
 //	void *key = malloc( 4 + 1);
 //	char k = 'a'; int s = 1;
 	RID rid;
-	for( int i = 0 ; i< 5000; i++){
+	for( int i = 0 ; i< 500; i++){
 		rid.pageNum = i;
 		float key = (float)i;
 //		memcpy( key, &s, 4 );
