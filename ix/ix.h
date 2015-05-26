@@ -29,8 +29,8 @@ typedef struct {
 	PageNum prev = InvalidPage;
 }NodeDesc;
 
-const int UpperThreshold = (PAGE_SIZE-sizeof(NodeDesc))*0.7;
-const int LowerThreshold = (PAGE_SIZE-sizeof(NodeDesc))*0.6;
+const int UpperThreshold = (PAGE_SIZE-sizeof(NodeDesc))*0.9;
+const int LowerThreshold = (PAGE_SIZE-sizeof(NodeDesc))*0.5;
 
 
 

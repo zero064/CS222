@@ -206,8 +206,8 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 	PageSize origsize=nodeDesc.size;
 	KeyDesc tempkeyDesc;
 	int tempnext=nodeDesc.next;
-	dprintf("before check\n nodeDesc.size is  %d\nUpperThreshold is %d\n",nodeDesc.size,UpperThreshold);
-	if(nodeDesc.size >= UpperThreshold){
+	dprintf("before check\n nodeDesc.size is  %d\nUpperThreshold is %d\nkeysize is %d\n",nodeDesc.size,UpperThreshold,getKeySize(attribute,key));
+	if((nodeDesc.size + getKeySize(attribute,key)) >= UpperThreshold){
 		//split the page
 		dprintf("before split, nodeDesc.size is %d\n",nodeDesc.size);
 
@@ -993,8 +993,9 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 	KeyDesc beginkeyDesc;
 	int currentoffset = nodeDesc.size;
 	bool Emptyflag = false;
+	dprintf("before check\n nodeDesc.size is  %d\nUpperThreshold is %d\nkeysize is %d\n",nodeDesc.size,UpperThreshold,getKeySize(attribute,key));
 
-	if(nodeDesc.size < LowerThreshold){
+	if((nodeDesc.size - getKeySize(attribute,key))< LowerThreshold){
 		//merege or redistribute the page
 
 
