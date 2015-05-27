@@ -1030,7 +1030,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 					dprintf("nodeDesc.size is %d\nsiblingoffset is %d\n",nodeDesc.size,siblingoffset);
 					//find the last key in original page and the first key in sibling page
 					FindLastKey(page,lastkeyDesc);
-					assert(lastkeyDesc.rightNode != InvalidPage && "rightNode != InvalidPage in Redistribution");
+					//assert(lastkeyDesc.rightNode != InvalidPage && "rightNode != InvalidPage in Redistribution");
 					memcpy(&beginkeyDesc,rightsibling,sizeof(KeyDesc));
 					//update the leftNode and rightNode for push down key
 					keyDesc.leftNode = lastkeyDesc.rightNode;
@@ -1132,7 +1132,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 					int siblingoffset;
 					//find the begining point in left page to move data
 					FindOffset(leftsibling,leftnodeDesc.size - (LowerThreshold-nodeDesc.size),siblingoffset,false);
-					assert((leftnodeDesc.size - (LowerThreshold-nodeDesc.size))>LowerThreshold && "(leftNode.size - (LowerThreshold-nodeDesc.size))>LowerThreshold");
+					//assert((leftnodeDesc.size - (LowerThreshold-nodeDesc.size))>LowerThreshold && "(leftNode.size - (LowerThreshold-nodeDesc.size))>LowerThreshold");
 					dprintf("nodeDesc.size is %d\n",nodeDesc.size);
 					dprintf("leftNode.size is %d\n",leftnodeDesc.size);
 					dprintf("siblingoffset is %d\n",siblingoffset);
