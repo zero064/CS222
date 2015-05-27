@@ -53,7 +53,11 @@ int testCase_LargeDataSet(const string &indexFileName, const Attribute &attribut
     unsigned key;
     int inRecordNum = 0;
    // unsigned numOfTuples = 1000 * 100;
+<<<<<<< HEAD
     unsigned numOfTuples = 1*100 * 100;
+=======
+    unsigned numOfTuples = 1*100 * 10;
+>>>>>>> 11a9ef4...  add test case for iteration deletion of multiple RID
 
     // create index file
     assertCreateIndexFile(success, indexManager, indexFileName);
@@ -65,11 +69,20 @@ int testCase_LargeDataSet(const string &indexFileName, const Attribute &attribut
     for(unsigned i = 0; i <= numOfTuples; i++)
     {
         key = i; 
+<<<<<<< HEAD
         rid.pageNum = key+1;
         rid.slotNum = key+2;
 
         assertInsertEntry(success, indexManager, ixfileHandle, attribute, &key, rid);
         inRecordNum += 1;
+=======
+	for( int j = 0; j < 300; j++ ){ 
+	    rid.pageNum = key+1+j;
+	    rid.slotNum = key+2+j;
+	    assertInsertEntry(success, indexManager, ixfileHandle, attribute, &key, rid);
+	    inRecordNum += 1;
+	}
+>>>>>>> 11a9ef4...  add test case for iteration deletion of multiple RID
     }
 
     
