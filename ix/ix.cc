@@ -1045,7 +1045,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 					dprintf("nodeDesc.size is %d\nsiblingoffset is %d\n",nodeDesc.size,siblingoffset);
 					//find the last key in original page and the first key in sibling page
 					FindLastKey(page,lastkeyDesc);
-					assert(lastkeyDesc.rightNode != InvalidPage && "rightNode != InvalidPage in Redistribution");
+					//assert(lastkeyDesc.rightNode != InvalidPage && "rightNode != InvalidPage in Redistribution");
 					memcpy(&beginkeyDesc,rightsibling,sizeof(KeyDesc));
 					//update the leftNode and rightNode for push down key
 					keyDesc.leftNode = lastkeyDesc.rightNode;
