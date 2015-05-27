@@ -223,13 +223,13 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 			splitoffset += tempkeyDesc.keySize;
 
 
-			if((splitoffset + insertedKeysize)>= UpperThreshold){
+			if((splitoffset + insertedKeysize)>= LowerThreshold){
 
 				break;
 			}
 			oldtempkeyDesc = tempkeyDesc;
 		}
-		splitoffset -= (sizeof(KeyDesc) + tempkeyDesc.keySize + sizeof(KeyDesc) + oldtempkeyDesc.keySize);
+		//splitoffset -= (sizeof(KeyDesc) + tempkeyDesc.keySize + sizeof(KeyDesc) + oldtempkeyDesc.keySize);
 		dprintf("at beginning,splitoffset is %d\n",splitoffset);
 		//create nodeDesc for original page
 
