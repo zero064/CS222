@@ -1821,7 +1821,7 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 
 	// if this page is root page, dont apply merge / redistribution.
 	if( nodeDesc.size < LowerThreshold && pageNum != ixfileHandle.findRootPage() ){
-
+		unsync = true;
 		dprintf("merge / des case %d \n", *(int*)key);
 		dprintf("nodeDesc.prev is %d\nnodeDesc.next is %d\n",nodeDesc.prev,nodeDesc.next);
 		NodeDesc nNodeDesc; // next node ( could be previous )
@@ -2173,6 +2173,7 @@ RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
 	this->lowKeyNull = false;
 	this->highKeyNull = false;
 	im = IndexManager::instance();
+	im->unsync = false;
 	float INF = INFINITY/2, NINF = -INFINITY/2;
 
 	if( lowKey == NULL ){
@@ -2260,6 +2261,7 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 	// check if someone called deleteEntry in indexManager
 	// if someone did, sync the location
 	if( im->unsync ){
+	    //assert(false);
 	    // find root first
 	    PageNum root = ixfileHandle.findRootPage();
 	    rc = ixfileHandle.readPage(root,page);
@@ -2274,11 +2276,13 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 		rc = ixfileHandle.readPage(returnPageNum,page);
 	    }
 	    int offset = 0 ;
-	    while( true ){ 
+	    while( offset < nodeDesc.size ){ 
 		DataEntryDesc ded;
 		memcpy( &ded, (char*)page+offset, sizeof(DataEntryDesc) );
+//		printf("pageNum %d offset %d keySize%d\n",returnPageNum,offset,ded.keySize);
 		void *dataKey = malloc(ded.keySize);
 		int compare = im->keyCompare( attribute, key , dataKey );
+		free(dataKey);
 		if( compare == 0 ){
 		    offsetToKey = offset;
 		    im->unsync = false;
@@ -2286,7 +2290,11 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 		}
 		offset += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID) ;
 	    }
-
+/*
+	    if( im->unsync ){
+		return -1;
+	    }
+*/
 	} 
 
 
