@@ -198,7 +198,8 @@ class IX_ScanIterator {
 		bool lowKeyInclusive, highKeyInclusive;
 		void *page, *overflowPage;
 		bool overflow;
-		int offsetToKey, offsetToRID, overflowRID;	
+		int offsetToKey, offsetToRID, overflowRID;
+		PageNum currentOverflowPage;
 
 };
 

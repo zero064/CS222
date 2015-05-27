@@ -1639,8 +1639,8 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 
 		PageNum pageNum, KeyDesc &keyDesc, int rightMost)
 
-{
-//	if(debug) checkPageInt(ixfileHandle, page, pageNum);
+{   
+	//checkPageInt(ixfileHandle, page, pageNum);
 	TreeOp operation = OP_None;
 	// retrieve node info
 	NodeDesc nodeDesc;
@@ -1829,10 +1829,41 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 			free(ded.keyValue);		
 			break;
 		}
-		else if( result == 0 && ded.overflow != InvalidPage ) {
-			// if it has more than two RIDs, remove the one in the list
-			dprintf("RID List offset is %d rid.pageNum is %d rid.slotNum is %d numrid %d\n",offset,rid.pageNum,rid.slotNum,ded.numOfRID);
+/*
+		else if( result == 0 && ded.overflow != InvalidPage ){
+			printf("result == 0 && ded.overflow != InvalidPage\n offset is %d\nrid.pageNum is %d\n rid.slotNum is %d\n",offset,rid.pageNum,rid.slotNum);
+			RC rc;
+			rc = ixfileHandle.readPage( ded.overflow , page );
+			assert( rc == SUCCESS && "Error in reading overflow page in deletion");
+			DataEntryDesc oDed;
 
+			memcpy( &oDed, page , sizeof(DataEntryDesc) );
+			for( int i=0; i< ded.numOfRID; i++){
+				RID t_rid;
+				memcpy( &t_rid, (char*)page+sizeof(DataEntryDesc)+ded.keySize + sizeof(RID)*i, sizeof(RID) );
+				if( rid.pageNum == t_rid.pageNum && rid.slotNum == t_rid.slotNum ){
+					ded.numOfRID -= 1;
+					break;
+				}
+			}
+			memcpy(page, &ded, sizeof(DataEntryDesc) );
+			free(nextPage);
+			free(ded.keyValue);		
+			return operation;
+
+		}
+*/
+		else if( result == 0 ) {
+			// if it has more than two RIDs, remove the one in the list
+			//printf("RID List offset is %d rid.pageNum is %d rid.slotNum is %d numrid %d\n",offset,rid.pageNum,rid.slotNum,ded.numOfRID);
+			
+			for( int i=0; i<ded.numOfRID; i++){
+				RID t_rid;
+				memcpy( &t_rid, (char*)page+offset+sizeof(DataEntryDesc)+ded.keySize+sizeof(RID)*i, sizeof(RID) );
+			//	printf("RID List offset is %d rid.pageNum is %d rid.slotNum is %d numrid %d\n",offset,t_rid.pageNum,t_rid.slotNum,ded.numOfRID);
+			}
+
+			unsync = true;
 			for( int i=0; i<ded.numOfRID; i++){
 
 				RID t_rid;
@@ -1853,8 +1884,9 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 			}
 			// Dealing over flow page deletion
 			if( !found && ded.overflow != InvalidPage ){
+			    printf("deal overflow\n");
 			    RC rc;
-			    PageNum overflowPageNum = ded.overflow; 
+			    PageNum overflowPageNum = ded.overflow; int count = 0; 
 			    while( !found ){
 				DataEntryDesc oDed;
 				rc = ixfileHandle.readPage( overflowPageNum , nextPage );
@@ -1866,27 +1898,33 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 				    RID t_rid;
 				    memcpy( &t_rid, (char*)nextPage+sizeof(DataEntryDesc)+ded.keySize + sizeof(RID)*i, sizeof(RID) );
 				    
+				printf("numrid %d %d %d %d %d\n",oDed.numOfRID,rid.pageNum,rid.slotNum,t_rid.pageNum,t_rid.slotNum);
+
 				    if( rid.pageNum == t_rid.pageNum && rid.slotNum == t_rid.slotNum ){
-				//printf("numrid %d %d %d %d %d\n",oDed.numOfRID,rid.pageNum,rid.slotNum,t_rid.pageNum,t_rid.slotNum);
-					int restSize = sizeof(RID) * ( oDed.numOfRID - i );
+assert( i == 0 );
+					int restSize = sizeof(RID) * ( oDed.numOfRID - (i+1) );
 					void *temp = malloc(PAGE_SIZE);
 					memcpy( temp, (char*)nextPage+sizeof(DataEntryDesc)+ded.keySize + sizeof(RID)*(i+1), restSize );
 					memcpy( (char*)nextPage+sizeof(DataEntryDesc)+ded.keySize+sizeof(RID)*i, temp, restSize );
 					oDed.numOfRID -= 1;
+					free(temp);
 					memcpy( nextPage, &oDed, sizeof(DataEntryDesc) );
 					rc = ixfileHandle.writePage( overflowPageNum, nextPage );
+					assert( rc == SUCCESS);
 					found = true;
 					break;
 				    }
 				}
-
+assert( count < 1);
 				if( !found && oDed.overflow != InvalidPage ){
 				    overflowPageNum = oDed.overflow;
 				}
-
+count++;
+				printf("numrid %d %d %d\n",oDed.numOfRID, rid.pageNum,rid.slotNum);
 				// end of the RID list and last overflow page
 				// clear all page 
 				if( oDed.overflow == InvalidPage && oDed.numOfRID == 0){
+				    printf("sup\n");
 				    overflowPageNum = ded.overflow;
 				    while( overflowPageNum != InvalidPage ){
 					assert( overflowPageNum != 0 );
@@ -1897,12 +1935,13 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 				    }
 				    assert( ded.numOfRID == 0 && "at this point all rid are cleared");
 				    int entrySize = sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID);
+
 				    memcpy( nextPage, (char*)page+offset+entrySize , nodeDesc.size - ( offset + entrySize ) );
 				    memcpy( (char*)page+offset , nextPage, nodeDesc.size - ( offset + entrySize ) );
 				    nodeDesc.size -= entrySize;
 				    memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc), &nodeDesc, sizeof(NodeDesc) );
 				    ixfileHandle.writePage( pageNum, page) ;
-				    free(ded.keyValue);		
+				    free(ded.keyValue);	
 				    return operation;
 				}
 			    }
@@ -1917,10 +1956,11 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 
 	}
 
+printKey(attribute,key);
+printf(" pageNum %d\n",pageNum);
 
 
-
-	if( !found ) { return OP_Error; }
+	if( !found ) { assert(false); return OP_Error; }
 
 	// if this page is root page, dont apply merge / redistribution.
 	if( nodeDesc.size < LowerThreshold && pageNum != ixfileHandle.findRootPage() ){
@@ -2374,17 +2414,22 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 		im->TraverseTree( ixfileHandle, attribute, key,  page, root, returnPageNum);
 		assert( root != returnPageNum && "root should not be leaf in this case" );
 		assert( returnPageNum >=1 && "something went wrong when traversing tree in scan ");
-		rc = ixfileHandle.readPage(returnPageNum,page);
+		rc = ixfileHandle.readPage(returnPageNum,page);  
 	    }
 	    int offset = 0 ;
-	    while( true ){ 
+	    printf("g pageNum %d\n",returnPageNum);
+	    while( offset < nodeDesc.size ){ 
 		DataEntryDesc ded;
 		memcpy( &ded, (char*)page+offset, sizeof(DataEntryDesc) );
 		void *dataKey = malloc(ded.keySize);
+		memcpy( dataKey, (char*)page+offset+sizeof(DataEntryDesc), ded.keySize);
 		int compare = im->keyCompare( attribute, key , dataKey );
-		if( compare == 0 ){
+		free(dataKey);
+		if( compare == 0 ){ im->printKey(attribute,key); printf("updated\n");
 		    offsetToKey = offset;
-		    im->unsync = false;
+		    offsetToRID = 0;
+		    if( !overflow )
+			im->unsync = false;
 		    break;
 		}
 		offset += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID) ;
@@ -2401,22 +2446,55 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 	if( overflow ){
 	    DataEntryDesc oDed;
 	    memcpy( &oDed, overflowPage, sizeof(DataEntryDesc));
-	    if( overflowRID < oDed.numOfRID ){
-		memcpy( &rid, (char*)overflowPage+sizeof(DataEntryDesc)+oDed.keySize+overflowRID*sizeof(RID), sizeof(RID) );
-		overflowRID++;
-		return SUCCESS;		
-	    }else{
-		overflowRID = 0; 
-		// if it still has a overflow chain behind it, read it and return new RID
-		if( oDed.overflow != InvalidPage ){
-		    ixfileHandle.readPage( oDed.overflow, overflowPage );
-		    memcpy( &oDed, overflowPage, sizeof(DataEntryDesc));
+
+	    if( im->unsync ){
+		// unsync re-read page from disk
+		rc = ixfileHandle.readPage( currentOverflowPage, overflowPage);
+		memcpy( &oDed, overflowPage, sizeof(DataEntryDesc));
+		printf("in scan overflow numrid %d\n",oDed.numOfRID);
+		if( overflowRID < oDed.numOfRID ){
+		    overflowRID = 0;
+		    memcpy( &rid, (char*)overflowPage+sizeof(DataEntryDesc)+oDed.keySize+overflowRID*sizeof(RID), sizeof(RID) );
+		    printf("OVERFLOW RID %d %d\n",rid.pageNum,rid.slotNum);
+		    im->unsync=false;
+		    return SUCCESS;
+		}else{
+		    overflowRID = 0; 
+		    // if it still has a overflow chain behind it, read it and return new RID
+		    if( oDed.overflow != InvalidPage ){
+			currentOverflowPage = oDed.overflow;
+			ixfileHandle.readPage( oDed.overflow, overflowPage );
+			memcpy( &oDed, overflowPage, sizeof(DataEntryDesc));
+			memcpy( &rid, (char*)overflowPage+sizeof(DataEntryDesc)+oDed.keySize+overflowRID*sizeof(RID), sizeof(RID) );
+			im->unsync=false;
+			return SUCCESS;
+		    }else{
+			printf("over\n");
+			overflow = false;
+		    }
+		}
+		im->unsync=false;
+	    }else{ 
+
+
+		if( overflowRID < oDed.numOfRID ){
 		    memcpy( &rid, (char*)overflowPage+sizeof(DataEntryDesc)+oDed.keySize+overflowRID*sizeof(RID), sizeof(RID) );
 		    overflowRID++;
 		    return SUCCESS;		
 		}else{
-		    overflow = false;
+		    overflowRID = 0; 
+		    // if it still has a overflow chain behind it, read it and return new RID
+		    if( oDed.overflow != InvalidPage ){
+			ixfileHandle.readPage( oDed.overflow, overflowPage );
+			memcpy( &oDed, overflowPage, sizeof(DataEntryDesc));
+			memcpy( &rid, (char*)overflowPage+sizeof(DataEntryDesc)+oDed.keySize+overflowRID*sizeof(RID), sizeof(RID) );
+			overflowRID++;
+			return SUCCESS;		
+		    }else{
+			overflow = false;
+		    }
 		}
+
 	    }
 	}
 
@@ -2448,18 +2526,22 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 
 	// Read rid and return
 	memcpy( &rid, (char*)page+offsetToKey+sizeof(DataEntryDesc)+ded.keySize+offsetToRID*sizeof(RID), sizeof(RID) );
+	im->printKey(attribute,key);
+	printf(" RID %d %d %d %d %d\n",rid.pageNum,rid.slotNum, ded.numOfRID, offsetToRID,offsetToKey);
 
 /*
-	printf("RID %d %d %d %d\n",rid.pageNum,rid.slotNum, ded.numOfRID, result);
+	printf("offsetToRID %d %d\n", offsetToRID,ded.keySize);
 	im->printKey(attribute,key); printf(" "); im->printKey(attribute,highKey);	printf("\n");
-	printf("offsetToRID %d \n", offsetToRID);
+
 */	
 	offsetToRID++;
 
 	if( offsetToRID == ded.numOfRID ){
+	printf("LAST RID %d %d %d %d\n",rid.pageNum,rid.slotNum, ded.numOfRID, offsetToKey);
 		// overflow case 
 		if( ded.overflow != InvalidPage ){	
 		    overflow = true;
+		    currentOverflowPage = ded.overflow;
 		    ixfileHandle.readPage( ded.overflow, overflowPage );
 		    overflowRID = 0;
 		}
