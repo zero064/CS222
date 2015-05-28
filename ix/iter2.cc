@@ -23,7 +23,7 @@ int assertScanVailid(IXFileHandle &ixfileHandle, const Attribute &attribute,
         }
         outRecordNum += 1;
     }
-
+cout<<"Hi";
     if (inRecordNum != outRecordNum)
     {
         cerr << "Wrong entries output...failure" << endl;
@@ -45,15 +45,15 @@ int testCase_LargeDataSet(const string &indexFileName, const Attribute &attribut
     // Close Index
     // Destry Index
 
-    cerr << endl << "****In Test Case 7 - LargeDataSet****" << endl;
+    cerr << endl << "****Test Iteration Deletion ****" << endl;
 
     RID rid;
     IXFileHandle ixfileHandle;
     IX_ScanIterator ix_ScanIterator;
     unsigned key;
     int inRecordNum = 0;
-    unsigned numOfTuples = 1000 * 1000;
-    //unsigned numOfTuples = 1*100 * 100;
+   // unsigned numOfTuples = 1000 * 100;
+    unsigned numOfTuples = 1*100 * 10;
 
     // create index file
     assertCreateIndexFile(success, indexManager, indexFileName);
@@ -65,56 +65,30 @@ int testCase_LargeDataSet(const string &indexFileName, const Attribute &attribut
     for(unsigned i = 0; i <= numOfTuples; i++)
     {
         key = i; 
-        rid.pageNum = key+1;
-        rid.slotNum = key+2;
-
-        assertInsertEntry(success, indexManager, ixfileHandle, attribute, &key, rid);
-        inRecordNum += 1;
+	for( int j = 0; j < 300; j++ ){ 
+	    rid.pageNum = key+1+j;
+	    rid.slotNum = key+2+j;
+	    assertInsertEntry(success, indexManager, ixfileHandle, attribute, &key, rid);
+	    inRecordNum += 1;
+	}
     }
 
-    // scan
-    int rc = assertScanVailid(ixfileHandle, attribute, ix_ScanIterator, inRecordNum);
-    if (rc != success){
-        cerr << "Scan inserted results failed" << endl;
-        return fail;
-    }
-
-    // Delete some 
-    int deletedRecord = 0;
-    for(unsigned i = 0; i <= numOfTuples; i+=10)
+    
+    assertInitalizeScan(success, indexManager, ixfileHandle, attribute, 
+            NULL, NULL, false ,false, ix_ScanIterator);
+    int count = 0;
+    // DeleteEntry in IndexScan Iterator
+    while(ix_ScanIterator.getNextEntry(rid, &key) == success)
     {
-        key = i; 
-        rid.pageNum = key+1;
-        rid.slotNum = key+2;
-
+        if (rid.pageNum % 100 == 0) {
+            cerr << "returned rid: " << rid.pageNum << " " << rid.slotNum << endl;
+        }
         assertDeleteEntry(success, indexManager, ixfileHandle, attribute, &key, rid);
-        deletedRecord += 1;
+	count ++;
     }
-
-    // scan 
-    rc = assertScanVailid(ixfileHandle, attribute, ix_ScanIterator, 
-            inRecordNum - deletedRecord);
-    if (rc != success){
-        cerr << "Scan inserted results after deletion failed" << endl;
-        return fail;
-    }
-
-    // Insert again
-    for(unsigned i = 0; i <= numOfTuples; i+=10)
-    {
-        key = i; 
-        rid.pageNum = key+1;
-        rid.slotNum = key+2;
-
-        assertInsertEntry(success, indexManager, ixfileHandle, attribute, &key, rid);
-    }
-
-    // Scan to verify the result
-    rc = assertScanVailid(ixfileHandle, attribute, ix_ScanIterator, inRecordNum);
-    if (rc != success){
-        cerr << "Scan inserted results failed" << endl;
-        return fail;
-    }
+    cerr << endl;
+    cerr << "delete count "<< count << " numoftuples"<<inRecordNum<<endl;
+    assert(count == inRecordNum && "deletion within scan failed");
 
     // Close Scan
     assertCloseIterator(success, ix_ScanIterator);
@@ -139,10 +113,10 @@ int main()
 
     RC result = testCase_LargeDataSet(indexFileName, attrAge);
     if (result == success) {
-        cerr << "IX_Test Case 7 - Large DataSet passed" << endl;
+        cerr << "Iteration Deletion passed" << endl;
         return success;
     } else {
-        cerr << "IX_Test Case 7 - Large DataSet failed" << endl;
+        cerr << "Iteration Deletion failed" << endl;
         return fail;
     }
 
