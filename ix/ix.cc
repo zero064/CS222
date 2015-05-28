@@ -430,8 +430,8 @@ TreeOp IndexManager::TraverseTreeInsert(IXFileHandle &ixfileHandle, const Attrib
 		treeop = nexttreeop;
 	}
 	assert( keyValue == keyDesc.keyValue && "keyValue should equal to keyDesc.keyValue ");
-	checkKeyInt(ixfileHandle, attribute, page);
-	checkPageInt(ixfileHandle, page, pageNum,false);
+	//checkKeyInt(ixfileHandle, attribute, page);
+	//checkPageInt(ixfileHandle, page, pageNum,false);
 	return treeop;
 }
 void IndexManager::checkPageInt(IXFileHandle &ixfileHandle, void *page,PageNum pageNum,bool p)
@@ -1578,9 +1578,9 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 	checkKeyInt(ixfileHandle, attribute, page);
 	//if this page is merged, check integrity from leftsibling
 	if(rightMost == 1 && treeop == OP_Merge){
-		checkPageInt(ixfileHandle, leftsibling, nodeDesc.prev,false);
+		//checkPageInt(ixfileHandle, leftsibling, nodeDesc.prev,false);
 	}else{
-		checkPageInt(ixfileHandle, page, pageNum,false);
+	   //checkPageInt(ixfileHandle, page, pageNum,false);
 	}
 	if(nexttreeop == OP_Error){
 		treeop = nexttreeop;
