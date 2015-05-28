@@ -1726,7 +1726,7 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 */
 		else if( result == 0 && ded.overflow != InvalidPage ) {
 			// if it has more than two RIDs, remove the one in the list
-			printf("RID List offset is %d rid.pageNum is %d rid.slotNum is %d numrid %d\n",offset,rid.pageNum,rid.slotNum,ded.numOfRID);
+			//printf("RID List offset is %d rid.pageNum is %d rid.slotNum is %d numrid %d\n",offset,rid.pageNum,rid.slotNum,ded.numOfRID);
 
 			for( int i=0; i<ded.numOfRID; i++){
 

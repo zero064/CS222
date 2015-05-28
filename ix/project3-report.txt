@@ -1,0 +1,10 @@
+Our btree has split, merge and redistribution function. In the process of inserting a data entry, ix manager will examine NonLeaf node to check whether there is enough space in this node for possible insertion brought by the split of Leaf page. Therefore, it will split the unsafe NonLeaf node in advance. We use the similiar mechanism on merge and redistribution function. In the process of deleting a data entry, ix manager will examine NolLeaf node to check whether there is possibility of underflow. If the answer is yes, it will try to redistribute data from sibling node. When there  are not enough key entries in sibling nodes for redistribution, ix manager will merge the node to reclaim the space.
+
+In order to implement the scan and iterator feature, we have to let IX_Iterator become friend of IndexManager so that it can retrieve the information and get the key and rid from B+ tree.
+
+We add bool variable sync to in the iterator and indexmanager to check if the deletion occur during iteration. If the flag is up, we notify the iterator to search the correct key location since the merge/shift case might happen during deletion.
+
+
+
+
+
