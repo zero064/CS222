@@ -163,7 +163,9 @@ class IXFileHandle : public DebugMsg {
 		PageNum findRootPage();
 		RC updateRootPage(PageNum pageNum);
 		RC isReadable();
+		string getFileName();
 	private:
+		string fname;
 		FileHandle fileHandle;
 		RC error;
 
@@ -190,7 +192,7 @@ class IX_ScanIterator {
 				bool highKeyInclusive);
 
 	private:
-		IXFileHandle ixfileHandle;
+		IXFileHandle ixfileHandle,lockedFile;
 		IndexManager *im;
 		Attribute attribute;
 		void *lowKey; bool lowKeyNull , highKeyNull;

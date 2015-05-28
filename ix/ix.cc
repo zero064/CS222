@@ -2299,6 +2299,7 @@ RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
 	im->unsync = false;
 	float INF = INFINITY/2, NINF = -INFINITY/2;
 
+	ixfileHandle.getFileName()
 	if( lowKey == NULL ){
 		this->lowKeyNull = true;
 		this->lowKey = malloc(sizeof(float));
@@ -2386,6 +2387,7 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 	if( im->unsync ){
 	    //assert(false);
 	    // find root first
+	    
 	    PageNum root = ixfileHandle.findRootPage();
 	    rc = ixfileHandle.readPage(root,page);
 	   // Start Tree Traversal if root is non-leaf
@@ -2526,6 +2528,7 @@ RC IXFileHandle::isReadable()
 RC IXFileHandle::initFilePointer(const string &fileName)
 {
 	error = fileHandle.initFilePointer( fileName );
+	fname = fileName;
 	return error;
 }
 
@@ -2663,6 +2666,11 @@ RC IXFileHandle::deletePage(PageNum pageNum)
 	fileHandle.writePage( dir, page );
 	free(page);
 	return SUCCESS;
+}
+
+string IXFileHandle::getFileName()
+{
+    return fname;
 }
 
 RC IXFileHandle::collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount)
