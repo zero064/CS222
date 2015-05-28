@@ -17,7 +17,7 @@ IndexManager::IndexManager()
 {
 
     unsync = false;
-	//	debug = true;
+	debug = true;
 
 }
 
@@ -939,8 +939,9 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 	//store the leftNode and rightNode in currentkeyDesc
 	PageNum temprightNode = 0;
 	PageNum templeftNode =0;
-	
-
+	dprintf("The inserted key\n");
+	if( debug ) printKey(attribute,key);
+				dprintf("\n");
 	//scan to find the desired pointer
 	while(true){
 		memcpy(&currentkeyDesc,(char *) page+offset,sizeof(KeyDesc));
