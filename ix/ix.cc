@@ -636,8 +636,7 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid, void *page, PageNum pageNum, KeyDesc &keyDesc)
 {
     
-	checkPageInt(ixfileHandle, page, pageNum,false);
-
+//	checkPageInt(ixfileHandle, page, pageNum,false);
 	TreeOp operation = OP_None;
 	// retrieve node info
 	NodeDesc nodeDesc;
@@ -646,7 +645,69 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 	// potential split page buffer
 	void *splitPage = malloc(PAGE_SIZE);
 
-	// insert first
+	// if current node size + new dataEntry size > threshold , do split first
+	if( nodeDesc.size + sizeof(DataEntryDesc) + getKeySize(attribute,key) + sizeof(RID) > UpperThreshold ){ 
+		offset = 0; // offset of entry which is going to split to right node
+		operation = OP_Split;
+		// add offset until it passes the half of size
+		while( offset < nodeDesc.size / 2){
+			DataEntryDesc ded;
+			memcpy( &ded, (char*)page+offset, sizeof(DataEntryDesc) );
+			offset += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID);
+		}
+		// allocate new page to insert splitted nodes
+		PageNum freePageID = ixfileHandle.findFreePage();
+		// form a new page, fill up the informatio
+		//printf("%d %d\n",offset, nodeDesc.size/2);
+		//assert( offset > nodeDesc.size/2 && "WTF");
+		memcpy(splitPage, (char*)page+offset, nodeDesc.size - offset );
+		NodeDesc splitNodeDesc;
+		splitNodeDesc.type = Leaf;
+		splitNodeDesc.size = nodeDesc.size - offset;
+		splitNodeDesc.next = nodeDesc.next;
+		splitNodeDesc.prev = pageNum;
+		memcpy( (char*)splitPage+PAGE_SIZE-sizeof(NodeDesc), &splitNodeDesc, sizeof(NodeDesc) );
+		nodeDesc.size = offset;
+		nodeDesc.next = freePageID;
+		memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc), &nodeDesc, sizeof(NodeDesc) );
+		ixfileHandle.writePage(pageNum,page);
+
+		// get First entry key value
+		DataEntryDesc nDed;
+		memcpy( &nDed, (char*)splitPage, sizeof(DataEntryDesc));
+		keyDesc.rightNode = freePageID;
+		keyDesc.leftNode = pageNum;
+		keyDesc.keySize = nDed.keySize;
+		memcpy( keyDesc.keyValue, (char*)splitPage+sizeof(DataEntryDesc), nDed.keySize);
+		ixfileHandle.writePage(freePageID,splitPage);
+
+
+		// if the insertion key is great than the split page's first key
+		// insert it into split page
+		if( keyCompare( attribute, key , keyDesc.keyValue ) >= 0 ){
+		    // copy the spot page 
+		    memcpy(page, splitPage, PAGE_SIZE);	
+		    memcpy( &nodeDesc, (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
+		    pageNum = freePageID;
+		}	
+
+
+		// update right leaf's left node to split page number 
+		// if it's not empty
+		if( splitNodeDesc.next != InvalidPage ){
+		    NodeDesc ntNodeDesc;
+		    ixfileHandle.readPage( splitNodeDesc.next, splitPage);
+		    memcpy( &ntNodeDesc, (char*)splitPage+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc));
+		    ntNodeDesc.prev = freePageID; 
+		    memcpy( (char*)splitPage+PAGE_SIZE-sizeof(NodeDesc), &ntNodeDesc, sizeof(NodeDesc));
+		    ixfileHandle.writePage( splitNodeDesc.next, splitPage);
+		}
+		
+	}
+
+	
+	offset = 0;
+	// insertion
 	while( offset < nodeDesc.size ){
 
 		DataEntryDesc ded;
@@ -658,14 +719,13 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 		// compare the key to find insertion point
 		int result = keyCompare(attribute, ded.keyValue, key); 
 //		if( result == 0 && ded.keySize-4 != *(int*)key ) assert(false);
-//if( (ded.keySize-4) == *(int*)key ) { 
-	//	printf("result %d ",result); printKey(attribute,ded.keyValue); printf(" "); printKey(attribute,key); printf("\n");
-	//	printf("%d %d %d\n",ded.keySize-4,*(int*)key,offset); // }
+		//if( (ded.keySize-4) == *(int*)key ) { 
+		//printf("result %d ",result); printKey(attribute,ded.keyValue); printf(" "); printKey(attribute,key); printf("\n");
+		//printf("%d %d %d\n",ded.keySize-4,*(int*)key,offset); // }
 
 		// key value smaller than rest of the data
 		// insert new key,rid pair right here
 		if( result > 0 ){ 
-//			printf("%d %d\n",*(int*)key,*(int*)ded.keyValue);
 			// use splitpage buffer as temp buffer, copy the rest of the key and rid lists
 			int restDataSize = nodeDesc.size - offset;
 			memcpy( splitPage , (char*)page+offset , restDataSize );
@@ -718,11 +778,9 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 			memcpy( (char*)page+sizeof(DataEntryDesc)+oDed.keySize+oDed.numOfRID*sizeof(RID), &rid, sizeof(RID) );
 			oDed.numOfRID++;
 			memcpy( page, &oDed, sizeof(DataEntryDesc));
-//			printf("%d\n",sizeof(DataEntryDesc)+oDed.keySize+oDed.numOfRID*sizeof(RID));
 			assert( sizeof(DataEntryDesc)+oDed.keySize+oDed.numOfRID*sizeof(RID) < PAGE_SIZE && "overflow page overflowed" );
 			rc = ixfileHandle.writePage( overflowPageNum , page );
 			assert( rc == SUCCESS && "write overflow page failed");
-
 			free(ded.keyValue);
 
 			return operation;
@@ -768,7 +826,12 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 			// update page descriptor
 			nodeDesc.size += sizeof(RID);
 			memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc) , &nodeDesc , sizeof(NodeDesc) );
-//if( *(int*)key == 20 ){ printKey(attribute,key); printf(" %d %d %d %d %d\n", rid.pageNum, ded.numOfRID, pageNum, offset, nodeDesc.size); }
+			/*
+			if( *(int*)key == 20 ){ 
+			    printKey(attribute,key); 
+			    printf(" %d %d %d %d %d\n", rid.pageNum, ded.numOfRID, pageNum, offset, nodeDesc.size); 
+			}
+			*/
 			free(ded.keyValue);
 			insert = true;
 			break;
@@ -794,61 +857,15 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 		nodeDesc.size += sizeof(DataEntryDesc) + nDed.keySize + nDed.numOfRID * sizeof(RID);
 		memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc), &nodeDesc, sizeof(NodeDesc) );
 	}
-
-	// size > threshold , do split
-	if( nodeDesc.size > UpperThreshold ){ 
-		offset = 0; // offset of entry which is going to split to right node
-		operation = OP_Split;
-		// add offset until it passes the half of size
-		while( offset < nodeDesc.size / 2){
-			DataEntryDesc ded;
-			memcpy( &ded, (char*)page+offset, sizeof(DataEntryDesc) );
-			offset += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID);
-		}
-		// allocate new page to insert splitted nodes
-		PageNum freePageID = ixfileHandle.findFreePage();
-		// form a new page, fill up the informatio
-//printf("%d %d\n",offset, nodeDesc.size/2);
-//assert( offset > nodeDesc.size/2 && "WTF");
-		memcpy(splitPage, (char*)page+offset, nodeDesc.size - offset );
-		NodeDesc splitNodeDesc;
-		splitNodeDesc.type = Leaf;
-		splitNodeDesc.size = nodeDesc.size - offset;
-		splitNodeDesc.next = nodeDesc.next;
-		splitNodeDesc.prev = pageNum;
-		memcpy( (char*)splitPage+PAGE_SIZE-sizeof(NodeDesc), &splitNodeDesc, sizeof(NodeDesc) );
-		nodeDesc.size = offset;
-		nodeDesc.next = freePageID;
-		memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc), &nodeDesc, sizeof(NodeDesc) );
-
-		// get First entry key value
-		DataEntryDesc nDed;
-		memcpy( &nDed, (char*)splitPage, sizeof(DataEntryDesc));
-		keyDesc.rightNode = freePageID;
-		keyDesc.leftNode = pageNum;
-		keyDesc.keySize = nDed.keySize;
-		memcpy( keyDesc.keyValue, (char*)splitPage+sizeof(DataEntryDesc), nDed.keySize);
-
-
-
-		ixfileHandle.writePage(freePageID,splitPage);
-		// update right leaf's left node to split page number 
-		// if it's not empty
-		if( splitNodeDesc.next != InvalidPage ){
-		    NodeDesc ntNodeDesc;
-		    ixfileHandle.readPage( splitNodeDesc.next, splitPage);
-		    memcpy( &ntNodeDesc, (char*)splitPage+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc));
-		    ntNodeDesc.prev = freePageID; 
-		    memcpy( (char*)splitPage+PAGE_SIZE-sizeof(NodeDesc), &ntNodeDesc, sizeof(NodeDesc));
-		    ixfileHandle.writePage( splitNodeDesc.next, splitPage);
-		}
-	
-	}
-
+	// not necessarily be the pageNum pointed by non-leaf node
+	// could be the split node num if the new key is inserted
+	// into split page
 	ixfileHandle.writePage(pageNum,page);
 	free(splitPage); 
 	return operation;
 }
+
+
 void IndexManager::FindLastKey(void *page,KeyDesc &keyDesc)
 {
 	NodeDesc nodeDesc;
