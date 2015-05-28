@@ -57,7 +57,7 @@ int testCase_5a(const string &indexFileName, const Attribute &attribute)
 
         inRidPageNumSum += rid.pageNum;
     }
-    
+
     // Test Open Scan
     assertInitalizeScan(success, indexManager, ixfileHandle, attribute, 
             &value, NULL, true, true, ix_ScanIterator);
