@@ -1274,8 +1274,17 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 	ixfileHandle.readPage(currentpageNum,nextpage);
 	memcpy(&nextnodeDesc,(char *)nextpage+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
 	//dprintf("Copycat1 deleting or modifying the key\n");
+	DataEntryDesc trykeyDesc;
+	void *trykey = malloc(PAGE_SIZE);
+
 
 	if(nextnodeDesc.type == Leaf){
+		memcpy(&trykeyDesc,nextpage,sizeof(DataEntryDesc));
+		dprintf("trykeyDesc.keySize is %d\n",trykeyDesc.keySize);
+		memcpy(trykey,(char *)nextpage+sizeof(DataEntryDesc),trykeyDesc.keySize);
+		dprintf("the first key in nextpage\n");
+		if(debug) printKey(attribute,trykey);
+		dprintf("\n");
 		dprintf("nextnodeDesc.type == Leaf\n");
 		nexttreeop = deleteFromLeaf(ixfileHandle,attribute,key,rid,nextpage,currentpageNum, currentkeyDesc, nextRightmost);
 
@@ -1583,6 +1592,7 @@ TreeOp IndexManager::TraverseTreeDelete(IXFileHandle &ixfileHandle, const Attrib
 	if(nexttreeop == OP_Error){
 		treeop = nexttreeop;
 	}
+	free(trykey);
 	free(deletepage);
 	free(extrapage);
 	free(leftsibling);
