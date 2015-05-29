@@ -786,6 +786,7 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 			rc = ixfileHandle.writePage( overflowPageNum , page );
 			assert( rc == SUCCESS && "write overflow page failed");
 			free(ded.keyValue);
+			free(splitPage); 
 
 			return operation;
 		}
@@ -813,6 +814,7 @@ TreeOp IndexManager::insertToLeaf(IXFileHandle &ixfileHandle, const Attribute &a
 
 			free(overflowPage);
 			free(ded.keyValue);
+			free(splitPage); 
 			return operation;
 		}
 
