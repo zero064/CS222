@@ -199,7 +199,7 @@ class IX_ScanIterator {
 		void *page, *overflowPage;
 		bool overflow;
 		int offsetToKey, offsetToRID, overflowRID;
-		PageNum currentOverflowPage;
+		PageNum currentOverflowPage, pageNum;
 
 };
 
