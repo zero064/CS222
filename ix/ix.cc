@@ -501,8 +501,8 @@ void IndexManager::checkPageInt(IXFileHandle &ixfileHandle, void *page,PageNum p
 void IndexManager::checkKeyInt(IXFileHandle &ixfileHandle, const Attribute &attribute, void *page)
 {
 	KeyDesc currentkeyDesc;
-	currentkeyDesc.keyValue = malloc(maxvarchar);
-	void * currentkeyValue = currentkeyDesc.keyValue;
+
+	void * currentkeyValue = malloc(maxvarchar);
 
 	//initialize rightnode
 	PageNum rightnode;
