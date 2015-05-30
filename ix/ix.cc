@@ -17,7 +17,7 @@ IndexManager::IndexManager()
 {
 
     unsync = false;
-	debug = true;
+	//debug = true;
 
 }
 
@@ -511,6 +511,7 @@ void IndexManager::checkKeyInt(IXFileHandle &ixfileHandle, const Attribute &attr
 	memcpy(&nodeDesc,(char *)page+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
 	if(nodeDesc.size == 0){
 		dprintf("this page is empty page\n");
+		free(currentkeyValue);
 		return;
 	}
 	while(true){
