@@ -501,8 +501,8 @@ void IndexManager::checkPageInt(IXFileHandle &ixfileHandle, void *page,PageNum p
 void IndexManager::checkKeyInt(IXFileHandle &ixfileHandle, const Attribute &attribute, void *page)
 {
 	KeyDesc currentkeyDesc;
-	currentkeyDesc.keyValue = malloc(maxvarchar);
-	void * currentkeyValue = currentkeyDesc.keyValue;
+
+	void * currentkeyValue = malloc(maxvarchar);
 
 	//initialize rightnode
 	PageNum rightnode;
@@ -515,6 +515,8 @@ void IndexManager::checkKeyInt(IXFileHandle &ixfileHandle, const Attribute &attr
 	memcpy(&nodeDesc,(char *)page+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
 	if(nodeDesc.size == 0){
 		dprintf("this page is empty page\n");
+		free(currentkeyValue);
+
 		return;
 	}
 	while(true){
