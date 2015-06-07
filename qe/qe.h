@@ -2,7 +2,7 @@
 #define _qe_h_
 
 #include <vector>
-
+#include <queue>
 #include "../rbf/rbfm.h"
 #include "../rm/rm.h"
 #include "../ix/ix.h"
@@ -40,6 +40,11 @@ class Iterator {
         virtual RC getNextTuple(void *data) = 0;
         virtual void getAttributes(vector<Attribute> &attrs) const = 0;
         virtual ~Iterator() {};
+    protected:
+	int getAttrSize(Attribute attr, void *data);
+	AttrType getAttrValue(vector<Attribute> attrs, string attr, void *data, void *value);
+	bool compare(CompOp op, AttrType type, void *v1, void *v2);
+	RC join( vector<Attribute> lAttrs, void *ldata, vector<Attribute>rAttrs, void *rdata);
 };
 
 
@@ -205,16 +210,20 @@ class Filter : public Iterator {
 };
 
 
-class Project : public Iterator {
+class Project : public Iterator , public DebugMsg {
     // Projection operator
     public:
         Project(Iterator *input,                    // Iterator of input R
-              const vector<string> &attrNames){};   // vector containing attribute names
-        ~Project(){};
+              const vector<string> &attrNames);    //{};   // vector containing attribute names
+        ~Project(); //{};
 
-        RC getNextTuple(void *data) {return QE_EOF;};
+        RC getNextTuple(void *data); // {return QE_EOF;};
         // For attribute in vector<Attribute>, name it as rel.attr
-        void getAttributes(vector<Attribute> &attrs) const{};
+        void getAttributes(vector<Attribute> &attrs) const; //{};
+    private:
+	Iterator *input;
+	vector<string> attrNames;
+	vector<Attribute> attrs;
 };
 
 // Optional for the undergraduate solo teams. 5 extra-credit points
@@ -225,12 +234,21 @@ class BNLJoin : public Iterator {
                TableScan *rightIn,           // TableScan Iterator of input S
                const Condition &condition,   // Join condition
                const unsigned numRecords     // # of records can be loaded into memory, i.e., memory block size (decided by the optimizer)
-        ){};
-        ~BNLJoin(){};
+        ); //{};
+        ~BNLJoin(); //{};
 
-        RC getNextTuple(void *data){return QE_EOF;};
+        RC getNextTuple(void *data); // {return QE_EOF;};
         // For attribute in vector<Attribute>, name it as rel.attr
-        void getAttributes(vector<Attribute> &attrs) const{};
+        void getAttributes(vector<Attribute> &attrs) const; // {};
+    private:
+	RC updateBlock();
+	Iterator *leftIn;
+	TableScan *rightIn;
+	Condition condition;
+	unsigned numRecords;
+	vector<void*> buffer;
+	vector<Attribute> lAttrs,rAttrs;
+	queue<void*> joinedQueue;
 };
 
 

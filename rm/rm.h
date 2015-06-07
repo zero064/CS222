@@ -32,6 +32,16 @@ public:
   RC close() { return rbfm_ScanIterator.close(); };
 };
 
+class RM_IndexScanIterator : public DebugMsg {
+    public:
+	RM_IndexScanIterator(){};   // Constructor
+	~RM_IndexScanIterator(){};  // Destructor
+
+    // "key" follows the same format as in IndexManager::insertEntry()
+	RC getNextEntry(RID &rid, void *key){};	    // Get next matching entry
+	RC close(){};			    // Terminate index scan
+};
+
 
 // Relation Manager
 class RelationManager : public DebugMsg
@@ -56,6 +66,22 @@ public:
   RC updateTuple(const string &tableName, const void *data, const RID &rid);
 
   RC readTuple(const string &tableName, const RID &rid, void *data);
+
+  // RM extension for ix 
+  RC createIndex(const string &tableName, const string &attributeName){};
+
+  RC destroyIndex(const string &tableName, const string &attributeName){};
+
+  // indexScan returns an iterator to allow the caller to go through qualified entries in index
+  RC indexScan(const string &tableName,
+                        const string &attributeName,
+                        const void *lowKey,
+                        const void *highKey,
+                        bool lowKeyInclusive,
+                        bool highKeyInclusive,
+                        RM_IndexScanIterator &rm_IndexScanIterator
+       ){};
+
 
   // mainly for debugging
   // Print a tuple that is passed to this utility method.
