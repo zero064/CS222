@@ -17,6 +17,7 @@ RecordBasedFileManager* RecordBasedFileManager::instance()
 RecordBasedFileManager::RecordBasedFileManager()
 {
     pagedFileManager = PagedFileManager::instance();
+    debug = false;
 }
 
 RecordBasedFileManager::~RecordBasedFileManager()
@@ -177,7 +178,7 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
     memcpy( &pageDesc, (char*)page+PAGE_SIZE-sizeof(PageDesc), sizeof(PageDesc) );
 
     if( rOffset.offset == DeletedSlotMark ){
-	printf("assert \n page %d slot %d listsize %d\n",rid.pageNum,rid.slotNum,pageDesc.numOfSlot);
+	printf("yo assert \n page %d slot %d listsize %d\n",rid.pageNum,rid.slotNum,pageDesc.numOfSlot);
 	assert( false && "readRecord failed dude" ); 
 	return FAILURE;
     }
@@ -407,7 +408,6 @@ size_t RecordBasedFileManager::writeDataToBuffer(const vector<Attribute> &record
     	}
     }
 
-
     // get null indicator's size 
     //int nullFieldsIndicatorActualSize = ceil((double) recordDescriptor.size() / CHAR_BIT);
     int nullFieldsIndicatorActualSize = ceil((double) nonNull / CHAR_BIT);
@@ -435,24 +435,8 @@ size_t RecordBasedFileManager::writeDataToBuffer(const vector<Attribute> &record
     	AttrType type = attribute.type;
     	if(attribute.length==0){
     	// if null indicator has more than 1 byte , annoying ~"~
-
-
     		fieldOffsetDescriptor[i] = PAGE_SIZE;
-    		//int formattedOffset = descriptorLength + offset - nullFieldsIndicatorActualSize;
-    		//printf("i %d f offset %d o offset %d \n",fieldOffset+i, formattedOffset , offset );
-    		//descriptor[fieldOffset+i] = (unsigned char)formattedOffset;  // assign each field's offet to descriptor
-    		/*if( type == TypeVarChar ){
-    			int len;
-    			memcpy( &len, (char*)data+offset, sizeof(int));
-    			offset += len + sizeof(int);
-    			//printf("string offset %i %i\n",len,offset);
-    		}else if(type == TypeReal){
-    			offset += sizeof(float);
-    		}else if(type == TypeInt){
-    			offset += sizeof(int);
-    		}*/
     	}else{
-
         	// if null indicator has more than 1 byte , annoying ~"~
         		if( ((unsigned char*)nullFieldsIndicator)[ (0+k) / CHAR_BIT ] & (1 << (7-(k%8)) ) ){
         			dprintf("null\n");
@@ -462,9 +446,6 @@ size_t RecordBasedFileManager::writeDataToBuffer(const vector<Attribute> &record
         		}
 
         		fieldOffsetDescriptor[i] = descriptorLength + offset;
-        		//int formattedOffset = descriptorLength + offset - nullFieldsIndicatorActualSize;
-        		//printf("i %d f offset %d o offset %d \n",fieldOffset+i, formattedOffset , offset );
-        		//descriptor[fieldOffset+i] = (unsigned char)formattedOffset;  // assign each field's offet to descriptor
         		if( type == TypeVarChar ){
         			int len;
         			memcpy( &len, (char*)data+offset, sizeof(int));
@@ -500,6 +481,12 @@ size_t RecordBasedFileManager::writeDataToBuffer(const vector<Attribute> &record
     readDataFromBuffer(recordDescriptor,test,formattedData);
     printRecord(recordDescriptor,test); 
     free(test);
+
+
+    char t;
+    memcpy( &t , (char*)formattedData + descriptorLength, 1 ); 
+    if( t == 20 ) printf("%d\n",t);
+
 */
     free(nullFieldsIndicator);
     free(fieldOffsetDescriptor);
@@ -878,8 +865,9 @@ RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<At
 	    char nullIndicator;
 	    memcpy( &nullIndicator, (char*)returnedData+descriptorLength+nullIndicatorOffet , sizeof(char));
 	    if( nullIndicator & (1 << (7-(i%8)))  ) {
-		data = malloc(1);
-		memcpy( data , &nullIndicator, sizeof(char) );
+		unsigned char null = 128;
+		memcpy( data , &null, sizeof(unsigned char) );
+		//printf("NULL %d\n",data);
 		free(returnedData);
 		return SUCCESS;
 	    }
@@ -1055,8 +1043,6 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 	}
 
 
-
-
 	for( int i=0 ; i<recordDescriptor.size(); i++ ){
 	    // get the condtional attribute index 
 	    if( conditionAttribute.compare( recordDescriptor[i].name ) == 0 || compOp == NO_OP ){
@@ -1064,7 +1050,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 		int nullIndicatorOffet = ( i / CHAR_BIT );
 		char nullIndicator;
 		memcpy( &nullIndicator, (char*)returnedData+descriptorLength+nullIndicatorOffet , sizeof(char));
-		
+
 		// if it's null & it's not NO_OP
 		if( nullIndicator & (1 << (7-(i%8))) && compOp != NO_OP) {
 		    printf("1231231231\n");
@@ -1083,8 +1069,12 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 		int t_len2 = 0;
 		int cmpValue = 0; 
 		if( type == TypeVarChar ){
-		    memcpy( &t_len, (char*)value, sizeof(int) );
-		    memcpy( &t_len2, (char*)returnedData+offset, sizeof(int) );
+		    memcpy( &t_len, (char*)value, sizeof(int) ); // target
+		    memcpy( &t_len2, (char*)returnedData+offset, sizeof(int) ); // our data
+		    string sa((char*)value+4,t_len); 
+		    string sb((char*)returnedData+offset+4,t_len2);
+		    cmpValue = sb.compare(sa);
+/*
 		    if( t_len == t_len2 ){
 			//printf("t_len is %d\n",t_len);
 			cmpValue = memcmp( (char*)value+sizeof(int), (char*)returnedData+offset+sizeof(int), t_len);
@@ -1094,6 +1084,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 		    }else{
 			cmpValue = -1;
 		    }
+*/
 		    //printf("string from data %s\n\n",str);
 
 		}else if(type == TypeReal){

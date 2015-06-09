@@ -19,7 +19,7 @@ RC TEST_RM_5(const string &tableName, const int nameLength, const string &name, 
     vector<Attribute> attrs;
     RC rc = rm->getAttributes(tableName, attrs);
     assert(rc == success && "RelationManager::getAttributes() should not fail.");
-    
+
     int nullAttributesIndicatorActualSize = getActualByteForNullsIndicator(attrs.size());
     unsigned char *nullsIndicator = (unsigned char *) malloc(nullAttributesIndicatorActualSize);
 	memset(nullsIndicator, 0, nullAttributesIndicatorActualSize);
