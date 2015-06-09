@@ -1,7 +1,7 @@
 #ifndef _pfm_h_
 #define _pfm_h_
     
-//#define NDEBUG 
+#define NDEBUG 
 
 #include <string>
 #include <climits>

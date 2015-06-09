@@ -290,7 +290,7 @@ RelationManager* RelationManager::instance()
 
 RelationManager::RelationManager()
 {  
-//    debug = true;
+    debug = false;
     rbfm = RecordBasedFileManager::instance();
 }
 
