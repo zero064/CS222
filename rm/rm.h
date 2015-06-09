@@ -15,6 +15,7 @@
 #include <bitset>
 
 #include "../rbf/rbfm.h"
+#include "../ix/ix.h"
 
 using namespace std;
 # define TABLE_SIZE 4096
@@ -36,10 +37,11 @@ class RM_IndexScanIterator : public DebugMsg {
     public:
 	RM_IndexScanIterator(){};   // Constructor
 	~RM_IndexScanIterator(){};  // Destructor
+	IX_ScanIterator ix_ScanIterator;
 
     // "key" follows the same format as in IndexManager::insertEntry()
-	RC getNextEntry(RID &rid, void *key){};	    // Get next matching entry
-	RC close(){};			    // Terminate index scan
+	RC getNextEntry(RID &rid, void *key){return ix_ScanIterator.getNextEntry(rid,key);};	    // Get next matching entry
+	RC close(){return ix_ScanIterator.close();};			    // Terminate index scan
 };
 
 
@@ -68,9 +70,9 @@ public:
   RC readTuple(const string &tableName, const RID &rid, void *data);
 
   // RM extension for ix 
-  RC createIndex(const string &tableName, const string &attributeName){};
+  RC createIndex(const string &tableName, const string &attributeName);
 
-  RC destroyIndex(const string &tableName, const string &attributeName){};
+  RC destroyIndex(const string &tableName, const string &attributeName);
 
   // indexScan returns an iterator to allow the caller to go through qualified entries in index
   RC indexScan(const string &tableName,
@@ -80,7 +82,7 @@ public:
                         bool lowKeyInclusive,
                         bool highKeyInclusive,
                         RM_IndexScanIterator &rm_IndexScanIterator
-       ){};
+       );
 
 
   // mainly for debugging
@@ -120,7 +122,7 @@ private:
   int IsSystemTable(const string &tableName);
   RC UpdateColumns(int tableid,vector<Attribute> attributes);
   RC CreateVarChar(void *data,const string &str);
-
+  RC CreateIndexesRecord(void *data,const string tablename,const string columnname);
 
 
   RC PrepareCatalogDescriptor(string tablename,vector<Attribute> &attributes);

@@ -132,6 +132,36 @@ RC RelationManager::CreateTablesRecord(void *data,int tableid,const string table
 	return 0;
 
 }
+RC RelationManager::CreateIndexesRecord(void *data,const string tablename,const string columnname){
+	int offset=0;
+	int tablesize = tablename.size();
+	int columnsize = columnname.size();
+	char nullind=0;
+
+	//copy null indicator
+	memcpy((char *)data+offset,&nullind,1);
+	offset=offset+1;
+
+	//copy table name
+	memcpy((char *)data+offset,&tablesize,sizeof(int));
+	offset=offset+sizeof(int);
+
+	memcpy((char *)data+offset,tablename.c_str(),tablesize);
+	offset=offset+tablesize;
+
+	//copy file name
+	memcpy((char *)data+offset,&columnsize,sizeof(int));
+	offset=offset+sizeof(int);
+
+	memcpy((char *)data+offset,columnname.c_str(),columnsize);
+	offset=offset+columnsize;
+
+
+	dprintf("\ncreate Indexes record\noffset is %d\n",offset);
+
+	return 0;
+
+}
 
 RC RelationManager::CreateColumnsRecord(void * data,int tableid, Attribute attr, int position, int nullflag){
 	int offset=0;
@@ -375,13 +405,248 @@ RC RelationManager::deleteCatalog()
     return -1;
 }
 
-RC createIndex(const string &tableName, const string &attributeName)
+RC RelationManager::createIndex(const string &tableName, const string &attributeName)
 {
+	RM_ScanIterator rm_ScanIterator;
+	IndexManager *indexManager=IndexManager::instance();
+	IXFileHandle ixfileHandle;
+	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
+	FileHandle fileHandle;
+	RID rid;
+	int tableid = -1;
+	char *VarChardata=(char *)malloc(PAGE_SIZE);
+	char *data=(char *)malloc(PAGE_SIZE);
+	vector<string> attrname;
+	attrname.push_back(attributeName);
+	int len;
+	vector<Attribute> attrs;
+	vector<Attribute>  indexattrs;
+	bool validattr = false;
+	char nullIndicator;
+	Attribute attr;
+	void *key = malloc(PAGE_SIZE);
+	string indexName = tableName;
+	//get recordDescriptor for this table
+	getAttributes(tableName,attrs);
+	//get recordDescriptor for Indexes
+	PrepareCatalogDescriptor("Indexes", indexattrs);
 
+
+	//check whether attribute exist
+	for(int i = 0;i < attrs.size();i++){
+		if(attributeName.compare(attrs[i].name) == 0 && attrs[i].length != 0){
+			//store the attribute information
+			attr = attrs[i];
+			validattr = true;
+			break;
+		}
+	}
+	if(!validattr){
+		dprintf("null attribute name");
+		return -1;
+	}
+
+
+	//create index name
+	indexName += ".";
+	indexName += attr.name;
+	dprintf("indexName is %s\n",indexName.c_str());
+	//create index file
+	if(indexManager->createFile(indexName) == 0){
+		//open index file
+		indexManager->openFile(indexName,ixfileHandle);
+	}else{
+		dprintf("Fail to create file");
+		return -1;
+	}
+
+	//insert record to Indexes
+	rbfm->openFile("Indexes",fileHandle);
+	CreateIndexesRecord(VarChardata,tableName,attr.name);
+	//debug, check whether record is valid
+	if(debug) rbfm->printRecord(indexattrs,VarChardata);
+	rbfm->insertRecord(fileHandle,indexattrs,VarChardata,rid);
+	rbfm->closeFile(fileHandle);
+
+
+	//scan tablename, insert index for every record
+	if( scan(tableName,"",NO_OP,NULL,attrname,rm_ScanIterator) == 0 ){
+		while(rm_ScanIterator.getNextTuple(rid,data)!=RM_EOF){
+			//if null indicator is not 1, insert index
+			memcpy(&nullIndicator,data,1);
+			if(nullIndicator & (1 << 7)){
+
+			}else{
+				//!!!! skip null indicator
+				switch( attr.type ){
+				    case TypeInt:
+				    	memcpy(key,(char *)data+1,sizeof(int));
+						break;
+				    case TypeReal:
+				    	memcpy(key,(char *)data+1,sizeof(float));
+				    	break;
+				    case TypeVarChar:
+				    	memcpy(&len,(char *)data+1,sizeof(int));
+				    	dprintf("len is %d\n",len);
+				    	memcpy(key,(char *)data+1,sizeof(int)+len);
+				    	break;
+				    default:
+				    	dprintf("Invalid attribute type");
+				}
+				indexManager->insertEntry(ixfileHandle,attr,key,rid);
+			}
+		}
+		rm_ScanIterator.close();
+		//printBtree
+		if(debug) indexManager->printBtree(ixfileHandle,attr);
+		//close indexfile
+		indexManager->closeFile(ixfileHandle);
+
+
+
+		//gettable id for tablename
+		free(key);
+		free(VarChardata);
+		free(data);
+		return 0;
+	}
+	free(key);
+	free(VarChardata);
+	free(data);
+	dprintf("In createIndex\nFail to scan\n");
+	return -1;
 }
 
-RC destroyIndex(const string &tableName, const string &attributeName)
+RC RelationManager::destroyIndex(const string &tableName, const string &attributeName)
 {
+	RM_ScanIterator rm_ScanIterator_delete;
+	IndexManager *indexManager=IndexManager::instance();
+	IXFileHandle ixfileHandle;
+	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
+	FileHandle fileHandle;
+	RID rid;
+	int tableid = -1;
+	char *data=(char *)malloc(PAGE_SIZE);
+	void *VarChardata = malloc(PAGE_SIZE);
+	vector<string> attrname;
+	attrname.push_back("column-name");
+	vector<Attribute> attrs;
+	vector<Attribute>  indexattrs;
+	bool validattr = false;
+	Attribute attr;
+	string targetstring;
+	string indexName = tableName;
+	//get recordDescriptor for this table
+	getAttributes(tableName,attrs);
+	//get recordDescriptor for Indexes
+	PrepareCatalogDescriptor("Indexes", indexattrs);
+
+
+	//check whether attribute exist
+	for(int i = 0;i < attrs.size();i++){
+		if(attributeName.compare(attrs[i].name) == 0 && attrs[i].length != 0){
+			//store the attribute information
+			attr = attrs[i];
+			validattr = true;
+			break;
+		}
+	}
+	if(!validattr){
+		dprintf("null attribute name");
+		return -1;
+	}
+
+
+	//create index name
+	indexName += ".";
+	indexName += attr.name;
+	dprintf("indexName is %s\n",indexName.c_str());
+	//destroy index file
+	if(indexManager->destroyFile(indexName) == 0){
+
+	}else{
+		dprintf("Fail to destroy file");
+		return -1;
+	}
+
+	//delelet record from Indexes
+	rbfm->openFile("Indexes",fileHandle);
+	//create VarChar
+	CreateVarChar(VarChardata,tableName);
+	//scan for to-be-deleted record
+	if( scan("Indexes","table-name",EQ_OP,VarChardata,attrname,rm_ScanIterator_delete) == 0 ){
+		while(rm_ScanIterator_delete.getNextTuple(rid,data)!=RM_EOF){
+			VarCharToString((char *)data+1,targetstring);
+			dprintf("targetstring is %s\n",targetstring.c_str());
+			if(attributeName.compare(targetstring) == 0){
+				break;
+			}
+		}
+	}
+	rm_ScanIterator_delete.close();
+	//delete record
+	if(rbfm->deleteRecord(fileHandle,indexattrs,rid)!=0){
+		dprintf("Fail to delete record in destroyIndexes\n");
+		return -1;
+	}
+	rbfm->closeFile(fileHandle);
+
+		//free allocated block
+		free(data);
+		free(VarChardata);
+		return 0;
+
+}
+RC RelationManager::indexScan(const string &tableName,
+                        const string &attributeName,
+                        const void *lowKey,
+                        const void *highKey,
+                        bool lowKeyInclusive,
+                        bool highKeyInclusive,
+                        RM_IndexScanIterator &rm_IndexScanIterator
+       ){
+	IndexManager *indexManager=IndexManager::instance();
+	IXFileHandle ixfileHandle;
+	vector<Attribute> attrs;
+	string indexName = tableName;
+	//get recordDescriptor for this table
+	getAttributes(tableName,attrs);
+	bool validattr = false;
+	Attribute attr;
+	//check whether attribute exist
+	for(int i = 0;i < attrs.size();i++){
+		if(attributeName.compare(attrs[i].name) == 0 && attrs[i].length != 0){
+			//store the attribute information
+			attr = attrs[i];
+			validattr = true;
+			break;
+		}
+	}
+	if(!validattr){
+		dprintf("null attribute name");
+		return -1;
+	}
+	//create index name
+	indexName += ".";
+	indexName += attr.name;
+	dprintf("indexName is %s\n",indexName.c_str());
+	//open index file
+	if(indexManager->openFile(indexName,ixfileHandle) == 0){
+
+	}else{
+		dprintf("in indexscan\nFail to open indexfile file\n");
+		return -1;
+	}
+
+
+	//pass parameter to indexManager's scan
+
+	if(indexManager->scan(ixfileHandle, attr, lowKey, highKey, lowKeyInclusive, highKeyInclusive,rm_IndexScanIterator.ix_ScanIterator) == 0){
+		dprintf("sucessfully run indexscan\n");
+		return 0;
+	}
+	dprintf("fail to run indexscan\n");
+	return -1;
 
 }
 RC RelationManager::createTable(const string &tableName, const vector<Attribute> &attrs)
