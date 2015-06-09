@@ -273,8 +273,8 @@ GHJoin::GHJoin( Iterator *leftIn, Iterator *rightIn, const Condition &condition,
     RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
     this->condition = condition; 
     this->numPartitions = numPartitions;
-    this->leftIn = leftIn;
-    this->rightIn = rightIn;
+//    this->leftIn = leftIn;
+//    this->rightIn = rightIn;
 
 //    vector<FileHandle> leftPart;
     for( int i=0; i<numPartitions; i++){
