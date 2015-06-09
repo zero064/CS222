@@ -274,12 +274,23 @@ class GHJoin : public Iterator {
             Iterator *rightIn,               // Iterator of input S
             const Condition &condition,      // Join condition (CompOp is always EQ)
             const unsigned numPartitions     // # of partitions for each relation (decided by the optimizer)
-      ){};
-      ~GHJoin(){};
+      );//{};
+      ~GHJoin();//{};
 
-      RC getNextTuple(void *data){return QE_EOF;};
+      RC getNextTuple(void *data);//{return QE_EOF;};
       // For attribute in vector<Attribute>, name it as rel.attr
-      void getAttributes(vector<Attribute> &attrs) const{};
+      void getAttributes(vector<Attribute> &attrs) const;//{};
+    
+    private:
+	Condition condition;
+	vector<FileHandle> leftPart,rightPart;
+	vector<Attribute> lAttrs,rAttrs;
+	vector<string> lAttrsName,rAttrsName;
+	vector<void*> lBuffer,rBuffer;
+	int getHash( void *value, AttrType type , int numPartitions );
+	RC getPartition();
+	RBFM_ScanIterator lpt, rpt;
+	int partition,numPartitions;
 };
 
 class Aggregate : public Iterator {

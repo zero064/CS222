@@ -265,3 +265,158 @@ void BNLJoin::getAttributes(vector<Attribute> &attrs) const
     attrs.insert(attrs.begin(), left.begin(), left.end() );
     attrs.insert(attrs.end(), right.begin(),left.end() );
 }
+
+
+
+GHJoin::GHJoin( Iterator *leftIn, Iterator *rightIn, const Condition &condition,const unsigned numPartitions)
+{
+    RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
+    this->condition = condition; 
+    this->numPartitions = numPartitions;
+    this->leftIn = leftIn;
+    this->rightIn = rightIn;
+
+//    vector<FileHandle> leftPart;
+    for( int i=0; i<numPartitions; i++){
+	FileHandle fileHandle;
+	string tableName = "left_join"+('0'+i);
+	rbfm->createFile(tableName);
+	rbfm->openFile(tableName,fileHandle);
+	leftPart.push_back(fileHandle);
+    }
+//    vector<FileHandle> rightPart;
+    for( int i=0; i<numPartitions; i++){
+	FileHandle fileHandle;
+	string tableName = "right_join"+('0'+i);
+	rbfm->createFile(tableName);
+	rbfm->openFile(tableName,fileHandle);
+	rightPart.push_back(fileHandle);
+    }
+
+    // Parti cion~~~
+    void *data = malloc(2000);
+    void *value = malloc(300);
+
+    leftIn->getAttributes(lAttrs);
+    for(int i=0; i<lAttrs.size(); i++){
+	lAttrsName.push_back( lAttrs[i].name );
+    }
+    while( leftIn->getNextTuple( data ) != QE_EOF ){
+	AttrType type = getAttrValue( lAttrs, condition.lhsAttr, data , value );
+	int hashNum = getHash( value , type , numPartitions );
+	RID rid;
+	rbfm->insertRecord( leftPart[hashNum], lAttrs, data, rid);
+    } 
+    
+    rightIn->getAttributes(rAttrs);
+    for(int i=0; i<rAttrs.size(); i++){
+	rAttrsName.push_back( rAttrs[i].name );
+    }
+    while( rightIn->getNextTuple( data ) != QE_EOF ){
+	AttrType type = getAttrValue( rAttrs, condition.rhsAttr, data , value );
+	int hashNum = getHash( value , type , numPartitions );
+	RID rid;
+	rbfm->insertRecord( rightPart[hashNum], rAttrs, data, rid);
+    } 
+
+    partition = 0;
+    free(data);
+    free(value);
+}
+
+RC GHJoin::getNextTuple( void *data )
+{
+    RID rid;
+    void *tuple = malloc( 2000 );
+    void *value = malloc( 300 );
+    while( rpt.getNextRecord( rid, tuple ) != RBFM_EOF ){
+	AttrType type = getAttrValue( rAttrs, condition.rhsAttr, tuple, value );
+	for( int i=0; i<lBuffer.size(); i++){
+	    if( compare( condition.op , type , lBuffer[i], value ) ){
+		join( lAttrs, lBuffer[i], rAttrs, tuple );
+		memcpy( data , lBuffer[i], 2000 );
+		free(tuple);
+		free(value);
+		return SUCCESS;
+	    }
+	}
+
+    }
+    
+    if( getPartition() == QE_EOF ){
+	return QE_EOF;
+    }
+    getNextTuple( data );
+}
+
+RC GHJoin::getPartition()
+{
+    if( partition >= numPartitions ){
+	return QE_EOF;
+    }
+    // free all memeory
+    for( int i=0; i<lBuffer.size(); i++){
+	free( lBuffer[i] );
+    }
+    lBuffer.clear();
+    RC rc;
+    RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
+    rc = rbfm->scan(leftPart[partition], lAttrs, "", NO_OP, NULL, lAttrsName, lpt); 
+    assert( rc == SUCCESS );
+    // Load all tuples in partition into memory
+    RID rid;
+    void *tuple = malloc( 2000 );
+    while( lpt.getNextRecord( rid , tuple ) != RBFM_EOF ){
+	void *temp = malloc( 2000 );
+	memcpy( temp , tuple , 2000 );
+	lBuffer.push_back(temp);
+    }
+    lpt.close();
+
+    rc = rbfm->scan(rightPart[partition], rAttrs, "", NO_OP, NULL, rAttrsName, rpt); 
+    assert( rc == SUCCESS );
+    partition++;    
+}
+
+GHJoin::~GHJoin()
+{
+    RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
+    int numPartitions = leftPart.size();
+    for( int i=0; i<numPartitions; i++){
+	rbfm->closeFile(leftPart[i]);
+	rbfm->closeFile(rightPart[i]);
+	string lTableName = "left_join"+('0'+i);
+	string rTableName = "right_join"+('0'+i);
+	rbfm->destroyFile(lTableName);
+	rbfm->destroyFile(rTableName);
+    }
+}
+
+int GHJoin::getHash( void *value, AttrType type , int numPartitions )
+{
+
+    switch( type ){
+	case TypeInt:
+	    int a;
+	    memcpy( &a , value , sizeof(int));
+	    return a%numPartitions;
+	case TypeReal:
+	    float b;
+	    memcpy( &b , value , sizeof(int));
+	    return (int)b%numPartitions;
+	case TypeVarChar:
+	    char c;
+	    memcpy( &c , (char*)value+sizeof(int), sizeof(char));
+	    return c%numPartitions;
+    }
+}
+
+
+void GHJoin::getAttributes(vector<Attribute> &attrs) const
+{
+//    vector<Attribute> left,right;
+ //   leftIn->getAttributes(left);
+  //  rightIn->getAttributes(right);
+    attrs.insert(attrs.begin(), lAttrs.begin(), lAttrs.end() );
+    attrs.insert(attrs.end(), rAttrs.begin(), rAttrs.end() );
+}
