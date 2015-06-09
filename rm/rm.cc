@@ -5,6 +5,7 @@
 RC RelationManager::PrepareCatalogDescriptor(string tablename,vector<Attribute> &attributes){
 	string tables="Tables";
 	string columns="Columns";
+	string indexes = "Indexes";
 	Attribute attr;
 
 	if(tables.compare(tablename)==0){
@@ -74,8 +75,23 @@ RC RelationManager::PrepareCatalogDescriptor(string tablename,vector<Attribute> 
 
 
 		return 0;
-	}
-	else{
+	}else if(indexes.compare(tablename) == 0){
+		//create descriptor for Indexes
+		//index's table
+		attr.name="table-name";
+		attr.type=TypeVarChar;
+		attr.length=50;
+		attr.position=1;
+		attributes.push_back(attr);
+		//index's column
+		attr.name="column-name";
+		attr.type=TypeVarChar;
+		attr.length=50;
+		attr.position=2;
+		attributes.push_back(attr);
+
+		return 0;
+	}else{
 		dprintf("Error! PrepareCatalogDescriptor can only be used to get Catalog's record descriptor\n");
 		return -1;
 	}
@@ -286,6 +302,8 @@ RC RelationManager::createCatalog()
 {
 	vector<Attribute> tablesdescriptor;
 	vector<Attribute> columnsdescriptor;
+	vector<Attribute> indexesdescriptor;
+
 
 	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
 	FileHandle table_filehandle;
@@ -311,19 +329,31 @@ RC RelationManager::createCatalog()
 		CreateTablesRecord(data,tableid,"Columns",systemtable);
 		rc = rbfm->insertRecord(table_filehandle,tablesdescriptor,data,rid);
 		assert( rc == 0 && "insert table should not fail");
-		// close table file
-		rbfm->closeFile(table_filehandle);
 
+		//put the information about Indexed in Tables
+		tableid = 3;
+		CreateTablesRecord(data,tableid,"Indexes",systemtable);
+		rc = rbfm->insertRecord(table_filehandle,tablesdescriptor,data,rid);
+		assert( rc == 0 && "insert table should not fail");
+
+		rbfm->closeFile(table_filehandle);
+		// close table file
 
 		//create Columns
 		if((rbfm->createFile("Columns"))==0){
 			UpdateColumns(1,tablesdescriptor);
 			PrepareCatalogDescriptor("Columns",columnsdescriptor);
-			UpdateColumns(tableid,columnsdescriptor);
-
+			UpdateColumns(2,columnsdescriptor);
+			//put the information about Indexes in Columns
+			PrepareCatalogDescriptor("Indexes",indexesdescriptor);
+			UpdateColumns(3,indexesdescriptor);
 			free(data);
 			dprintf("successfully create catalog\n");
+			//create Indexes
+			if(rbfm->createFile("Indexes") == 0){
+
 			return 0;
+			}
 		}
 	}
 
@@ -336,13 +366,24 @@ RC RelationManager::deleteCatalog()
 
 	if(rbfm->destroyFile("Tables")==0){
 		if(rbfm->destroyFile("Columns")==0){
-			dprintf("successfully delete Tables and Columns \n"); 
-			return 0;
+			if(rbfm->destroyFile("Indexes") == 0){
+				dprintf("successfully delete Tables and Columns \n");
+				return 0;
+			}
 		}
 	}
     return -1;
 }
 
+RC createIndex(const string &tableName, const string &attributeName)
+{
+
+}
+
+RC destroyIndex(const string &tableName, const string &attributeName)
+{
+
+}
 RC RelationManager::createTable(const string &tableName, const vector<Attribute> &attrs)
 {
 	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
