@@ -384,11 +384,12 @@ BNLJoin::BNLJoin(Iterator *leftIn,TableScan *rightIn,const Condition &condition,
        buffer.push_back(tuple);
        }
      */
-    buffer = malloc(11000);
+    printf("%d\n",numRecords);
+    buffer = malloc(1000*numRecords);
     finishedFlag = SUCCESS;
     leftIn->getAttributes( lAttrs );
     rightIn->getAttributes( rAttrs );
-    debug = true;
+    //debug = true;
 }
 
 BNLJoin::~BNLJoin()
@@ -409,7 +410,9 @@ RC BNLJoin::getNextTuple(void *data)
     }
     if( !joinedQueue.empty() ){
 	int i = joinedQueue.front();
-	joinedQueue.pop();   
+
+	joinedQueue.pop();  
+	assert( i<numRecords ); 
 	memcpy( data , (char*)buffer+i*1000 , 200 );
     }
 
@@ -428,13 +431,13 @@ RC BNLJoin::updateBlock()
     int counter = 0;
     // read tuples into block
     for( int i=0; i<numRecords; i++){
-    	//	printf("%p\n",buffer[i]);
-    	//copy record to buffer
-    	finishedFlag = leftIn->getNextTuple( (char*)buffer+i*1000 );
-    	//	printf("%f\n",*(float*)((char*)buffer[i]+1+sizeof(int)+sizeof(int) ));
-    	if( finishedFlag == QE_EOF ){ dprintf("End of the left table\n"); break; }
-    	//counter for what?
-    	counter = i;
+
+	//	printf("%p\n",buffer[i]);
+	finishedFlag = leftIn->getNextTuple( (char*)buffer+i*1000 );
+	//	printf("%f\n",*(float*)((char*)buffer[i]+1+sizeof(int)+sizeof(int) ));
+	if( finishedFlag == QE_EOF ){ break; }
+	counter = i;
+
     }
 
 
@@ -455,6 +458,7 @@ RC BNLJoin::updateBlock()
 		dprintf("condition.bRhsIsAttr\n");
 	    rtype = getAttrValue( rAttrs, condition.rhsAttr, probe, rvalue, nullValue);
 	    dprintf("lAttrs.size is %d\nrAttrs.size is %d\n",lAttrs.size(),rAttrs.size() );
+
 	}else{
 		dprintf("!condition.bRhsIsAttr\n");
 		rtype = condition.rhsValue.type;

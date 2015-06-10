@@ -236,7 +236,7 @@ class Project : public Iterator , public DebugMsg {
 };
 
 // Optional for the undergraduate solo teams. 5 extra-credit points
-class BNLJoin : public Iterator {
+class BNLJoin : public Iterator , public DebugMsg{
     // Block nested-loop join operator
     public:
         BNLJoin(Iterator *leftIn,            // Iterator of input R
