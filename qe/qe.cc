@@ -29,6 +29,7 @@ AttrType Iterator::getAttrValue(vector<Attribute> attrs, string attr, void *data
     for( int i=0; i<attrs.size(); i++){
 	//size only used in this scope
 	int size;
+	//printf("%s %s\n",attrs[i].name.c_str(),attr.c_str());
 	// check if attrs[i] is desired attribute
 	if( attrs[i].name.compare( attr ) == 0 ){
 	    // if null indicator is 1, no value for desired attribute
@@ -238,6 +239,7 @@ RC Filter::getNextTuple(void *data)
     AttrType attrtype;
     bool leftnullValue;
     bool rightnullValue;
+//    for(int i=0; i<attrs.size(); i++) printf("%s\n",attrs[i].name.c_str());
     while(input->getNextTuple(data) != QE_EOF){
 	attrtype = getAttrValue(attrs, condition.lhsAttr, data, vleft, leftnullValue);
 	if(leftnullValue) continue;
@@ -511,7 +513,7 @@ void BNLJoin::getAttributes(vector<Attribute> &attrs) const
     leftIn->getAttributes(left);
     rightIn->getAttributes(right);
     attrs.insert(attrs.begin(), left.begin(), left.end() );
-    attrs.insert(attrs.end(), right.begin(),left.end() );
+    attrs.insert(attrs.end(), right.begin(),right.end() );
 }
 
 
