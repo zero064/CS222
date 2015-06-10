@@ -220,13 +220,13 @@ void Iterator::printValue(CompOp op,string leftname,AttrType leftType,void* left
 Filter::Filter(Iterator *input, const Condition &condition  )
 {
 
-
+    debug = true;
+	dprintf("Filter constructor\n");
     // Get Attributes from iterator
     input->getAttributes(attrs);
     //initialize member
     this->input = input;
     this->condition = condition;
-    debug = true;
 
 };
 
@@ -242,7 +242,8 @@ RC Filter::getNextTuple(void *data)
 	attrtype = getAttrValue(attrs, condition.lhsAttr, data, vleft, leftnullValue);
 	if(leftnullValue) continue;
 	if(condition.bRhsIsAttr){
-	    //righthand-side is attribute
+	    dprintf("condition.bRhsIsAttr\n");
+		//righthand-side is attribute
 	    //get value for right attribute
 	    getAttrValue(attrs, condition.rhsAttr, data, vright, rightnullValue);
 	    if(rightnullValue) continue;
@@ -254,7 +255,8 @@ RC Filter::getNextTuple(void *data)
 	    }
 
 	}else{
-	    //righthand-side is value
+	    dprintf("!condition.bRhsIsAttr\n");
+		//righthand-side is value
 	    //if tuple match predicate, break
 	    if(compare(condition.op, attrtype, vleft, condition.rhsValue.data)){
 		free(vleft);
@@ -271,8 +273,10 @@ RC Filter::getNextTuple(void *data)
 
 void Filter::getAttributes(vector<Attribute> &attrs) const
 {
-    attrs.clear();
+    if(debug) printf("In getAttributes beginning\n");
+	attrs.clear();
     attrs = this->attrs;
+
 };
 
 
