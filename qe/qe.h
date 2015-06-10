@@ -247,7 +247,8 @@ class BNLJoin : public Iterator {
 	Condition condition;
 	unsigned numRecords;
 	int finishedFlag;
-	vector<void*> buffer;
+//	vector<void*> buffer;
+	void *buffer;
 	vector<Attribute> lAttrs,rAttrs;
 	queue<int> joinedQueue;
 };
