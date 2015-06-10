@@ -45,6 +45,7 @@ $(CODEROOT)/ix/libix.a:
 .PHONY: clean
 clean:
 	ls | grep -v .cc | grep -v makefile | grep -v .h | grep -v .sh | xargs rm
+	rm right*
 #	-rm qetest_01 qetest_02 qetest_03 qetest_03b qetest_03c qetest_04 qetest_05 qetest_05b qetest_06 qetest_06b qetest_07 qetest_07b qetest_08 qetest_08b qetest_09 qetest_09b *.a *.o *~
 	$(MAKE) -C $(CODEROOT)/rm clean
 	$(MAKE) -C $(CODEROOT)/ix clean 

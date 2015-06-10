@@ -384,7 +384,8 @@ BNLJoin::BNLJoin(Iterator *leftIn,TableScan *rightIn,const Condition &condition,
        buffer.push_back(tuple);
        }
      */
-    buffer = malloc(11000);
+    printf("%d\n",numRecords);
+    buffer = malloc(1000*numRecords);
     finishedFlag = SUCCESS;
     leftIn->getAttributes( lAttrs );
     rightIn->getAttributes( rAttrs );
@@ -408,8 +409,9 @@ RC BNLJoin::getNextTuple(void *data)
     }
     if( !joinedQueue.empty() ){
 	int i = joinedQueue.front();
-	joinedQueue.pop();   
-	memcpy( data , (char*)buffer+i*1000 , 400 );
+	joinedQueue.pop();  
+	assert( i<numRecords ); 
+	memcpy( data , (char*)buffer+i*1000 , 200 );
     }
 
     return finishedFlag;
@@ -430,7 +432,7 @@ RC BNLJoin::updateBlock()
 	//	printf("%p\n",buffer[i]);
 	finishedFlag = leftIn->getNextTuple( (char*)buffer+i*1000 );
 	//	printf("%f\n",*(float*)((char*)buffer[i]+1+sizeof(int)+sizeof(int) ));
-	if( finishedFlag == QE_EOF ){ printf("12312312412421\n");; break; }
+	if( finishedFlag == QE_EOF ){ break; }
 	counter = i;
     }
 
@@ -449,9 +451,7 @@ RC BNLJoin::updateBlock()
 	// find comparison attribute offset 
 	AttrType rtype;
 	if( condition.bRhsIsAttr ){
-    printf("sup\n");
 	    rtype = getAttrValue( rAttrs, condition.rhsAttr, probe, rvalue, nullValue);
-    printf("sup %d %d\n",lAttrs.size(),rAttrs.size() );
 	}else{
 	    rtype = condition.rhsValue.type;
 	    memcpy( rvalue, condition.rhsValue.data, 200 );
