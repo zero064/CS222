@@ -27,7 +27,7 @@ AttrType Iterator::getAttrValue(vector<Attribute> attrs, string attr, void *data
     int offset = nullSize; // offset to find value
     for( int i=0; i<attrs.size(); i++){
 	// skip null field
-	if( nullIndicator[i/8] & ( 1 << (8-i) ) ) continue;
+	if( nullIndicator[i/8] & ( 1 << (7-(i%8)) ) ) continue;
 	// get attribute value size 
 	int size = getAttrSize( attrs[i], (char*)data+offset ); 
 	// get the value and return the type of value
@@ -146,7 +146,26 @@ Filter::Filter(Iterator *input, const Condition &condition  )
 
 RC Filter::getNextTuple(void *data)
 {
-    input->getNextTuple(data);
+    void* vleft = malloc(PAGE_SIZE);
+    void* vright = malloc(PAGE_SIZE);
+    AttrType attrtype;
+
+	while(input->getNextTuple(data) != QE_EOF){
+		attrtype = getAttrValue(attrs, condition.lhsAttr, data, vleft);
+		if(condition.bRhsIsAttr){
+			//righthand-side is attribute
+			//get value for right attribute
+			getAttrValue(attrs, condition.rhsAttr, data, vright);
+			//if tuple match predicate, break
+			if(compare(condition.op, attrtype, vleft, vright)) break;
+
+		}else{
+			//righthand-side is value
+			//if tuple match predicate, break
+			if(compare(condition.op, attrtype, vleft, condition.rhsValue.data)) break;
+		}
+	}
+	return 0;
 
 };
 
