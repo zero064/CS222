@@ -18,24 +18,36 @@ int Iterator::getAttrSize(Attribute attr, void *data)
     }
 }
 
-AttrType Iterator::getAttrValue(vector<Attribute> attrs, string attr, void *data, void *value)
+AttrType Iterator::getAttrValue(vector<Attribute> attrs, string attr, void *data, void *value, bool &nullValue)
 {
     assert( data != NULL); assert(value != NULL); assert(attrs.size() > 0 );
     int nullSize = ceil( (double)attrs.size() / 8 ) ;
-    char nullIndicator[nullSize];
+    unsigned char nullIndicator[nullSize];
+    nullValue = false;
     memcpy( &nullIndicator, data, nullSize);
     int offset = nullSize; // offset to find value
     for( int i=0; i<attrs.size(); i++){
-	// skip null field
-	if( nullIndicator[i/8] & ( 1 << (7-(i%8)) ) ) continue;
-	// get attribute value size 
-	int size = getAttrSize( attrs[i], (char*)data+offset ); 
-	// get the value and return the type of value
+    //size only used in this scope
+    	int size;
+	// check if attrs[i] is desired attribute
 	if( attrs[i].name.compare( attr ) == 0 ){
-	    memcpy( value, (char*)data+offset, size );
+		// if null indicator is 1, no value for desired attribute
+		if( nullIndicator[i/8] & ( 1 << (7-(i%8)) ) ){
+			nullValue = true;
+			return attrs[i].type;
+		}
+		// get attribute value size
+		size = getAttrSize( attrs[i], (char*)data+offset );
+		memcpy( value, (char*)data+offset, size );
 	    return attrs[i].type;
+	}else{
+		// skip null field for increasing offset
+		if( nullIndicator[i/8] & ( 1 << (7-(i%8)) ) ) continue;
+		// calculate size for value
+		size = getAttrSize( attrs[i], (char*)data+offset );
+		offset += size;
 	}
-	offset += size;
+
     }
     // shouldn't be here
     assert(false);
@@ -130,6 +142,80 @@ bool Iterator::compare(CompOp op, AttrType type, void *v1, void *v2)
     assert(false);
 
 }
+void Iterator::printValue(CompOp op,string leftname,AttrType leftType,void* leftvalue, string rightname, AttrType rightType,void* rightvalue)
+{
+    switch( op ){
+	case NO_OP:
+		printf("ComOp is NO_OP\n");
+		break;
+	case EQ_OP:
+		printf("ComOp is EQ_OP\n");
+		break;
+	case LT_OP:
+		printf("ComOp is LT_OP\n");
+		break;
+	case GT_OP:
+		printf("ComOp is GT_OP\n");
+		break;
+	case LE_OP:
+		printf("ComOp is LE_OP\n");
+		break;
+	case GE_OP:
+		printf("ComOp is GE_OP\n");
+		break;
+	case NE_OP:
+		printf("ComOp is NE_OP\n");
+		break;
+	default:
+		printf("Undefined ComOp\n");
+    }
+    if(leftvalue == NULL){
+    	printf("leftvalue is NULL\n");
+    }else{
+        switch( leftType ){
+    	case TypeInt:
+    	    int a;
+    	    memcpy( &a, leftvalue, sizeof(int));
+    	    printf("%s(TypeInt) is %d\n",leftname.c_str(),a);
+    	    break;
+    	case TypeReal:
+    	    float fa;
+    	    memcpy( &fa, leftvalue, sizeof(float));
+    	    printf("%s(TypeReal) is %f\n",leftname.c_str(),fa);
+    	    break;
+    	case TypeVarChar:
+    	    int la;
+    	    memcpy( &la, leftvalue, sizeof(int));
+    	    assert( la > 0 && la < 2000 );
+    	    string sa( (char*)leftvalue+sizeof(int), la );
+    	    printf("%s(TypeVarChar) is %s\n",leftname.c_str(),sa.c_str());
+    	    break;
+        }
+    }
+    if(rightvalue == NULL){
+    	printf("rightvalue is NULL\n");
+    }else{
+        switch( rightType ){
+    	case TypeInt:
+    	    int a;
+    	    memcpy( &a, rightvalue, sizeof(int));
+    	    printf("%s(TypeInt) is %d\n",rightname.c_str(),a);
+    	    break;
+    	case TypeReal:
+    	    float fa;
+    	    memcpy( &fa, rightvalue, sizeof(float));
+    	    printf("%s(TypeReal) is %f\n",rightname.c_str(),fa);
+    	    break;
+    	case TypeVarChar:
+    	    int la;
+    	    memcpy( &la, rightvalue, sizeof(int));
+    	    assert( la > 0 && la < 2000 );
+    	    string sa( (char*)rightvalue+sizeof(int), la );
+    	    printf("%s(TypeVarChar) is %s\n",rightname.c_str(),sa.c_str());
+    	    break;
+        }
+    }
+}
 
 Filter::Filter(Iterator *input, const Condition &condition  )
 {
@@ -150,13 +236,16 @@ RC Filter::getNextTuple(void *data)
     void* vleft = malloc(PAGE_SIZE);
     void* vright = malloc(PAGE_SIZE);
     AttrType attrtype;
-
+    bool leftnullValue;
+    bool rightnullValue;
 	while(input->getNextTuple(data) != QE_EOF){
-		attrtype = getAttrValue(attrs, condition.lhsAttr, data, vleft);
+		attrtype = getAttrValue(attrs, condition.lhsAttr, data, vleft, leftnullValue);
+		if(leftnullValue) continue;
 		if(condition.bRhsIsAttr){
 			//righthand-side is attribute
 			//get value for right attribute
-			getAttrValue(attrs, condition.rhsAttr, data, vright);
+			getAttrValue(attrs, condition.rhsAttr, data, vright, rightnullValue);
+			if(rightnullValue) continue;
 			//if tuple match predicate, break
 			if(compare(condition.op, attrtype, vleft, vright)){
 				free(vleft);
@@ -174,6 +263,8 @@ RC Filter::getNextTuple(void *data)
 			}
 		}
 	}
+	free(vleft);
+	free(vright);
 	return QE_EOF;
 
 };
@@ -193,6 +284,7 @@ Project::Project(Iterator *input, const vector<string> &attrNames)
     assert( input != NULL && "Yo iterator shouldn't be null okay?\n");
     this->input = input;
     this->attrNames = attrNames;
+    //debug = true;
     vector<Attribute> origin_attr;
     input->getAttributes(origin_attr);
     for( int i=0; i< attrNames.size(); i++){
@@ -213,28 +305,61 @@ RC Project::getNextTuple(void *data)
     void *tuple = malloc(2000);
     RC rc;
     rc = input->getNextTuple(tuple);
-
-    // offset to put projected record 
-    int offset = 0;
     // get original schema
     vector<Attribute> origin_attr;
     input->getAttributes(origin_attr);
+    //fetch original null indicator
+    int nullSize = ceil( (double)origin_attr.size() / 8 ) ;
+    unsigned char nullIndicator[nullSize];
+    memcpy( &nullIndicator, tuple, nullSize);
+    if(debug) printf("nullSize is %d\n",nullSize);
+    //create returned null indicator
+    int returnednullSize = ceil( (double)attrNames.size() / 8 ) ;
+    unsigned char returnednullIndicator[returnednullSize];
+    memset(returnednullIndicator,0,returnednullSize);
+    if(debug) printf("returnednullSize is %d\n",returnednullSize);
+
+    // offset to put projected record
+    int offset = returnednullSize;
+
 
     // iterator through schema, get projection
     for( int i=0; i< attrNames.size(); i++){
-	int targetOffset = 0;
+	int targetOffset = nullSize;
 	for( int j=0; j<origin_attr.size(); j++){
-	    int size = getAttrSize( origin_attr[j],(char*)tuple+targetOffset );
+
 	    if( origin_attr[j].name.compare( attrNames[i] ) == 0 ){
-		// copy projection, increases offset 
+		// copy projection, increases offset
+	    if( nullIndicator[j/8] & ( 1 << (7-(j%8)) ) ){
+	    	//if null value happen, create null indicator for this bit
+	    	unsigned char tempnull = 1 << (7-(i%8));
+	    	//merge with exsiting null indicator
+	    	returnednullIndicator[i/8] = returnednullIndicator[i/8] + tempnull;
+	        if(debug) printf("returnednullIndicator[%d/8] is %d\n",i,returnednullIndicator[i/8]);
+
+	    	continue;
+	    }
+		int size = getAttrSize( origin_attr[j],(char*)tuple+targetOffset );
+        if(debug) printf("size is %d\ntargetOffset is %d\nattrname is %s\n",size,targetOffset,origin_attr[j].name.c_str());
 		memcpy( (char*)data+offset, (char*)tuple+targetOffset, size );
+        if(debug) printf("offset is %d\n",offset);
+
 		offset += size;
 		break;
+	    }else{
+			//skip null value
+	    	if( nullIndicator[j/8] & ( 1 << (7-(j%8)) ) ){
+		        if(debug) printf("rnullIndicator[%d/8] is %d\n",j,nullIndicator[j/8]);
+	    		continue;
+	    	}
+			int size = getAttrSize( origin_attr[j],(char*)tuple+targetOffset );
+	    	targetOffset += size;
+	        if(debug) printf("targetOffset is %d\n",targetOffset);
+
 	    }
-	    targetOffset += size;
 	}
     }
-   
+    memcpy(data,returnednullIndicator,returnednullSize);
     free(tuple);
     return rc;
 }
@@ -290,6 +415,7 @@ RC BNLJoin::updateBlock()
 
     // table to record outter block's tuple has been joined 
     bool joined[numRecords];
+    bool nullValue;
     memset( joined, false, numRecords*sizeof(bool) );
     int counter = 0;
     // read tuples into block
@@ -311,7 +437,7 @@ RC BNLJoin::updateBlock()
 	AttrType rtype;
 
 	if( condition.bRhsIsAttr ){
-	    rtype = getAttrValue( rAttrs, condition.rhsAttr, probe, rvalue);
+	    rtype = getAttrValue( rAttrs, condition.rhsAttr, probe, rvalue, nullValue);
 	}else{
 	    rtype = condition.rhsValue.type;
 	    memcpy( rvalue, condition.rhsValue.data, 200 );
@@ -323,7 +449,7 @@ RC BNLJoin::updateBlock()
 	for( int i=0; i<=counter; i++){
 	    if( joined[i] ) continue;
 	    // get left value
-	    AttrType ltype = getAttrValue( lAttrs, condition.lhsAttr, buffer[i], lvalue);
+	    AttrType ltype = getAttrValue( lAttrs, condition.lhsAttr, buffer[i], lvalue, nullValue);
 
 	    assert( ltype == rtype );
 	    // compare the attribtue & value
@@ -371,6 +497,7 @@ GHJoin::GHJoin( Iterator *leftIn, Iterator *rightIn, const Condition &condition,
     RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
     this->condition = condition; 
     this->numPartitions = numPartitions;
+    bool nullValue;
 //    this->leftIn = leftIn;
 //    this->rightIn = rightIn;
 
@@ -400,7 +527,7 @@ GHJoin::GHJoin( Iterator *leftIn, Iterator *rightIn, const Condition &condition,
 	lAttrsName.push_back( lAttrs[i].name );
     }
     while( leftIn->getNextTuple( data ) != QE_EOF ){
-	AttrType type = getAttrValue( lAttrs, condition.lhsAttr, data , value );
+	AttrType type = getAttrValue( lAttrs, condition.lhsAttr, data , value, nullValue );
 	int hashNum = getHash( value , type , numPartitions );
 	RID rid;
 	rbfm->insertRecord( leftPart[hashNum], lAttrs, data, rid);
@@ -411,7 +538,7 @@ GHJoin::GHJoin( Iterator *leftIn, Iterator *rightIn, const Condition &condition,
 	rAttrsName.push_back( rAttrs[i].name );
     }
     while( rightIn->getNextTuple( data ) != QE_EOF ){
-	AttrType type = getAttrValue( rAttrs, condition.rhsAttr, data , value );
+	AttrType type = getAttrValue( rAttrs, condition.rhsAttr, data , value , nullValue);
 	int hashNum = getHash( value , type , numPartitions );
 	RID rid;
 	rbfm->insertRecord( rightPart[hashNum], rAttrs, data, rid);
@@ -427,8 +554,9 @@ RC GHJoin::getNextTuple( void *data )
     RID rid;
     void *tuple = malloc( 2000 );
     void *value = malloc( 300 );
+    bool nullValue;
     while( rpt.getNextRecord( rid, tuple ) != RBFM_EOF ){
-	AttrType type = getAttrValue( rAttrs, condition.rhsAttr, tuple, value );
+	AttrType type = getAttrValue( rAttrs, condition.rhsAttr, tuple, value , nullValue);
 	for( int i=0; i<lBuffer.size(); i++){
 	    if( compare( condition.op , type , lBuffer[i], value ) ){
 		join( lAttrs, lBuffer[i], rAttrs, tuple );
