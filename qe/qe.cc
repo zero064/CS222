@@ -104,10 +104,33 @@ bool Iterator::compare(CompOp op, AttrType type, void *v1, void *v2)
 
 }
 
-Filter::Filter(Iterator* input, const Condition &condition) {
-}
+Filter::Filter(Iterator *input, const Condition &condition  )
+{
 
-// ... the rest of your implementations go here
+
+    // Get Attributes from iterator
+    input->getAttributes(attrs);
+    //initialize member
+    this->input = input;
+    this->condition = condition;
+
+};
+
+
+RC Filter::getNextTuple(void *data)
+{
+    input->getNextTuple(data);
+
+};
+
+void Filter::getAttributes(vector<Attribute> &attrs) const
+{
+    attrs.clear();
+    attrs = this->attrs;
+
+
+};
+
 
 
 Project::Project(Iterator *input, const vector<string> &attrNames)
