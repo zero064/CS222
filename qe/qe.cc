@@ -388,6 +388,7 @@ BNLJoin::BNLJoin(Iterator *leftIn,TableScan *rightIn,const Condition &condition,
     finishedFlag = SUCCESS;
     leftIn->getAttributes( lAttrs );
     rightIn->getAttributes( rAttrs );
+    debug = true;
 }
 
 BNLJoin::~BNLJoin()
@@ -409,7 +410,7 @@ RC BNLJoin::getNextTuple(void *data)
     if( !joinedQueue.empty() ){
 	int i = joinedQueue.front();
 	joinedQueue.pop();   
-	memcpy( data , (char*)buffer+i*1000 , 400 );
+	memcpy( data , (char*)buffer+i*1000 , 200 );
     }
 
     return finishedFlag;
@@ -427,11 +428,13 @@ RC BNLJoin::updateBlock()
     int counter = 0;
     // read tuples into block
     for( int i=0; i<numRecords; i++){
-	//	printf("%p\n",buffer[i]);
-	finishedFlag = leftIn->getNextTuple( (char*)buffer+i*1000 );
-	//	printf("%f\n",*(float*)((char*)buffer[i]+1+sizeof(int)+sizeof(int) ));
-	if( finishedFlag == QE_EOF ){ printf("12312312412421\n");; break; }
-	counter = i;
+    	//	printf("%p\n",buffer[i]);
+    	//copy record to buffer
+    	finishedFlag = leftIn->getNextTuple( (char*)buffer+i*1000 );
+    	//	printf("%f\n",*(float*)((char*)buffer[i]+1+sizeof(int)+sizeof(int) ));
+    	if( finishedFlag == QE_EOF ){ dprintf("End of the left table\n"); break; }
+    	//counter for what?
+    	counter = i;
     }
 
 
@@ -449,11 +452,12 @@ RC BNLJoin::updateBlock()
 	// find comparison attribute offset 
 	AttrType rtype;
 	if( condition.bRhsIsAttr ){
-    printf("sup\n");
+		dprintf("condition.bRhsIsAttr\n");
 	    rtype = getAttrValue( rAttrs, condition.rhsAttr, probe, rvalue, nullValue);
-    printf("sup %d %d\n",lAttrs.size(),rAttrs.size() );
+	    dprintf("lAttrs.size is %d\nrAttrs.size is %d\n",lAttrs.size(),rAttrs.size() );
 	}else{
-	    rtype = condition.rhsValue.type;
+		dprintf("!condition.bRhsIsAttr\n");
+		rtype = condition.rhsValue.type;
 	    memcpy( rvalue, condition.rhsValue.data, 200 );
 	}
 
