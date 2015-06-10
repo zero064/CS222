@@ -11,8 +11,8 @@ int Iterator::getAttrSize(Attribute attr, void *data)
 	    return sizeof(float);
 	case TypeVarChar:
 	    memcpy( &size , data , sizeof(int) );
-	//	string sa( (char*)data+4,size);
-	//	printf("%s\n",sa.c_str();
+	    //	string sa( (char*)data+4,size);
+	    //	printf("%s\n",sa.c_str();
 	    assert( size != -1 && size < PAGE_SIZE && "wrong in reading varchar size");
 	    return size+sizeof(int);
     }
@@ -27,25 +27,25 @@ AttrType Iterator::getAttrValue(vector<Attribute> attrs, string attr, void *data
     memcpy( &nullIndicator, data, nullSize);
     int offset = nullSize; // offset to find value
     for( int i=0; i<attrs.size(); i++){
-    //size only used in this scope
-    	int size;
+	//size only used in this scope
+	int size;
 	// check if attrs[i] is desired attribute
 	if( attrs[i].name.compare( attr ) == 0 ){
-		// if null indicator is 1, no value for desired attribute
-		if( nullIndicator[i/8] & ( 1 << (7-(i%8)) ) ){
-			nullValue = true;
-			return attrs[i].type;
-		}
-		// get attribute value size
-		size = getAttrSize( attrs[i], (char*)data+offset );
-		memcpy( value, (char*)data+offset, size );
+	    // if null indicator is 1, no value for desired attribute
+	    if( nullIndicator[i/8] & ( 1 << (7-(i%8)) ) ){
+		nullValue = true;
+		return attrs[i].type;
+	    }
+	    // get attribute value size
+	    size = getAttrSize( attrs[i], (char*)data+offset );
+	    memcpy( value, (char*)data+offset, size );
 	    return attrs[i].type;
 	}else{
-		// skip null field for increasing offset
-		if( nullIndicator[i/8] & ( 1 << (7-(i%8)) ) ) continue;
-		// calculate size for value
-		size = getAttrSize( attrs[i], (char*)data+offset );
-		offset += size;
+	    // skip null field for increasing offset
+	    if( nullIndicator[i/8] & ( 1 << (7-(i%8)) ) ) continue;
+	    // calculate size for value
+	    size = getAttrSize( attrs[i], (char*)data+offset );
+	    offset += size;
 	}
 
     }
@@ -84,8 +84,8 @@ RC Iterator::join( vector<Attribute> lAttrs, void *ldata, vector<Attribute>rAttr
     memcpy( (char*)ldata+nullSize, (char*)temp+lstart, lsize );  
     memcpy( (char*)ldata+nullSize+lsize , (char*)rdata+rstart , rsize );
     free(temp);
-//    printf("join %f\n",*(float*)((char*)ldata+9+12));
-//    printf("join %f\n",*(float*)((char*)ldata+9+8));
+    //    printf("join %f\n",*(float*)((char*)ldata+9+12));
+    //    printf("join %f\n",*(float*)((char*)ldata+9+8));
     return SUCCESS;
 }
 
@@ -146,74 +146,74 @@ void Iterator::printValue(CompOp op,string leftname,AttrType leftType,void* left
 {
     switch( op ){
 	case NO_OP:
-		printf("ComOp is NO_OP\n");
-		break;
+	    printf("ComOp is NO_OP\n");
+	    break;
 	case EQ_OP:
-		printf("ComOp is EQ_OP\n");
-		break;
+	    printf("ComOp is EQ_OP\n");
+	    break;
 	case LT_OP:
-		printf("ComOp is LT_OP\n");
-		break;
+	    printf("ComOp is LT_OP\n");
+	    break;
 	case GT_OP:
-		printf("ComOp is GT_OP\n");
-		break;
+	    printf("ComOp is GT_OP\n");
+	    break;
 	case LE_OP:
-		printf("ComOp is LE_OP\n");
-		break;
+	    printf("ComOp is LE_OP\n");
+	    break;
 	case GE_OP:
-		printf("ComOp is GE_OP\n");
-		break;
+	    printf("ComOp is GE_OP\n");
+	    break;
 	case NE_OP:
-		printf("ComOp is NE_OP\n");
-		break;
+	    printf("ComOp is NE_OP\n");
+	    break;
 	default:
-		printf("Undefined ComOp\n");
+	    printf("Undefined ComOp\n");
     }
     if(leftvalue == NULL){
-    	printf("leftvalue is NULL\n");
+	printf("leftvalue is NULL\n");
     }else{
-        switch( leftType ){
-    	case TypeInt:
-    	    int a;
-    	    memcpy( &a, leftvalue, sizeof(int));
-    	    printf("%s(TypeInt) is %d\n",leftname.c_str(),a);
-    	    break;
-    	case TypeReal:
-    	    float fa;
-    	    memcpy( &fa, leftvalue, sizeof(float));
-    	    printf("%s(TypeReal) is %f\n",leftname.c_str(),fa);
-    	    break;
-    	case TypeVarChar:
-    	    int la;
-    	    memcpy( &la, leftvalue, sizeof(int));
-    	    assert( la > 0 && la < 2000 );
-    	    string sa( (char*)leftvalue+sizeof(int), la );
-    	    printf("%s(TypeVarChar) is %s\n",leftname.c_str(),sa.c_str());
-    	    break;
-        }
+	switch( leftType ){
+	    case TypeInt:
+		int a;
+		memcpy( &a, leftvalue, sizeof(int));
+		printf("%s(TypeInt) is %d\n",leftname.c_str(),a);
+		break;
+	    case TypeReal:
+		float fa;
+		memcpy( &fa, leftvalue, sizeof(float));
+		printf("%s(TypeReal) is %f\n",leftname.c_str(),fa);
+		break;
+	    case TypeVarChar:
+		int la;
+		memcpy( &la, leftvalue, sizeof(int));
+		assert( la > 0 && la < 2000 );
+		string sa( (char*)leftvalue+sizeof(int), la );
+		printf("%s(TypeVarChar) is %s\n",leftname.c_str(),sa.c_str());
+		break;
+	}
     }
     if(rightvalue == NULL){
-    	printf("rightvalue is NULL\n");
+	printf("rightvalue is NULL\n");
     }else{
-        switch( rightType ){
-    	case TypeInt:
-    	    int a;
-    	    memcpy( &a, rightvalue, sizeof(int));
-    	    printf("%s(TypeInt) is %d\n",rightname.c_str(),a);
-    	    break;
-    	case TypeReal:
-    	    float fa;
-    	    memcpy( &fa, rightvalue, sizeof(float));
-    	    printf("%s(TypeReal) is %f\n",rightname.c_str(),fa);
-    	    break;
-    	case TypeVarChar:
-    	    int la;
-    	    memcpy( &la, rightvalue, sizeof(int));
-    	    assert( la > 0 && la < 2000 );
-    	    string sa( (char*)rightvalue+sizeof(int), la );
-    	    printf("%s(TypeVarChar) is %s\n",rightname.c_str(),sa.c_str());
-    	    break;
-        }
+	switch( rightType ){
+	    case TypeInt:
+		int a;
+		memcpy( &a, rightvalue, sizeof(int));
+		printf("%s(TypeInt) is %d\n",rightname.c_str(),a);
+		break;
+	    case TypeReal:
+		float fa;
+		memcpy( &fa, rightvalue, sizeof(float));
+		printf("%s(TypeReal) is %f\n",rightname.c_str(),fa);
+		break;
+	    case TypeVarChar:
+		int la;
+		memcpy( &la, rightvalue, sizeof(int));
+		assert( la > 0 && la < 2000 );
+		string sa( (char*)rightvalue+sizeof(int), la );
+		printf("%s(TypeVarChar) is %s\n",rightname.c_str(),sa.c_str());
+		break;
+	}
     }
 }
 
@@ -238,34 +238,34 @@ RC Filter::getNextTuple(void *data)
     AttrType attrtype;
     bool leftnullValue;
     bool rightnullValue;
-	while(input->getNextTuple(data) != QE_EOF){
-		attrtype = getAttrValue(attrs, condition.lhsAttr, data, vleft, leftnullValue);
-		if(leftnullValue) continue;
-		if(condition.bRhsIsAttr){
-			//righthand-side is attribute
-			//get value for right attribute
-			getAttrValue(attrs, condition.rhsAttr, data, vright, rightnullValue);
-			if(rightnullValue) continue;
-			//if tuple match predicate, break
-			if(compare(condition.op, attrtype, vleft, vright)){
-				free(vleft);
-				free(vright);
-				return 0;
-			}
+    while(input->getNextTuple(data) != QE_EOF){
+	attrtype = getAttrValue(attrs, condition.lhsAttr, data, vleft, leftnullValue);
+	if(leftnullValue) continue;
+	if(condition.bRhsIsAttr){
+	    //righthand-side is attribute
+	    //get value for right attribute
+	    getAttrValue(attrs, condition.rhsAttr, data, vright, rightnullValue);
+	    if(rightnullValue) continue;
+	    //if tuple match predicate, break
+	    if(compare(condition.op, attrtype, vleft, vright)){
+		free(vleft);
+		free(vright);
+		return 0;
+	    }
 
-		}else{
-			//righthand-side is value
-			//if tuple match predicate, break
-			if(compare(condition.op, attrtype, vleft, condition.rhsValue.data)){
-				free(vleft);
-				free(vright);
-				return 0;
-			}
-		}
+	}else{
+	    //righthand-side is value
+	    //if tuple match predicate, break
+	    if(compare(condition.op, attrtype, vleft, condition.rhsValue.data)){
+		free(vleft);
+		free(vright);
+		return 0;
+	    }
 	}
-	free(vleft);
-	free(vright);
-	return QE_EOF;
+    }
+    free(vleft);
+    free(vright);
+    return QE_EOF;
 
 };
 
@@ -273,8 +273,6 @@ void Filter::getAttributes(vector<Attribute> &attrs) const
 {
     attrs.clear();
     attrs = this->attrs;
-
-
 };
 
 
@@ -297,7 +295,7 @@ Project::Project(Iterator *input, const vector<string> &attrNames)
 
 Project::~Project()
 {
-   // input->close();
+    // input->close();
 }
 
 RC Project::getNextTuple(void *data)
@@ -330,31 +328,31 @@ RC Project::getNextTuple(void *data)
 
 	    if( origin_attr[j].name.compare( attrNames[i] ) == 0 ){
 		// copy projection, increases offset
-	    if( nullIndicator[j/8] & ( 1 << (7-(j%8)) ) ){
-	    	//if null value happen, create null indicator for this bit
-	    	unsigned char tempnull = 1 << (7-(i%8));
-	    	//merge with exsiting null indicator
-	    	returnednullIndicator[i/8] = returnednullIndicator[i/8] + tempnull;
-	        if(debug) printf("returnednullIndicator[%d/8] is %d\n",i,returnednullIndicator[i/8]);
+		if( nullIndicator[j/8] & ( 1 << (7-(j%8)) ) ){
+		    //if null value happen, create null indicator for this bit
+		    unsigned char tempnull = 1 << (7-(i%8));
+		    //merge with exsiting null indicator
+		    returnednullIndicator[i/8] = returnednullIndicator[i/8] + tempnull;
+		    if(debug) printf("returnednullIndicator[%d/8] is %d\n",i,returnednullIndicator[i/8]);
 
-	    	continue;
-	    }
+		    continue;
+		}
 		int size = getAttrSize( origin_attr[j],(char*)tuple+targetOffset );
-        if(debug) printf("size is %d\ntargetOffset is %d\nattrname is %s\n",size,targetOffset,origin_attr[j].name.c_str());
+		if(debug) printf("size is %d\ntargetOffset is %d\nattrname is %s\n",size,targetOffset,origin_attr[j].name.c_str());
 		memcpy( (char*)data+offset, (char*)tuple+targetOffset, size );
-        if(debug) printf("offset is %d\n",offset);
+		if(debug) printf("offset is %d\n",offset);
 
 		offset += size;
 		break;
 	    }else{
-			//skip null value
-	    	if( nullIndicator[j/8] & ( 1 << (7-(j%8)) ) ){
-		        if(debug) printf("rnullIndicator[%d/8] is %d\n",j,nullIndicator[j/8]);
-	    		continue;
-	    	}
-			int size = getAttrSize( origin_attr[j],(char*)tuple+targetOffset );
-	    	targetOffset += size;
-	        if(debug) printf("targetOffset is %d\n",targetOffset);
+		//skip null value
+		if( nullIndicator[j/8] & ( 1 << (7-(j%8)) ) ){
+		    if(debug) printf("rnullIndicator[%d/8] is %d\n",j,nullIndicator[j/8]);
+		    continue;
+		}
+		int size = getAttrSize( origin_attr[j],(char*)tuple+targetOffset );
+		targetOffset += size;
+		if(debug) printf("targetOffset is %d\n",targetOffset);
 
 	    }
 	}
@@ -374,19 +372,19 @@ BNLJoin::BNLJoin(Iterator *leftIn,TableScan *rightIn,const Condition &condition,
 {
     assert( leftIn != NULL );
     assert( rightIn != NULL );
-    
+
     this->leftIn = leftIn;
     this->rightIn = rightIn;
     this->condition = condition;
     this->numRecords = numRecords;
     // allocate block of memory
-/* 
-    for( int i=0; i<numRecords; i++){
-	void *tuple = malloc(1000);
-	buffer.push_back(tuple);
-    }
-*/
-    buffer = malloc(10000);
+    /* 
+       for( int i=0; i<numRecords; i++){
+       void *tuple = malloc(1000);
+       buffer.push_back(tuple);
+       }
+     */
+    buffer = malloc(11000);
     finishedFlag = SUCCESS;
     leftIn->getAttributes( lAttrs );
     rightIn->getAttributes( rAttrs );
@@ -395,25 +393,26 @@ BNLJoin::BNLJoin(Iterator *leftIn,TableScan *rightIn,const Condition &condition,
 BNLJoin::~BNLJoin()
 {
     // release all memory
-/*
-    for( int i=0; i<numRecords; i++){
-	free( buffer[i] );
-    }
-*/
+    /*
+       for( int i=0; i<numRecords; i++){
+       free( buffer[i] );
+       }
+     */
     free(buffer);
 }
 
 RC BNLJoin::getNextTuple(void *data)
 {
     while( joinedQueue.empty() && finishedFlag != QE_EOF){
-	printf("sup\n");
 	updateBlock();
     }
     if( !joinedQueue.empty() ){
 	int i = joinedQueue.front();
-	joinedQueue.pop();    
+	joinedQueue.pop();   
 	memcpy( data , (char*)buffer+i*1000 , 400 );
     }
+
+    return finishedFlag;
 
 }
 
@@ -428,15 +427,16 @@ RC BNLJoin::updateBlock()
     int counter = 0;
     // read tuples into block
     for( int i=0; i<numRecords; i++){
-//	printf("%p\n",buffer[i]);
+	//	printf("%p\n",buffer[i]);
 	finishedFlag = leftIn->getNextTuple( (char*)buffer+i*1000 );
-//	printf("%f\n",*(float*)((char*)buffer[i]+1+sizeof(int)+sizeof(int) ));
-	if( finishedFlag == QE_EOF ){ assert(false); break; }
+	//	printf("%f\n",*(float*)((char*)buffer[i]+1+sizeof(int)+sizeof(int) ));
+	if( finishedFlag == QE_EOF ){ printf("12312312412421\n");; break; }
 	counter = i;
     }
 
 
     void *probe = malloc(1000);
+
 
     // reset iterator 
     rightIn->setIterator();
@@ -449,20 +449,19 @@ RC BNLJoin::updateBlock()
 	// find comparison attribute offset 
 	AttrType rtype;
 	if( condition.bRhsIsAttr ){
+    printf("sup\n");
 	    rtype = getAttrValue( rAttrs, condition.rhsAttr, probe, rvalue, nullValue);
+    printf("sup %d %d\n",lAttrs.size(),rAttrs.size() );
 	}else{
 	    rtype = condition.rhsValue.type;
 	    memcpy( rvalue, condition.rhsValue.data, 200 );
 	}
 
-//	printf("%d %d\n",*(int*)rvalue,counter);
-
-
 
 	for( int i=0; i<=counter; i++){
 	    if( joined[i] ) continue;
 	    // get left value
-	    AttrType ltype = getAttrValue( lAttrs, condition.lhsAttr, buffer[i], lvalue, nullValue);
+	    AttrType ltype = getAttrValue( lAttrs, condition.lhsAttr, (char*)buffer+i*1000, lvalue, nullValue);
 
 	    assert( ltype == rtype );
 	    // compare the attribtue & value
@@ -470,34 +469,36 @@ RC BNLJoin::updateBlock()
 		joined[i] = true;
 		// join right record to left record 
 		join( lAttrs, (char*)buffer+i*1000, rAttrs, probe );
-//		cout<< *(float*)((char*)buffer[i]+1+16) << endl;
-//		printf("%f\n",*(float*)((char*)buffer[i]+1+20));
+		//		cout<< *(float*)((char*)buffer[i]+1+16) << endl;
+		//		printf("%f\n",*(float*)((char*)buffer[i]+1+20));
 	    }
-	    
+
 	}
 
 
     }
-    free(rvalue); free(lvalue);
-    printf("QB %d\n",joinedQueue.size());
+
+
+    // free pointers
+    free(rvalue); free(lvalue); free(probe);
+
     // push joined results (pointers) into queue
     for( int i=0; i<=counter; i++){
 	if( joined[i] ){
 	    joinedQueue.push(i);
-//		printf("yoyoyo %d\n",*(int*)((char*)buffer[i]+1));
+	    //		printf("yoyoyo %d\n",*(int*)((char*)buffer[i]+1));
 	}
     }
-    printf("QA %d\n",joinedQueue.size());
-    printf("finished pushed\n");
 
-    // free probe pointer
-    free(probe);
+
+
 
 
 }
 
 void BNLJoin::getAttributes(vector<Attribute> &attrs) const
 {
+    attrs.clear();
     vector<Attribute> left,right;
     leftIn->getAttributes(left);
     rightIn->getAttributes(right);
@@ -513,10 +514,10 @@ GHJoin::GHJoin( Iterator *leftIn, Iterator *rightIn, const Condition &condition,
     this->condition = condition; 
     this->numPartitions = numPartitions;
     bool nullValue;
-//    this->leftIn = leftIn;
-//    this->rightIn = rightIn;
+    //    this->leftIn = leftIn;
+    //    this->rightIn = rightIn;
 
-//    vector<FileHandle> leftPart;
+    //    vector<FileHandle> leftPart;
     for( int i=0; i<numPartitions; i++){
 	FileHandle fileHandle;
 	string tableName = "left_join"+('0'+i);
@@ -524,7 +525,7 @@ GHJoin::GHJoin( Iterator *leftIn, Iterator *rightIn, const Condition &condition,
 	rbfm->openFile(tableName,fileHandle);
 	leftPart.push_back(fileHandle);
     }
-//    vector<FileHandle> rightPart;
+    //    vector<FileHandle> rightPart;
     for( int i=0; i<numPartitions; i++){
 	FileHandle fileHandle;
 	string tableName = "right_join"+('0'+i);
@@ -547,7 +548,7 @@ GHJoin::GHJoin( Iterator *leftIn, Iterator *rightIn, const Condition &condition,
 	RID rid;
 	rbfm->insertRecord( leftPart[hashNum], lAttrs, data, rid);
     } 
-    
+
     rightIn->getAttributes(rAttrs);
     for(int i=0; i<rAttrs.size(); i++){
 	rAttrsName.push_back( rAttrs[i].name );
@@ -583,7 +584,7 @@ RC GHJoin::getNextTuple( void *data )
 	}
 
     }
-    
+
     if( getPartition() == QE_EOF ){
 	return QE_EOF;
     }
@@ -655,9 +656,9 @@ int GHJoin::getHash( void *value, AttrType type , int numPartitions )
 
 void GHJoin::getAttributes(vector<Attribute> &attrs) const
 {
-//    vector<Attribute> left,right;
- //   leftIn->getAttributes(left);
-  //  rightIn->getAttributes(right);
+    //    vector<Attribute> left,right;
+    //   leftIn->getAttributes(left);
+    //  rightIn->getAttributes(right);
     attrs.insert(attrs.begin(), lAttrs.begin(), lAttrs.end() );
     attrs.insert(attrs.end(), rAttrs.begin(), rAttrs.end() );
 }

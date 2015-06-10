@@ -1006,7 +1006,10 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 	    c_rid.pageNum++;
 	    if( c_rid.pageNum % 512 == 0 ) c_rid.pageNum++;
 
-	    if( fileHandle.readPage( c_rid.pageNum, page ) == FAILURE) return RBFM_EOF;
+	    if( fileHandle.readPage( c_rid.pageNum, page ) == FAILURE){
+		 free(returnedData);
+		 return RBFM_EOF;
+	    }
 	    memcpy( &pageDesc, (char*)page+PAGE_SIZE-sizeof(PageDesc), sizeof(PageDesc) );
 	    if( pageDesc.numOfSlot < 0 ) pageDesc.numOfSlot*=-1; // if it's an inconsistent page
 	} 
@@ -1053,7 +1056,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 
 		// if it's null & it's not NO_OP
 		if( nullIndicator & (1 << (7-(i%8))) && compOp != NO_OP) {
-		    printf("1231231231\n");
+//		    printf("1231231231\n");
 //		    assert(false);
 		    break;
 		}
