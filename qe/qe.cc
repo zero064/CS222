@@ -140,6 +140,7 @@ Filter::Filter(Iterator *input, const Condition &condition  )
     //initialize member
     this->input = input;
     this->condition = condition;
+    debug = true;
 
 };
 
@@ -157,15 +158,23 @@ RC Filter::getNextTuple(void *data)
 			//get value for right attribute
 			getAttrValue(attrs, condition.rhsAttr, data, vright);
 			//if tuple match predicate, break
-			if(compare(condition.op, attrtype, vleft, vright)) break;
+			if(compare(condition.op, attrtype, vleft, vright)){
+				free(vleft);
+				free(vright);
+				return 0;
+			}
 
 		}else{
 			//righthand-side is value
 			//if tuple match predicate, break
-			if(compare(condition.op, attrtype, vleft, condition.rhsValue.data)) break;
+			if(compare(condition.op, attrtype, vleft, condition.rhsValue.data)){
+				free(vleft);
+				free(vright);
+				return 0;
+			}
 		}
 	}
-	return 0;
+	return QE_EOF;
 
 };
 
