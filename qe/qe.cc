@@ -1,4 +1,4 @@
-
+#include <math.h>
 #include "qe.h"
 
 int Iterator::getAttrSize(Attribute attr, void *data)
@@ -21,10 +21,15 @@ int Iterator::getAttrSize(Attribute attr, void *data)
 AttrType Iterator::getAttrValue(vector<Attribute> attrs, string attr, void *data, void *value)
 {
     assert( data != NULL); assert(value != NULL); assert(attrs.size() > 0 );
-    int offset = 0; // offset to find value
+    int nullSize = ceil( (double)attrs.size() / 8 ) ;
+    char nullIndicator[nullSize];
+    memcpy( &nullIndicator, data, nullSize);
+    int offset = nullSize; // offset to find value
     for( int i=0; i<attrs.size(); i++){
+	// skip null field
+	if( nullIndicator[i/8] & ( 1 << (8-i) ) ) continue;
 	// get attribute value size 
-	int size = getAttrSize( attrs[i], (char*)data+offset );
+	int size = getAttrSize( attrs[i], (char*)data+offset ); 
 	// get the value and return the type of value
 	if( attrs[i].name.compare( attr ) == 0 ){
 	    memcpy( value, (char*)data+offset, size );
@@ -38,15 +43,37 @@ AttrType Iterator::getAttrValue(vector<Attribute> attrs, string attr, void *data
 
 RC Iterator::join( vector<Attribute> lAttrs, void *ldata, vector<Attribute>rAttrs, void *rdata )
 {
-    int offset = 0; 
+    int nullSize = ceil( (double)( lAttrs.size() + rAttrs.size() ) / 8 ) ;
+
+    int lstart = ceil( (double)lAttrs.size() / 8.0 );
+    int lsize = 0 ;
     for( int i=0; i<lAttrs.size(); i++){
-	offset += getAttrSize( lAttrs[i], (char*)ldata+offset );
+	lsize += getAttrSize( lAttrs[i], (char*)ldata+lstart+lsize );
     }
-    int size = 0;
+
+    int rstart = ceil( (double)rAttrs.size() / 8.0 );
+    int rsize = 0;
     for( int i=0; i<rAttrs.size(); i++){
-	size += getAttrSize( rAttrs[i], (char*)rdata+size );
+	rsize += getAttrSize( rAttrs[i], (char*)rdata+rstart+rsize );
     }
-    memcpy( (char*)ldata + offset , rdata , size );
+
+    void *temp = malloc( 2000 );
+    memcpy( temp, ldata, lstart+lsize );
+
+    char nullIndicator[nullSize];
+    memcpy( nullIndicator, ldata , lstart );
+    char rIndicator[rstart];
+    memcpy( rIndicator, rdata , rstart );
+    // setup null indicator
+    for( int i = 0; i<rAttrs.size(); i++){
+	nullIndicator[ (i+lAttrs.size())/8 ] = rIndicator[ i/8 ] & ( 1 << 7-(i%8) );
+    }
+    memcpy( ldata, nullIndicator, nullSize );
+    memcpy( (char*)ldata+nullSize, (char*)temp+lstart, lsize );  
+    memcpy( (char*)ldata+nullSize+lsize , (char*)rdata+rstart , rsize );
+    free(temp);
+//    printf("join %f\n",*(float*)((char*)ldata+9+12));
+//    printf("join %f\n",*(float*)((char*)ldata+9+8));
     return SUCCESS;
 }
 
@@ -141,6 +168,7 @@ RC Project::getNextTuple(void *data)
     // get original schema
     vector<Attribute> origin_attr;
     input->getAttributes(origin_attr);
+
     // iterator through schema, get projection
     for( int i=0; i< attrNames.size(); i++){
 	int targetOffset = 0;
@@ -180,6 +208,7 @@ BNLJoin::BNLJoin(Iterator *leftIn,TableScan *rightIn,const Condition &condition,
 	void *tuple = malloc(2000);
 	buffer.push_back(tuple);
     }
+    finishedFlag = SUCCESS;
     leftIn->getAttributes( lAttrs );
     rightIn->getAttributes( rAttrs );
 }
@@ -194,26 +223,36 @@ BNLJoin::~BNLJoin()
 
 RC BNLJoin::getNextTuple(void *data)
 {
-    if( joinedQueue.empty() ){
+    while( joinedQueue.empty() && finishedFlag != QE_EOF){
 	updateBlock();
-    }    
-    void *tmp = joinedQueue.front();
-    memcpy( data , tmp , 2000 );
+    }
+    if( !joinedQueue.empty() ){
+    int i = joinedQueue.front();
     joinedQueue.pop();    
+    memcpy( data , buffer[i] , 2000 );
+}
+
 }
 
 RC BNLJoin::updateBlock()
 {
+
     // table to record outter block's tuple has been joined 
     bool joined[numRecords];
-    memset( joined, false, numRecords );
+    memset( joined, false, numRecords*sizeof(bool) );
+    int counter = 0;
     // read tuples into block
     for( int i=0; i<numRecords; i++){
-	leftIn->getNextTuple( buffer[i] );
+	finishedFlag = leftIn->getNextTuple( buffer[i] );
+//	printf("%f\n",*(float*)((char*)buffer[i]+1+sizeof(int)+sizeof(int) ));
+	if( finishedFlag == QE_EOF ){ assert(false); break; }
+	counter = i;
     }
-
+ 
     void *probe = malloc(2000);
-    
+    // reset iterator 
+    rightIn->setIterator();
+
     while( rightIn->getNextTuple( probe ) != QE_EOF ){
 	// find comparison attribute offset 
 	void *rvalue = malloc(200);
@@ -227,33 +266,41 @@ RC BNLJoin::updateBlock()
 	    memcpy( rvalue, condition.rhsValue.data, 200 );
 	}
 
+//	printf("%d %d\n",*(int*)rvalue,counter);
 
-	for( int i=0; i<numRecords; i++){
+
+	for( int i=0; i<=counter; i++){
 	    if( joined[i] ) continue;
-	    // get left value 
+	    // get left value
 	    AttrType ltype = getAttrValue( lAttrs, condition.lhsAttr, buffer[i], lvalue);
+
 	    assert( ltype == rtype );
 	    // compare the attribtue & value
 	    if( compare( condition.op, ltype, lvalue, rvalue) ){
 		joined[i] = true;
 		// join right record to left record 
 		join( lAttrs, buffer[i], rAttrs, probe );
+		printf("%f\n",*(float*)((char*)buffer[i]+1+20));
 	    }
 	    
 	}
 	free(rvalue); free(lvalue);
-    }
 
+    }
+    printf("QB %d\n",joinedQueue.size());
     // push joined results (pointers) into queue
-    for( int i=0; i<numRecords; i++){
+    for( int i=0; i<=counter; i++){
 	if( joined[i] ){
-	    joinedQueue.push( buffer[i] );
+	    joinedQueue.push(i);
+//		printf("yoyoyo %d\n",*(int*)((char*)buffer[i]+1));
 	}
     }
-    // reset iterator 
-    rightIn->setIterator();
+    printf("QA %d\n",joinedQueue.size());
+    printf("finished pushed\n");
+
     // free probe pointer
     free(probe);
+
 
 }
 

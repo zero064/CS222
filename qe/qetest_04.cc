@@ -33,7 +33,7 @@ RC testCase_4() {
 	// Go over the data through iterator
 	void *data = malloc(bufSize);
 	bool nullBit = false;
-	
+
 	while (project->getNextTuple(data) != QE_EOF) {
 		int offset = 0;
 

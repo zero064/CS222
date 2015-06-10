@@ -246,9 +246,10 @@ class BNLJoin : public Iterator {
 	TableScan *rightIn;
 	Condition condition;
 	unsigned numRecords;
+	int finishedFlag;
 	vector<void*> buffer;
 	vector<Attribute> lAttrs,rAttrs;
-	queue<void*> joinedQueue;
+	queue<int> joinedQueue;
 };
 
 
