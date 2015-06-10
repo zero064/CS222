@@ -42,9 +42,11 @@ class Iterator {
         virtual ~Iterator() {};
     protected:
 	int getAttrSize(Attribute attr, void *data);
-	AttrType getAttrValue(vector<Attribute> attrs, string attr, void *data, void *value);
+	AttrType getAttrValue(vector<Attribute> attrs, string attr, void *data, void *value, bool &nullValue);
 	bool compare(CompOp op, AttrType type, void *v1, void *v2);
 	RC join( vector<Attribute> lAttrs, void *ldata, vector<Attribute>rAttrs, void *rdata);
+	void printValue(CompOp op,string leftname,AttrType leftType,void* leftvalue, string rightname, AttrType rightType,void* rightvalue);
+
 };
 
 
@@ -196,7 +198,7 @@ class IndexScan : public Iterator
 };
 
 
-class Filter : public Iterator {
+class Filter : public Iterator , public DebugMsg{
     // Filter operator
     public:
         Filter(Iterator *input,               // Iterator of input R
@@ -204,9 +206,16 @@ class Filter : public Iterator {
         );
         ~Filter(){};
 
-        RC getNextTuple(void *data) {return QE_EOF;};
+        RC getNextTuple(void *data) ;
         // For attribute in vector<Attribute>, name it as rel.attr
-        void getAttributes(vector<Attribute> &attrs) const{};
+        void getAttributes(vector<Attribute> &attrs) const;
+    private:
+        Iterator *input;
+        Condition condition;
+        vector<Attribute> attrs;
+        vector<string> attrNames;
+        RID rid;
+
 };
 
 
