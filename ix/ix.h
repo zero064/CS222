@@ -172,7 +172,7 @@ class IXFileHandle : public DebugMsg {
 
 
 
-class IX_ScanIterator {
+class IX_ScanIterator : public DebugMsg{
 
 	public:
 		IX_ScanIterator();  							// Constructor

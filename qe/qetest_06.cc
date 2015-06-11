@@ -33,7 +33,7 @@ RC testCase_6() {
 
 	// Create INLJoin
 	INLJoin *inlJoin = new INLJoin(leftIn, rightIn, cond);
-
+	//printf("initialize INLJoin\n");
 	// Go over the data through iterator
 	void *data = malloc(bufSize);
 	bool nullBit = false;

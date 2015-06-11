@@ -17,7 +17,7 @@ IndexManager::IndexManager()
 {
 
     unsync = false;
-    //debug = true;
+    debug = true;
 
 }
 
@@ -2171,6 +2171,7 @@ void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attri
 
 IX_ScanIterator::IX_ScanIterator()
 {
+	//debug = true;
 }
 
 IX_ScanIterator::~IX_ScanIterator()
@@ -2243,10 +2244,15 @@ RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
 		rc = ixfileHandle.readPage(returnPageNum,page);
 	}
 
-
+	//fetch nodeDesc for start page
+	NodeDesc startnodeDesc;
+	memcpy(&startnodeDesc,(char *)page+PAGE_SIZE-sizeof(NodeDesc),sizeof(NodeDesc));
+	dprintf("startnodeDesc.size is %d\n",startnodeDesc.size);
 	offsetToKey = 0;
 	offsetToRID = 0;
 	while( true ){
+
+
 
 		DataEntryDesc ded;
 		memcpy( &ded, (char*)page+offsetToKey, sizeof(DataEntryDesc));
@@ -2273,6 +2279,10 @@ RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
 		free(key);
 
 		offsetToKey += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID);
+		if(offsetToKey >= startnodeDesc.size){
+			dprintf("offsetToKey is %d\n",offsetToKey);
+			return SUCCESS;
+		}
 	}
 
 
@@ -2283,6 +2293,8 @@ RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
 RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 {
 	RC rc;
+
+
 	// check if someone called deleteEntry in indexManager
 	// if someone did, sync the location
 	if( im->unsync ){
@@ -2331,6 +2343,7 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 	// check if the offset exceeds the page size
 	NodeDesc nodeDesc;
 	memcpy( &nodeDesc, (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
+
 
 	if( overflow ){
 	    DataEntryDesc oDed;

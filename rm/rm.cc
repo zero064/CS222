@@ -630,6 +630,7 @@ RC RelationManager::indexScan(const string &tableName,
 	indexName += ".";
 	indexName += attr.name;
 	dprintf("indexName is %s\n",indexName.c_str());
+	//check whether index for this attribute exist
 	//open index file
 	if(indexManager->openFile(indexName,ixfileHandle) == 0){
 

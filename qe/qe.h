@@ -46,6 +46,7 @@ class Iterator {
 	bool compare(CompOp op, AttrType type, void *v1, void *v2);
 	RC join( vector<Attribute> lAttrs, void *ldata, vector<Attribute>rAttrs, void *rdata);
 	void printValue(CompOp op,string leftname,AttrType leftType,void* leftvalue, string rightname, AttrType rightType,void* rightvalue);
+	size_t getDataSize(const vector<Attribute> &recordDescriptor, const void *data, bool printFlag);
 
 };
 
@@ -263,18 +264,24 @@ class BNLJoin : public Iterator , public DebugMsg{
 };
 
 
-class INLJoin : public Iterator {
+class INLJoin : public Iterator , public DebugMsg{
     // Index nested-loop join operator
     public:
         INLJoin(Iterator *leftIn,           // Iterator of input R
                IndexScan *rightIn,          // IndexScan Iterator of input S
                const Condition &condition   // Join condition
-        ){};
+        );
         ~INLJoin(){};
 
-        RC getNextTuple(void *data){return QE_EOF;};
+        RC getNextTuple(void *data);
         // For attribute in vector<Attribute>, name it as rel.attr
-        void getAttributes(vector<Attribute> &attrs) const{};
+        void getAttributes(vector<Attribute> &attrs) const;
+    private:
+        Iterator* leftIn;
+        IndexScan* rightIn;
+        Condition condition;
+        vector<Attribute> leftattrs;
+        vector<Attribute> rightattrs;
 };
 
 // Optional for everyone. 10 extra-credit points

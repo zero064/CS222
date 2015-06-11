@@ -73,13 +73,24 @@ RC Iterator::join( vector<Attribute> lAttrs, void *ldata, vector<Attribute>rAttr
     void *temp = malloc( 2000 );
     memcpy( temp, ldata, lstart+lsize );
 
-    char nullIndicator[nullSize];
+    unsigned char nullIndicator[nullSize];
+
     memcpy( nullIndicator, ldata , lstart );
-    char rIndicator[rstart];
+    unsigned char rIndicator[rstart];
     memcpy( rIndicator, rdata , rstart );
     // setup null indicator
     for( int i = 0; i<rAttrs.size(); i++){
-	nullIndicator[ (i+lAttrs.size())/8 ] = rIndicator[ i/8 ] & ( 1 << 7-(i%8) );
+    	//declare tempnull for carrying null bit
+    	bool tempnull = false;
+    	//calculate the correct position for null bit
+    	int tempoffset  = i + lAttrs.size() - 8*floor((i+lAttrs.size())/8);
+    	printf("tempoffset is %d\n",tempoffset);
+    	if(rIndicator[ i/8 ] & ( 1 << 7-(i%8) ) != 0){
+    		tempnull =true;
+
+    	}
+    	unsigned char tempchar = tempnull << (7-tempoffset );
+    	nullIndicator[ (i+lAttrs.size())/8 ] = nullIndicator[ (i+lAttrs.size())/8 ] + tempchar;
     }
     memcpy( ldata, nullIndicator, nullSize );
     memcpy( (char*)ldata+nullSize, (char*)temp+lstart, lsize );  
@@ -217,7 +228,86 @@ void Iterator::printValue(CompOp op,string leftname,AttrType leftType,void* left
 	}
     }
 }
+size_t Iterator::getDataSize(const vector<Attribute> &recordDescriptor, const void *data, bool printFlag){
 
+
+    //count non-null attribute
+    int nonNull=0;
+    for(int i=0;i<recordDescriptor.size();i++){
+    	if(recordDescriptor[i].length){
+    		nonNull++;
+    	}
+    }
+    // get null indicator's size
+    //printf("nonNull is %d\n",nonNull);
+
+    int nullFieldsIndicatorActualSize = ceil((double) nonNull / CHAR_BIT);
+	//int nullFieldsIndicatorActualSize = ceil((double) recordDescriptor.size() / CHAR_BIT)
+    int offset = 0;
+    unsigned char *nullFieldsIndicator = (unsigned char *) malloc(nullFieldsIndicatorActualSize);
+    memset(nullFieldsIndicator,0,nullFieldsIndicatorActualSize);
+    memcpy(nullFieldsIndicator, data, nullFieldsIndicatorActualSize);
+    offset += nullFieldsIndicatorActualSize;
+    int k=0;
+    for(int i=0; i<recordDescriptor.size(); i++){
+	Attribute attribute = recordDescriptor[i];
+	string name = attribute.name;
+	AttrLength length = attribute.length;
+	AttrType type = attribute.type;
+
+	if(attribute.length != 0){
+
+	    if(printFlag) printf("%d %s %d ",i,name.c_str(),length);
+
+	    if( nullFieldsIndicator[k/8] & (1 << (7-(k%8)) ) ){
+	    	if(printFlag) printf("null\n");
+	    	k++;
+	    	continue;
+	    }
+
+	    void *buffer;
+	    if( type == TypeVarChar ){
+		buffer = malloc(sizeof(int));
+		memcpy( buffer , (char*)data+offset, sizeof(int));
+		offset += sizeof(int);
+		int len = *(int*)buffer;
+		if(printFlag) printf("%i ",len);
+		free(buffer);
+		buffer = malloc(len+1);  // null terminator
+		memcpy( buffer, (char*)data+offset, len);
+		offset += len;
+		((char *)buffer)[len]='\0';
+		if(printFlag) printf("%s\n",buffer);
+		free(buffer);
+		k++;
+		continue;
+	    }
+
+	    std::size_t size;
+	    if( type == TypeReal ){
+		size = sizeof(float);
+		buffer = malloc(size);
+		memcpy( buffer , (char*)data+offset, size);
+		offset += size;
+		if(printFlag) printf("%f \n",*(float*)buffer);
+
+	    }else{
+		size = sizeof(int);
+		buffer = malloc(size);
+		memcpy( buffer , (char*)data+offset, size);
+		offset += size;
+		if(printFlag) printf("%i \n",*(int*)buffer);
+	    }
+
+	    free(buffer);
+	    k++;
+	}
+    }
+
+    if(printFlag) printf("given size %d\n",offset);
+    free(nullFieldsIndicator);
+    return offset;
+}
 Filter::Filter(Iterator *input, const Condition &condition  )
 {
 
@@ -520,7 +610,104 @@ void BNLJoin::getAttributes(vector<Attribute> &attrs) const
     attrs.insert(attrs.end(), right.begin(),right.end() );
 }
 
+INLJoin::INLJoin(Iterator *leftIn, IndexScan *rightIn, const Condition &condition   )
+{
+	//debug = true;
+	//assign value to member
+	this->leftIn = leftIn;
+	this->rightIn = rightIn;
+	this->condition = condition;
+	//get descriptor for leftIn and rightIn
+	leftIn->getAttributes(leftattrs);
+	rightIn->getAttributes(rightattrs);
+	printf("INLJoin constructor\n");
+}
+RC INLJoin::getNextTuple(void *data)
+{
+	void * leftdata =  malloc(PAGE_SIZE);
+	void * rightdata =  malloc(PAGE_SIZE);
+	void * leftvalue = malloc(PAGE_SIZE);
+	void * rightvalue = malloc(PAGE_SIZE);
+	int leftdatasize;
+	int rightdatasize;
+	int totaldatasize;
+	int leftvaluesize;
+	bool nullValue;
+	bool validattr = false;
+	vector<Attribute> joindescriptor;
+	getAttributes(joindescriptor);
+	assert(joindescriptor.size() == (leftattrs.size() + rightattrs.size()));
+	Attribute attr;
+	//load attr from left attrs descriptor
+	for(int i = 0;i < leftattrs.size();i++){
+		if(condition.lhsAttr.compare(leftattrs[i].name) == 0 && leftattrs[i].length != 0){
+			//store the attribute information
+			attr = leftattrs[i];
+			validattr = true;
+			break;
+		}
+	}
+	assert(condition.lhsAttr.compare(attr.name) == 0 && "condition.lhsAttr.compare(attr.name) ==0");
+	if(!validattr){
+		printf("%s is null attribute name\n",condition.lhsAttr.c_str());
+		return -1;
+	}
+	printf("before entering outter loop\n");
+	//outer loop for leftIn
+	while(leftIn->getNextTuple(leftdata) != QE_EOF){
 
+		//get leftIn tuple's size
+		leftdatasize = getDataSize(leftattrs,leftdata,true);
+		//debug:leftsize
+		dprintf("leftdatasize is %d\n",leftdatasize);
+		//get lowKey and highKey for leftIn
+		getAttrValue(leftattrs, condition.lhsAttr, leftdata, leftvalue, nullValue);
+		//if null value, jump to next tuple
+		if(nullValue){
+			dprintf("nullValue\n");
+			continue;
+		}
+		//get value's size for leftIn's tuple
+		leftvaluesize = getAttrSize(attr, leftvalue);
+		//reset iterator for rightIn
+		dprintf("before reset Iterator\n");
+		rightIn->setIterator(leftvalue, leftvalue, true, true);
+		//inner loop for rightIn
+		dprintf("before entering inner loop\n");
+		while(rightIn->getNextTuple(rightdata) != QE_EOF){
+			dprintf("entering inner loop\n");
+			//get rightIn tuple's size
+			rightdatasize = getDataSize(rightattrs,rightdata,true);
+			//debug:rightsize
+			dprintf("rightdatasize is %d\n",rightdatasize);
+			//concatenate leftIn's tuple and rightIn's tuple
+			join(leftattrs, leftdata, rightattrs, rightdata);
+			//get data size for joined tuple
+			totaldatasize = getDataSize(joindescriptor, leftdata,true);
+			//copy leftdata to data
+			memcpy(data,leftdata,totaldatasize);
+			//free allocated memory
+			free(leftdata);
+			free(rightdata);
+			free(leftvalue);
+			free(rightvalue);
+			return 0;
+		}
+	}
+	//free allocated memory
+	free(leftdata);
+	free(rightdata);
+	free(leftvalue);
+	free(rightvalue);
+	return QE_EOF;
+}
+void INLJoin::getAttributes(vector<Attribute> &attrs) const
+{
+	//concatenate leftIn attribute and rightIn attribute
+    attrs.clear();
+    attrs.insert(attrs.begin(), leftattrs.begin(), leftattrs.end() );
+    attrs.insert(attrs.end(), rightattrs.begin(),rightattrs.end() );
+}
 
 GHJoin::GHJoin( Iterator *leftIn, Iterator *rightIn, const Condition &condition,const unsigned numPartitions)
 {
