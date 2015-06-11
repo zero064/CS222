@@ -404,7 +404,159 @@ RC RelationManager::deleteCatalog()
 	}
     return -1;
 }
+int RelationManager::getAttrSize(Attribute attr, void *data)
+{
+    int size = -1;
+    switch( attr.type ){
+	case TypeInt:
+	    return sizeof(int);
+	case TypeReal:
+	    return sizeof(float);
+	case TypeVarChar:
+	    memcpy( &size , data , sizeof(int) );
+	    //	string sa( (char*)data+4,size);
+	    //	printf("%s\n",sa.c_str();
+	    assert( size != -1 && size < PAGE_SIZE && "wrong in reading varchar size");
+	    return size+sizeof(int);
+    }
+}
 
+AttrType RelationManager::getAttrValue(vector<Attribute> attrs, string attr,const void *data, void *value, bool &nullValue)
+{
+    assert( data != NULL); assert(value != NULL); assert(attrs.size() > 0 );
+    int nullSize = ceil( (double)attrs.size() / 8 ) ;
+    unsigned char nullIndicator[nullSize];
+    nullValue = false;
+    memcpy( &nullIndicator, data, nullSize);
+    int offset = nullSize; // offset to find value
+    for( int i=0; i<attrs.size(); i++){
+	//size only used in this scope
+	int size;
+	//printf("%s %s\n",attrs[i].name.c_str(),attr.c_str());
+	// check if attrs[i] is desired attribute
+	if( attrs[i].name.compare( attr ) == 0 ){
+	    // if null indicator is 1, no value for desired attribute
+	    if( nullIndicator[i/8] & ( 1 << (7-(i%8)) ) ){
+		nullValue = true;
+		return attrs[i].type;
+	    }
+	    // get attribute value size
+	    size = getAttrSize( attrs[i], (char*)data+offset );
+	    memcpy( value, (char*)data+offset, size );
+	    return attrs[i].type;
+	}else{
+	    // skip null field for increasing offset
+	    if( nullIndicator[i/8] & ( 1 << (7-(i%8)) ) ) continue;
+	    // calculate size for value
+	    size = getAttrSize( attrs[i], (char*)data+offset );
+	    offset += size;
+	}
+
+    }
+    // shouldn't be here
+    assert(false);
+}
+RC RelationManager::updateIndex(const string &tableName, const void* data, const RID &recordRid )
+{
+	dprintf("In updateIndex\n");
+	// for every index attribute update them
+	RM_ScanIterator rm_ScanIterator_delete;
+	IndexManager *indexManager=IndexManager::instance();
+	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
+	FileHandle fileHandle;
+	RID rid;
+	vector<Attribute> attrs;
+	vector<Attribute>  indexattrs;
+	Attribute attr;
+	//for fetching attribute's key
+	void *key = malloc(PAGE_SIZE);
+	//for storing string in VarChar form
+	void *VarChardata = malloc(PAGE_SIZE);
+	//for fetching Indexes's column name
+	void *indexdata = malloc(PAGE_SIZE);
+	vector<string> attrname;
+	attrname.push_back("column-name");
+	//for storing  Indexes'column name in string form
+	string targetstring;
+	// for storing index file's name
+	string indexName;
+	bool nullValue;
+	//get recordDescriptor for this table
+	getAttributes(tableName,attrs);
+	//get recordDescriptor for Indexes
+	PrepareCatalogDescriptor("Indexes", indexattrs);
+	//scan Indexes to find all index attribute for tableName
+	rbfm->openFile("Indexes",fileHandle);
+	//create VarChar
+	CreateVarChar(VarChardata,tableName);
+	//scan for finding index attribute for this tableName
+	if( scan("Indexes","table-name",EQ_OP,VarChardata,attrname,rm_ScanIterator_delete) == 0 ){
+		while(rm_ScanIterator_delete.getNextTuple(rid,indexdata)!=RM_EOF){
+			IXFileHandle ixfileHandle;
+			VarCharToString((char *)indexdata+1,targetstring);
+			dprintf("targetstring is %s\n",targetstring.c_str());
+			//fetch attribute for this index name
+			if(loadIndexAttr(tableName, targetstring, attrs, attr) == 0){
+				assert(attr.name == targetstring && "attr.name == targetstring");
+				//get key value for this index name
+				getAttrValue(attrs, targetstring, data, key, nullValue);
+				if(nullValue){
+					dprintf("nullValue\n");
+					continue;
+				}
+				//get index's name
+				indexName = getIndexName(tableName, targetstring);
+				dprintf("indexName is %s\n",indexName.c_str());
+				//open ixfilehandle
+				indexManager->openFile(indexName,ixfileHandle);
+				//insertEntry
+				indexManager->insertEntry(ixfileHandle,attr, key, recordRid);
+
+				//close ixfilehandle
+				indexManager->closeFile(ixfileHandle);
+
+			}else{
+				dprintf("Unvalid attribute name");
+				continue;
+			}
+
+		}
+	}else{
+		dprintf("scan fail\n");
+		//free allocated memory
+		free(key);
+		free(VarChardata);
+		free(indexdata);
+		return -1;
+	}
+	rm_ScanIterator_delete.close();
+	rbfm->closeFile(fileHandle);
+	//free allocated memory
+	free(key);
+	free(VarChardata);
+	free(indexdata);
+	return 0;
+
+
+}
+RC RelationManager::loadIndexAttr(const string &tableName, const string &attributeName, vector<Attribute> &attrs, Attribute &attr)
+{
+	bool validattr = false;
+	//check whether attribute exist
+	for(int i = 0;i < attrs.size();i++){
+		if(attributeName.compare(attrs[i].name) == 0 && attrs[i].length != 0){
+			//store the attribute information
+			attr = attrs[i];
+			validattr = true;
+			break;
+		}
+	}
+	if(!validattr){
+		dprintf("null attribute name");
+		return -1;
+	}
+	return 0;
+}
 RC RelationManager::createIndex(const string &tableName, const string &attributeName)
 {
 	RM_ScanIterator rm_ScanIterator;
@@ -597,6 +749,14 @@ RC RelationManager::destroyIndex(const string &tableName, const string &attribut
 		return 0;
 
 }
+string RelationManager::getIndexName(string tableName, string columnName)
+{
+	string returnedstring = tableName;
+	returnedstring += ".";
+	returnedstring += columnName;
+	return returnedstring;
+}
+
 RC RelationManager::indexScan(const string &tableName,
                         const string &attributeName,
                         const void *lowKey,
@@ -732,6 +892,7 @@ int RelationManager::getTableId(const string &tableName){
 
 RC RelationManager::deleteTable(const string &tableName)
 {
+	RecordBasedFileManager *rbfm=RecordBasedFileManager::instance();
 	FileHandle filehandle;
 	RM_ScanIterator rm_ScanIterator;
 	RM_ScanIterator rm_ScanIterator2;
@@ -747,6 +908,51 @@ RC RelationManager::deleteTable(const string &tableName)
 	PrepareCatalogDescriptor("Tables",tablesdescriptor);
 	vector<Attribute> columnsdescriptor;
 	PrepareCatalogDescriptor("Columns",columnsdescriptor);
+
+	//destroy all index file about this table
+	vector<string> attrname_delete;
+	attrname_delete.push_back("column-name");
+	vector<Attribute> indexattrs;
+	// get record descriptor for Indexes
+	PrepareCatalogDescriptor("Indexes", indexattrs);
+	string targetstring;
+	RM_ScanIterator rm_ScanIterator_delete;
+	IndexManager *indexManager=IndexManager::instance();
+	FileHandle filehandle_delete;
+	RID rid_delete;
+	void *indexdata = malloc(PAGE_SIZE);
+	void* VarChardata = malloc(PAGE_SIZE);
+
+	//transform tableName to VarChar form
+	CreateVarChar(VarChardata,tableName);
+	//scan Indexes for to-be-deleted tableName
+	if(rbfm->openFile("Indexes", filehandle_delete) == 0){
+		if( scan("Indexes","table-name",EQ_OP,VarChardata,attrname_delete,rm_ScanIterator_delete) == 0 ){
+			while(rm_ScanIterator_delete.getNextTuple(rid_delete,indexdata)!=RM_EOF){
+				if(rbfm->deleteRecord(filehandle_delete, indexattrs, rid_delete) == 0 ){
+					dprintf("Successfully delete index record in Indexes\n");
+					//get column name in Indexes
+					VarCharToString((char *)indexdata+1,targetstring);
+					dprintf("targetstring is %s\n",targetstring.c_str());
+
+					//delete index file
+					destroyIndex(tableName, targetstring);
+
+				}else{
+					dprintf("Fail to delete index record in Indexes\n");
+
+				}
+			}
+		}
+	}else{
+		dprintf("Fail to open Indexes\n");
+	}
+	//close file , close rm_ScanIterator_delete
+	rbfm->closeFile(filehandle_delete);
+	rm_ScanIterator_delete.close();
+	free(indexdata);
+	free(VarChardata);
+
 	if(tableName.compare("Tables") && tableName.compare("Columns")){
 		if(rbfm->destroyFile(tableName)==0){
 			tableid=getTableId(tableName);
@@ -896,6 +1102,7 @@ RC RelationManager::insertTuple(const string &tableName, const void *data, RID &
 			if(rbfm->insertRecord(filehandle,descriptor,data,rid)==0){
 				
 				dprintf("Successfully insert tuple \n\n\n");
+				updateIndex(tableName,data, rid );
 
 			}
 			rbfm->closeFile(filehandle);

@@ -17,7 +17,7 @@ IndexManager::IndexManager()
 {
 
     unsync = false;
-    debug = true;
+    //debug = true;
 
 }
 

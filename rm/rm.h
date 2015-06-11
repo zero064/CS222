@@ -123,7 +123,11 @@ private:
   RC UpdateColumns(int tableid,vector<Attribute> attributes);
   RC CreateVarChar(void *data,const string &str);
   RC CreateIndexesRecord(void *data,const string tablename,const string columnname);
-
+  string getIndexName(string tableName, string columnName);
+  AttrType getAttrValue(vector<Attribute> attrs, string attr,const void *data, void *value, bool &nullValue);
+  int getAttrSize(Attribute attr, void *data);
+  RC updateIndex(const string &tableName,const void* data, const RID &recordRid );
+  RC loadIndexAttr(const string &tableName, const string &attributeName, vector<Attribute> &attrs, Attribute &attr);
 
   RC PrepareCatalogDescriptor(string tablename,vector<Attribute> &attributes);
   RC CreateTablesRecord(void *data,int tableid,string tablename,int systemtable);

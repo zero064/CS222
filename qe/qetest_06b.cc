@@ -35,12 +35,15 @@ int testCase_6B() {
 
 	leftIn->setIterator(NULL, value.data, true, false);
 	Filter *filter = new Filter(leftIn, cond_f); //left.B: 10~74, left.C: 50.0~114.0
-
+	//void* testdata = malloc(PAGE_SIZE);
+	//filter->getNextTuple(testdata);
+	//vector<Attribute> testattrs;
 	// Create Project
 	vector<string> attrNames;
 	attrNames.push_back("left.A");
 	attrNames.push_back("left.C");
 	Project *project = new Project(filter, attrNames);
+	//project->getAttributes(testattrs);
 
 	Condition cond_j;
 	cond_j.lhsAttr = "left.C";
