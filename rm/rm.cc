@@ -320,7 +320,7 @@ RelationManager* RelationManager::instance()
 
 RelationManager::RelationManager()
 {  
-    debug = false;
+    //debug = true;
     rbfm = RecordBasedFileManager::instance();
 }
 
@@ -605,6 +605,7 @@ RC RelationManager::indexScan(const string &tableName,
                         bool highKeyInclusive,
                         RM_IndexScanIterator &rm_IndexScanIterator
        ){
+	dprintf("in RM_indexscan\n");
 	IndexManager *indexManager=IndexManager::instance();
 	IXFileHandle ixfileHandle;
 	vector<Attribute> attrs;
@@ -633,7 +634,7 @@ RC RelationManager::indexScan(const string &tableName,
 	//check whether index for this attribute exist
 	//open index file
 	if(indexManager->openFile(indexName,ixfileHandle) == 0){
-
+		dprintf("successfully open %s\n",indexName.c_str());
 	}else{
 		dprintf("in indexscan\nFail to open indexfile file\n");
 		return -1;

@@ -330,6 +330,7 @@ RC Filter::getNextTuple(void *data)
     bool leftnullValue;
     bool rightnullValue;
 //    for(int i=0; i<attrs.size(); i++) printf("%s\n",attrs[i].name.c_str());
+    dprintf("In Filter, before entering while loop\n");
     while(input->getNextTuple(data) != QE_EOF){
 	attrtype = getAttrValue(attrs, condition.lhsAttr, data, vleft, leftnullValue);
 	if(leftnullValue) continue;
@@ -359,6 +360,7 @@ RC Filter::getNextTuple(void *data)
     }
     free(vleft);
     free(vright);
+    dprintf("In Filster, rc is QE_EOF\n");
     return QE_EOF;
 
 };
@@ -375,7 +377,8 @@ void Filter::getAttributes(vector<Attribute> &attrs) const
 
 Project::Project(Iterator *input, const vector<string> &attrNames)
 {
-    assert( input != NULL && "Yo iterator shouldn't be null okay?\n");
+    debug =true;
+	assert( input != NULL && "Yo iterator shouldn't be null okay?\n");
     this->input = input;
     this->attrNames = attrNames;
     //debug = true;
@@ -386,6 +389,9 @@ Project::Project(Iterator *input, const vector<string> &attrNames)
 	    if( origin_attr[j].name.compare( attrNames[i] ) == 0 )
 		attrs.push_back( origin_attr[j] );
 	}
+    }
+    for(int i=0; i < this->attrs.size(); i++){
+    	if(debug) printf("name:%s\ntype:%d\nlength:%d\nposition:%d\n",this->attrs[i].name.c_str(),this->attrs[i].type,this->attrs[i].length,this->attrs[i].position);
     }
 }
 
@@ -399,6 +405,11 @@ RC Project::getNextTuple(void *data)
     void *tuple = malloc(2000);
     RC rc;
     rc = input->getNextTuple(tuple);
+    if(rc == QE_EOF){
+    	dprintf("In project's getNextTuple\nrc is  %d,no new tuple\n",rc);
+    	free(tuple);
+    	return rc;
+    }
     // get original schema
     vector<Attribute> origin_attr;
     input->getAttributes(origin_attr);
@@ -455,12 +466,21 @@ RC Project::getNextTuple(void *data)
     }
     memcpy(data,returnednullIndicator,returnednullSize);
     free(tuple);
+    dprintf("rc is %d\n",rc);
     return rc;
 }
 
 void Project::getAttributes(vector<Attribute> &attrs) const
 {
-    attrs = this->attrs;
+    if(debug) printf("IN project, getAttributes\n");
+	attrs.clear();
+    if(debug) printf("IN project, attrs.size is  %d\nthis-attrs is %d\n",attrs.size(),this->attrs.size());
+    for(int i=0; i < this->attrs.size(); i++){
+    	if(debug) printf("name:%s\ntype:%d\nlength:%d\nposition:%d\n",this->attrs[i].name.c_str(),this->attrs[i].type,this->attrs[i].length,this->attrs[i].position);
+    }
+	attrs = this->attrs;
+    if(debug) printf("IN project,End of getAttributes\n");
+
 }
 
 
@@ -612,15 +632,20 @@ void BNLJoin::getAttributes(vector<Attribute> &attrs) const
 
 INLJoin::INLJoin(Iterator *leftIn, IndexScan *rightIn, const Condition &condition   )
 {
-	//debug = true;
+	debug = true;
 	//assign value to member
+	dprintf("INLJoin constructor\n");
+	//leftIn->getAttributes(leftattrs);
+
 	this->leftIn = leftIn;
 	this->rightIn = rightIn;
 	this->condition = condition;
 	//get descriptor for leftIn and rightIn
+	dprintf("before getting leftattrs\n");
 	leftIn->getAttributes(leftattrs);
+	dprintf("before getting rightattrs\n");
 	rightIn->getAttributes(rightattrs);
-	printf("INLJoin constructor\n");
+	dprintf("in End of INLJoin constructor \n");
 }
 RC INLJoin::getNextTuple(void *data)
 {
@@ -652,7 +677,7 @@ RC INLJoin::getNextTuple(void *data)
 		printf("%s is null attribute name\n",condition.lhsAttr.c_str());
 		return -1;
 	}
-	printf("before entering outter loop\n");
+	dprintf("before entering outter loop\n");
 	//outer loop for leftIn
 	while(leftIn->getNextTuple(leftdata) != QE_EOF){
 

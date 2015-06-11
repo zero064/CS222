@@ -2171,7 +2171,7 @@ void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attri
 
 IX_ScanIterator::IX_ScanIterator()
 {
-	//debug = true;
+	debug = true;
 }
 
 IX_ScanIterator::~IX_ScanIterator()
@@ -2232,16 +2232,18 @@ RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
 	// Get Root Page Info
 	NodeDesc nodeDesc;
 	memcpy( &nodeDesc , (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc));
-
+	dprintf("root is %d\nroot's nodeDesc.size is %d\n",root,nodeDesc.size);
 
 	// Start Tree Traversal if root is non-leaf
 	PageNum returnPageNum = 0;
 	if( nodeDesc.type == NonLeaf ){
+		dprintf("nodeDesc.type == NonLeaf\n");
 		im->TraverseTree( ixfileHandle, attribute, this->lowKey, page, root, returnPageNum);
 		assert( root != returnPageNum && "root should not be leaf in this case" );
 		assert( returnPageNum >=1 && "something went wrong when traversing tree in scan ");
 		pageNum = returnPageNum;
 		rc = ixfileHandle.readPage(returnPageNum,page);
+		dprintf("returnPageNum is %d\n",returnPageNum);
 	}
 
 	//fetch nodeDesc for start page
@@ -2262,17 +2264,21 @@ RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
 	//	printf("%d di %f low %f\n", im->keyCompare( attribute , key , this->lowKey ), *(float*)key, *(float*)this->lowKey );
 		if( this->lowKeyNull ){
 		    free(key);
+		    dprintf("In iterator init(this->lowKeyNull)\n offsetToKey is %d\n",offsetToKey);
 		    return SUCCESS;
 		}
 		if( lowKeyInclusive ){
 
 			if( im->keyCompare( attribute , key , this->lowKey ) >= 0 ){
 				free(key);
+				dprintf("In iterator init(im->keyCompare( attribute , key , this->lowKey ) >= 0)\n offsetToKey is %d\n",offsetToKey);
+
 				return SUCCESS;
 			}
 		}else{
 			if( im->keyCompare( attribute , key , this->lowKey ) > 0 ){
 				free(key);
+				dprintf("In iterator init(im->keyCompare( attribute , key , this->lowKey ) > 0)\n offsetToKey is %d\n",offsetToKey);
 				return SUCCESS;
 			}
 		}
@@ -2280,7 +2286,8 @@ RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
 
 		offsetToKey += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID);
 		if(offsetToKey >= startnodeDesc.size){
-			dprintf("offsetToKey is %d\n",offsetToKey);
+
+			dprintf("In iterator init(offsetToKey >= startnodeDesc.size)\noffsetToKey is %d\n",offsetToKey);
 			return SUCCESS;
 		}
 	}
@@ -2293,7 +2300,7 @@ RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
 RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 {
 	RC rc;
-
+	dprintf("in IX_ScanIterator getNextEntry\n");
 
 	// check if someone called deleteEntry in indexManager
 	// if someone did, sync the location
@@ -2403,7 +2410,11 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 
 
 	if( offsetToKey >= nodeDesc.size ){
-		if( nodeDesc.next == InvalidPage ) return IX_EOF;
+		dprintf("offsetToKey >= nodeDesc.size\n");
+		if( nodeDesc.next == InvalidPage ){
+			dprintf("nodeDesc.next == InvalidPage, offsetToKey is %d\nnodeDesc.size is %d\nreturn IX_EOF\n",offsetToKey,nodeDesc.size);
+			return IX_EOF;
+		}
 		pageNum = nodeDesc.next;
 		rc = ixfileHandle.readPage( nodeDesc.next, page );
 		assert( rc == SUCCESS && "something wrong in readpage in getNextEntry" );
@@ -2421,9 +2432,15 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 
 	int result = im->keyCompare( attribute, key , highKey );
 	if( highKeyInclusive ){ 
-		if( result > 0 ) return IX_EOF;
+		if( result > 0 ) {
+			dprintf("highKeyInclusive\nresult > 0,\noffsetToKey is %d return IX_EOF\n",offsetToKey);
+			return IX_EOF;
+		}
 	}else{ 
-		if( result >= 0 ) return IX_EOF;
+		if( result >= 0 ){
+			dprintf("!highKeyInclusive\nresult >= 0,\noffsetToKey is %d return IX_EOF\n");
+			return IX_EOF;
+		}
 	}
 
 	// Read rid and return
@@ -2470,6 +2487,7 @@ RC IX_ScanIterator::close()
 IXFileHandle::IXFileHandle()
 {
 	error = -1;
+	debug = true;
 }
 
 
@@ -2562,7 +2580,7 @@ PageNum IXFileHandle::findRootPage()
 	void *page = malloc(PAGE_SIZE);
 	PageNum root = 1; // assume root page is 1 if the whole structure hasn't been initialized
 	if( readPage(0, page) == FAILURE ) {
-
+		dprintf("readPage(0, page) == FAILURE\n");
 		for(int i=1; i< directorySize; i++ ){
 			PageNum empty = 0;
 			memcpy( (char*)page+i*sizeof(PageNum) , &empty, sizeof(PageNum) );
@@ -2581,6 +2599,7 @@ PageNum IXFileHandle::findRootPage()
 		assert(rc == SUCCESS && "Fail to write root page as leaf page");
 
 	}else{
+		dprintf("readPage(0, page) != FAILURE\n");
 		// read 1st directory's 1st entry
 		memcpy( &root , (char*)page+sizeof(PageNum) , sizeof(PageNum) );
 	}
