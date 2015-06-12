@@ -308,6 +308,62 @@ size_t Iterator::getDataSize(const vector<Attribute> &recordDescriptor, const vo
     free(nullFieldsIndicator);
     return offset;
 }
+
+float Iterator::transToFloat( const Attribute attr,const void* key)
+{
+	float tempfloat;
+	int tempint;
+	//if attr.type is TypeReal directly assing *(float *)key to tempfloat
+	if(attr.type == TypeReal){
+		tempfloat = *(float *) key;
+		return tempfloat;
+	}else if(attr.type == TypeInt){
+		//if attr.type is TypeInt
+
+		//assign *(int *)key tempint
+		tempint = *(int *) key;
+		//type conversion, (float) tempint
+		tempfloat = (float) tempint;
+		return tempfloat;
+
+	}else{
+	//else assert
+	assert(false && "type should be TypeReal or TypeInt");
+	}
+}
+int Iterator::VarCharToString(void *data,string &str){
+	int size;
+	int offset=0;
+	char * VarCharData=(char *) malloc(PAGE_SIZE);
+
+	memcpy(&size,(char *)data+offset,sizeof(int));
+	offset+=sizeof(int);
+
+	memcpy(VarCharData,(char *)data+offset,size);
+	offset+=size;
+
+	VarCharData[size]='\0';
+	string tempstring(VarCharData);
+	str=tempstring;
+
+
+	free(VarCharData);
+
+	return 0;
+
+
+}
+RC Iterator::CreateVarChar(void *data,const string &str){
+	int size=str.size();
+	int offset=0;
+	memcpy((char *)data+offset,&size,sizeof(int));
+	offset+=sizeof(int);
+	memcpy((char *)data+offset,str.c_str(),size);
+	offset+=size;
+
+
+	return 0;
+}
 Filter::Filter(Iterator *input, const Condition &condition  )
 {
 
@@ -735,201 +791,516 @@ void INLJoin::getAttributes(vector<Attribute> &attrs) const
 }
 Aggregate::Aggregate(Iterator *input, Attribute aggAttr, AggregateOp op)
 {
+	debug = true;
 	this->input = input;
 	input->getAttributes(attrs);
 	this->aggAttr = aggAttr;
 	this->op = op;
+	void *key = malloc(PAGE_SIZE);
+	void *data = malloc(PAGE_SIZE);
+	const float indexfloat =2;
+	float tempfloat;
+	Aggregation tempaggr;
+	bool nullValue;
+	dprintf("Aggregate constructor\n");
 	// No group by block
-
+	//check whether aggAttr is int or float
+	if(aggAttr.type == TypeInt || aggAttr.type == TypeReal){
 	//while loop, fetch next tuple from input
+		while(input->getNextTuple(data) != QE_EOF){
+			//fetch key value for aggAttr
+			getAttrValue(attrs, aggAttr.name,data,key, nullValue);
+			//if null key value , continue
+			if(nullValue){
+				dprintf("nullValue");
+				continue;
+			}
+			//transform key value of aggAttr to float value
+			tempfloat = transToFloat(aggAttr, key);
+			dprintf("tempfloat is %f\n",tempfloat);
 
-	//fetch key value for aggAttr
+			//switch on op
+			switch( op ){
 
-	//if null key value , continue
+				case COUNT :
+				//COUNT, count++
+					tempaggr = floatmap[indexfloat];
+					tempaggr.count += 1;
+					floatmap[indexfloat] = tempaggr;
+					break;
+				case SUM :
+				//SUM, sum++
+					tempaggr = floatmap[indexfloat];
+					tempaggr.sum += tempfloat;
+					floatmap[indexfloat] = tempaggr;
+					break;
+				case AVG :
+				//AVG, sum++ and count ++
+					tempaggr = floatmap[indexfloat];
+					tempaggr.count += 1;
+					tempaggr.sum += tempfloat;
+					floatmap[indexfloat] = tempaggr;
+					break;
+				case MIN :
+				//MIN, if new value < stored value, replace it
+					tempaggr = floatmap[indexfloat];
+					if(tempfloat < tempaggr.min){
+						tempaggr.min = tempfloat;
+						floatmap[indexfloat] = tempaggr;
+					}
+					break;
+				case MAX :
+				//MAX, if new value > stored value, replace it
+					tempaggr = floatmap[indexfloat];
+					if(tempfloat > tempaggr.max){
+						tempaggr.max = tempfloat;
+						floatmap[indexfloat] = tempaggr;
+					}
+					break;
+				default :
+					dprintf("wrong op\n");
+			}
+		}
+		//if op is AVG, calculate result
+			if(op == AVG){
+				tempaggr = floatmap[indexfloat];
+				tempaggr.avg = tempaggr.sum / tempaggr.count;
+				floatmap[indexfloat] = tempaggr;
+			}
+			tempaggr = floatmap[indexfloat];
+			dprintf("in map\ncount is %f\nsum is %f\navg is %f\nmax is %f\nmin is %f\n",tempaggr.count,tempaggr.sum,tempaggr.avg,tempaggr.max,tempaggr.min);
+	}
 
-	//transform key value of aggAttr to float value
-
-	//switch on op
-
-	//COUNT, count++
-
-	//SUM, sum++
-
-	//AVG, sum++ and count ++
-
-	//MIN, if new value < stored value, replace it
-
-	//MAX, if new value > stored value, replace it
-
-	//close iterator
-
-	//if op is AVG, calculate result
 
 	//set iterator to begin
-
+	floatIt = floatmap.begin();
+	//free allocated memory
+	free(data);
+	free(key);
 
 
 
 }
 Aggregate::Aggregate(Iterator *input, Attribute aggAttr, Attribute groupAttr, AggregateOp op)
 {
+	debug = true;
 	this->input = input;
 	input->getAttributes(attrs);
 	this->aggAttr = aggAttr;
 	this->groupAttr = groupAttr;
 	isGroupby = true;
 	this->op = op;
-
+	void *key = malloc(PAGE_SIZE);
+	void *data = malloc(PAGE_SIZE);
+	void *VarChardata = malloc(PAGE_SIZE);
+	string tempstring;
+	float tempfloat_group;
+	float tempfloat;
+	Aggregation tempaggr;
+	bool nullValue;
+	dprintf("Aggregate constructor\n");
 	//Group by block
 
+	//check whether aggAttr is int or float
+	if(aggAttr.type == TypeInt || aggAttr.type == TypeReal){
 
+		//while loop, fetch next tuple from input
+		while(input->getNextTuple(data) != QE_EOF){
+			//fetch key value for aggAttr
+			getAttrValue(attrs, aggAttr.name,data,key, nullValue);
+			//if null key value , continue
+			if(nullValue){
+				dprintf("nullValue");
+				continue;
+			}
+			//transform key value of aggAttr to float value
+			tempfloat = transToFloat(aggAttr, key);
+			dprintf("tempfloat is %f\n",tempfloat);
+			//fetch key value for groupAttr
+			//!reuse key  and nullValue
+			getAttrValue(attrs, groupAttr.name,data,key, nullValue);
+			//if null key value , continue
+			if(nullValue){
+				dprintf("nullValue");
+				continue;
+			}
+			//if groupAttr is float or int,transform key value of groupAttr to float value
+			if(groupAttr.type == TypeInt || groupAttr.type == TypeReal){
+				tempfloat_group = transToFloat(groupAttr, key);
+				dprintf("tempfloat_group is %f\n",tempfloat_group);
+			}else if(groupAttr.type == TypeVarChar){
+			//if groupAttr is VarChar ,transform key value of groupAttr to string
+				VarCharToString(key, tempstring);
+			}else{
+				assert(false);
+			}
+			//switch on op
+			switch( op ){
 
+				case COUNT :
+				//COUNT, count++
+					if(groupAttr.type == TypeInt || groupAttr.type == TypeReal){
+						tempaggr = floatmap[tempfloat_group];
+						tempaggr.count += 1;
+						floatmap[tempfloat_group] = tempaggr;
+						break;
+					}else if(groupAttr.type == TypeVarChar){
+						tempaggr = stringmap[tempstring];
+						tempaggr.count += 1;
+						stringmap[tempstring] = tempaggr;
+						break;
+					}
+				case SUM :
+				//SUM, sum++
+					if(groupAttr.type == TypeInt || groupAttr.type == TypeReal){
+						tempaggr = floatmap[tempfloat_group];
+						tempaggr.sum += tempfloat;
+						floatmap[tempfloat_group] = tempaggr;
+						break;
+					}else if(groupAttr.type == TypeVarChar){
+						tempaggr = stringmap[tempstring];
+						tempaggr.sum += tempfloat;
+						stringmap[tempstring] = tempaggr;
+						break;
+					}
+				case AVG :
+				//AVG, sum++ and count ++
+					if(groupAttr.type == TypeInt || groupAttr.type == TypeReal){
+						tempaggr = floatmap[tempfloat_group];
+						tempaggr.count += 1;
+						tempaggr.sum += tempfloat;
+						floatmap[tempfloat_group] = tempaggr;
+						break;
+					}else if(groupAttr.type == TypeVarChar){
+						tempaggr = stringmap[tempstring];
+						tempaggr.count += 1;
+						tempaggr.sum += tempfloat;
+						stringmap[tempstring] = tempaggr;
+						break;
+					}
+				case MIN :
+				//MIN, if new value < stored value, replace it
+					if(groupAttr.type == TypeInt || groupAttr.type == TypeReal){
+						tempaggr = floatmap[tempfloat_group];
+						if(tempfloat < tempaggr.min){
+							tempaggr.min = tempfloat;
+							floatmap[tempfloat_group] = tempaggr;
+						}
+						break;
+					}else if(groupAttr.type == TypeVarChar){
+						tempaggr = stringmap[tempstring];
+						if(tempfloat < tempaggr.min){
+							tempaggr.min = tempfloat;
+							stringmap[tempstring] = tempaggr;
+						}
+						break;
+					}
+				case MAX :
+				//MAX, if new value > stored value, replace it
+					if(groupAttr.type == TypeInt || groupAttr.type == TypeReal){
+						tempaggr = floatmap[tempfloat_group];
+						if(tempfloat > tempaggr.max){
+							tempaggr.max = tempfloat;
+							floatmap[tempfloat_group] = tempaggr;
+						}
+						break;
+					}else if(groupAttr.type == TypeVarChar){
+						tempaggr = stringmap[tempstring];
+						if(tempfloat > tempaggr.max){
+							tempaggr.max = tempfloat;
+							stringmap[tempstring] = tempaggr;
+						}
+						break;
+					}
+			}
+		}
 
-	//while loop, fetch next tuple from input
+		//if op is AVG, calculate result
+		if(op == AVG){
+			if(groupAttr.type == TypeInt || groupAttr.type == TypeReal){
+				for(FloatMap::iterator tempit=floatmap.begin();tempit != floatmap.end();tempit++){
+					tempfloat_group = tempit->first;
+					tempaggr = tempit->second;
+					tempaggr.avg = tempaggr.sum / tempaggr.count;
+					floatmap[tempfloat_group] = tempaggr;
+					dprintf("in map(%f)\ncount is %f\nsum is %f\navg is %f\n",tempfloat_group,tempaggr.count,tempaggr.sum,tempaggr.avg);
+				}
+			}else if(groupAttr.type == TypeVarChar){
+				for(StringMap::iterator tempit=stringmap.begin();tempit != stringmap.end();tempit++){
+					tempstring = tempit->first;
+					tempaggr = tempit->second;
+					tempaggr.avg = tempaggr.sum / tempaggr.count;
+					stringmap[tempstring] = tempaggr;
+					dprintf("in map(%s)\ncount is %f\nsum is %f\navg is %f\n",tempstring.c_str(),tempaggr.count,tempaggr.sum,tempaggr.avg);
+				}
+			}
 
-	//fetch key value for aggAttr
+		}else{
+			if(groupAttr.type == TypeInt || groupAttr.type == TypeReal){
+				for(FloatMap::iterator tempit=floatmap.begin();tempit != floatmap.end();tempit++){
+					tempfloat_group = tempit->first;
+					tempaggr = tempit->second;
+					dprintf("in map(%f)\ncount is %f\nsum is %f\navg is %f\nmax is %f\nmin is %f\n",tempfloat_group,tempaggr.count,tempaggr.sum,tempaggr.avg,tempaggr.max,tempaggr.min);
 
-	//if null key value , continue
+				}
+			}else if(groupAttr.type == TypeVarChar){
+				for(StringMap::iterator tempit=stringmap.begin();tempit != stringmap.end();tempit++){
+					tempstring = tempit->first;
+					tempaggr = tempit->second;
+					dprintf("in map(%s)\ncount is %f\nsum is %f\navg is %f\nmax is %f\nmin is %f\n",tempstring.c_str(),tempaggr.count,tempaggr.sum,tempaggr.avg,tempaggr.max,tempaggr.min);
 
-	//transform key value of aggAttr to float value
+				}
+			}
 
+		}
 
-	//fetch key value for groupAttr
-
-	//if null key value , continue
-
-
-	//if groupAttr is float or int,transform key value of groupAttr to float value
-
-	//if groupAttr is VarChar ,transform key value of groupAttr to string
-
-	//switch on op
-
-	//COUNT, count++
-
-	//SUM, sum++
-
-	//AVG, sum++ and count ++
-
-	//MIN, if new value < stored value, replace it
-
-	//MAX, if new value > stored value, replace it
-
-	//close iterator
-
-	//if op is AVG, calculate result
+	}
 
 	//free allocated memory block
-
+	free(data);
+	free(key);
+	free(VarChardata);
 	//set iterator to begin
+	floatIt = floatmap.begin();
+	stringIt = stringmap.begin();
 
 }
 RC Aggregate::getNextTuple(void *data)
 {
+	dprintf("In Aggregate::getNextTuple\n");
 	//create null indicator
-
+	char nullIndicator[1];
+	memset(nullIndicator,false,1);
+	dprintf("nullIndicator is %d\n",nullIndicator[1]);
 	//no group by
-	//if ite != end
+	if(!isGroupby){
+		dprintf("!isGroupby\n");
 
-	//switch on op
+		//if ite != end
+		if(floatIt != floatmap.end()){
+			dprintf("floatIt != floatmap.end()\n");
 
-	//COUNT, count++
+			//switch on op
+			switch( op ){
 
-	//copy null indicator
+				case COUNT :
+					//COUNT, count++
+					//copy null indicator
+					memcpy(data,nullIndicator,1);
+					memcpy((char *)data+1,&((floatIt->second).count),4);
+					break;
+				case SUM :
+					//SUM, sum++
+					//copy null indicator
+					memcpy(data,nullIndicator,1);
+					memcpy((char *)data+1,&((floatIt->second).sum),4);
+					break;
+				case AVG :
+					//AVG, sum++ and count ++
+					//copy null indicator
+					memcpy(data,nullIndicator,1);
+					memcpy((char *)data+1,&((floatIt->second).avg),4);
+					break;
+				case MIN :
+					//MIN
+					//copy null indicator
+					memcpy(data,nullIndicator,1);
+					memcpy((char *)data+1,&((floatIt->second).min),4);
+					break;
+				case MAX :
+					//MAX
+					//copy null indicator
+					memcpy(data,nullIndicator,1);
+					memcpy((char *)data+1,&((floatIt->second).max),4);
+					break;
 
-	//SUM, sum++
+			}
+			//increase iterator
+			floatIt++;
+			//free allocated memory block
+			return 0;
 
-	//copy null indicator
+		}else if(floatIt == floatmap.end()){
+		//if ite == end, return QE_EOF
+			dprintf("floatIt == floatmap.end()\n");
 
+			return QE_EOF;
+		//free allocated memory block
+		}
+	}else{
+		dprintf("isGroupby\n");
 
-	//AVG, sum++ and count ++
+		//Group by , groupAttr is float or int
+		if(groupAttr.type == TypeInt || groupAttr.type == TypeReal){
+			dprintf("groupAttr.type == TypeInt || groupAttr.type == TypeReal\n");
 
-	//copy null indicator
+			//if ite != end
+			if(floatIt != floatmap.end()){
+				dprintf("floatIt != floatmap.end()\n");
 
+				//if groupAttr is int, type conversion to tempbuffer
+				int tempint;
+				void *tempbuffer = malloc(PAGE_SIZE);
+				int offset =0;
 
-	//MIN
+				if(groupAttr.type == TypeInt){
+					tempint = (int) floatIt->first;
+					memcpy(tempbuffer,&tempint, 4);
+				}else if(groupAttr.type == TypeReal){
+					memcpy(tempbuffer,&(floatIt->first),4);
+				}
 
-	//copy null indicator
+			//switch on op
+			switch(op){
+			//COUNT, count++
+			case COUNT :
+				//copy null indicator
+				memcpy(data,nullIndicator,1);
+				offset += 1;
+				//copy groupAttr's value
+				memcpy((char *)data+offset,tempbuffer,4);
+				offset+= 4;
+				memcpy((char *)data+offset,&((floatIt->second).count),4 );
+				break;
+				//SUM, sum++
+			case SUM :
+				//copy null indicator
+				memcpy(data,nullIndicator,1);
+				offset += 1;
+				//copy groupAttr's value
+				memcpy((char *)data+offset,tempbuffer,4);
+				offset+= 4;
+				memcpy((char *)data+offset,&((floatIt->second).sum),4 );
+				break;
+			//AVG, sum++ and count ++
+			case AVG:
+				//copy null indicator
+				memcpy(data,nullIndicator,1);
+				offset += 1;
+				//copy groupAttr's value
+				memcpy((char *)data+offset,tempbuffer,4);
+				offset+= 4;
+				memcpy((char *)data+offset,&((floatIt->second).avg),4 );
+				break;
+			//MIN
+			case MIN:
+				//copy null indicator
+				memcpy(data,nullIndicator,1);
+				offset += 1;
+				//copy groupAttr's value
+				memcpy((char *)data+offset,tempbuffer,4);
+				offset+= 4;
+				memcpy((char *)data+offset,&((floatIt->second).min),4 );
+				break;
+			//MAX
+			case MAX :
+				//copy null indicator
+				memcpy(data,nullIndicator,1);
+				offset += 1;
+				//copy groupAttr's value
+				memcpy((char *)data+offset,tempbuffer,4);
+				offset+= 4;
+				memcpy((char *)data+offset,&((floatIt->second).max),4 );
+				break;
+			}
 
+			//increase iterator
+			floatIt++;
 
-	//MAX
+			//free allocated memory block
+			free(tempbuffer);
+			return 0;
+			}else if(floatIt == floatmap.end()){
+				//if ite == end, return QE_EOF
+				dprintf("floatIt == floatmap.end()\n");
+				return QE_EOF;
+				//free allocated memory block
+			}
+		}else if(groupAttr.type == TypeVarChar){
+			dprintf("groupAttr.type == TypeVarChar\n");
 
-	//copy null indicator
+			//Group by , groupAttr is string
 
-	//if ite == end, return QE_EOF
+			//if ite != end
+			if(stringIt != stringmap.end()){
+				dprintf("stringIt != stingmap.end()\n");
 
-	//free allocated memory block
+				void* tempbuffer = malloc(PAGE_SIZE);
+				int offset = 0;
+				//transform groupAttr to VarChar, copy to tempbuffer
+				CreateVarChar(tempbuffer, stringIt->first);
 
-	//Group by , groupAttr is float or int
+				//switch on op
 
-	//if ite != end
+				switch(op){
+				//COUNT, count++
+				case COUNT :
+					//copy null indicator
+					memcpy(data,nullIndicator,1);
+					offset += 1;
+					//copy groupAttr's value
+					memcpy((char *)data+offset,tempbuffer,sizeof(int)+(stringIt->first).size());
+					offset+= (sizeof(int)+(stringIt->first).size() );
+					memcpy((char *)data+offset,&((floatIt->second).count),4 );
+					break;
+					//SUM, sum++
+				case SUM :
+					//copy null indicator
+					memcpy(data,nullIndicator,1);
+					offset += 1;
+					//copy groupAttr's value
+					memcpy((char *)data+offset,tempbuffer,sizeof(int)+(stringIt->first).size());
+					offset+= (sizeof(int)+(stringIt->first).size() );
+					memcpy((char *)data+offset,&((floatIt->second).sum),4 );
+					break;
+				//AVG, sum++ and count ++
+				case AVG:
+					//copy null indicator
+					memcpy(data,nullIndicator,1);
+					offset += 1;
+					//copy groupAttr's value
+					memcpy((char *)data+offset,tempbuffer,sizeof(int)+(stringIt->first).size());
+					offset+= (sizeof(int)+(stringIt->first).size() );
+					memcpy((char *)data+offset,&((floatIt->second).avg),4 );
+					break;
+				//MIN
+				case MIN:
+					//copy null indicator
+					memcpy(data,nullIndicator,1);
+					offset += 1;
+					//copy groupAttr's value
+					memcpy((char *)data+offset,tempbuffer,sizeof(int)+(stringIt->first).size());
+					offset+= (sizeof(int)+(stringIt->first).size() );
+					memcpy((char *)data+offset,&((floatIt->second).min),4 );
+					break;
+				//MAX
+				case MAX :
+					//copy null indicator
+					memcpy(data,nullIndicator,1);
+					offset += 1;
+					//copy groupAttr's value
+					memcpy((char *)data+offset,tempbuffer,sizeof(int)+(stringIt->first).size());
+					offset+= (sizeof(int)+(stringIt->first).size() );
+					memcpy((char *)data+offset,&((floatIt->second).max),4 );
+					break;
+				}
 
-	//if groupAttr is int, type conversion to tempbuffer
+				//increase iterator
+				stringIt++;
 
+				//free allocated memory block
+				free(tempbuffer);
 
-	//switch on op
+			}else if(stringIt == stringmap.end()){
+				//if ite == end, return QE_EOF
+				dprintf("stringtIt == stingmap.end()\n");
+				return QE_EOF;
 
-	//COUNT, count++
+			}
+			//free allocated memory block
+		}
 
-	//copy null indicator
-
-
-	//SUM, sum++
-
-	//copy null indicator
-
-
-	//AVG, sum++ and count ++
-
-	//copy null indicator
-
-
-	//MIN
-
-	//copy null indicator
-
-
-	//MAX
-
-	//copy null indicator
-
-	//if ite == end, return QE_EOF
-
-	//Group by , groupAttr is string
-
-	//if ite != end
-
-	//transform groupAttr to VarChar, copy to tempbuffer
-
-
-	//switch on op
-
-	//COUNT, count++
-
-	//copy null indicator
-
-
-	//SUM, sum++
-
-	//copy null indicator
-
-
-	//AVG, sum++ and count ++
-
-	//copy null indicator
-
-
-	//MIN
-
-	//copy null indicator
-
-
-	//MAX
-
-	//copy null indicator
-
-	//if ite == end, return QE_EOF
-
+	}
 
 
 }

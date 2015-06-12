@@ -51,7 +51,7 @@ RC testCase_8() {
     if (maxVal != 109.0) {
     	rc = fail;
     }
-
+    //printf("before ending\n");
     delete agg;
     delete input;
     free(data);

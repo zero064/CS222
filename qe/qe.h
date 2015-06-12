@@ -23,14 +23,15 @@ const int int_pinf = numeric_limits<int>::max();
 const int int_ninf = numeric_limits<int>::min();
 const float float_pinf = numeric_limits<float>::max();
 const float float_ninf = numeric_limits<float>::min();
-struct Agrregation {
+struct Aggregation {
 	float count = 0;
 	float sum = 0;
 	float avg = 0;
 	float max = float_ninf;
 	float min = float_pinf;
 };
-
+typedef map<string,Aggregation> StringMap;
+typedef map<float,Aggregation> FloatMap;
 struct Value {
     AttrType type;          // type of value
     void     *data;         // value
@@ -59,7 +60,9 @@ class Iterator {
 	RC join( vector<Attribute> lAttrs, void *ldata, vector<Attribute>rAttrs, void *rdata);
 	void printValue(CompOp op,string leftname,AttrType leftType,void* leftvalue, string rightname, AttrType rightType,void* rightvalue);
 	size_t getDataSize(const vector<Attribute> &recordDescriptor, const void *data, bool printFlag);
-
+	float transToFloat( const Attribute attr,const void* key);
+	int VarCharToString(void *data,string &str);
+	RC CreateVarChar(void *data,const string &str);
 };
 
 
@@ -325,7 +328,7 @@ class GHJoin : public Iterator {
 	int partition,numPartitions, secHash;
 };
 
-class Aggregate : public Iterator {
+class Aggregate : public Iterator , public DebugMsg{
     // Aggregation operator
     public:
         // Mandatory for graduate teams only
@@ -356,6 +359,12 @@ class Aggregate : public Iterator {
         Attribute aggAttr;
         Attribute groupAttr;
         AggregateOp op;
+        StringMap stringmap;
+        FloatMap floatmap;
+    	StringMap::iterator stringIt;
+    	FloatMap::iterator floatIt;
+
+
 };
 
 #endif
