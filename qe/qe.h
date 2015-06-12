@@ -307,7 +307,8 @@ class GHJoin : public Iterator {
 	vector<void*> lBuffer,rBuffer;
 	int getHash( void *value, AttrType type , int numPartitions );
 	RC getPartition();
-	RBFM_ScanIterator lpt, rpt;
+	RecordBasedFileManager *rbfm;
+	RBFM_ScanIterator *rpt; // lpt;
 	int partition,numPartitions;
 };
 

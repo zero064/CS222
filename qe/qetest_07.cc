@@ -133,7 +133,6 @@ clean_up:
 }
 
 int main() {
-
 	// Create left/right large table, and populate the table
 	if (createLargeLeftTable() != success) {
 		cout << "***** [FAIL] QE Test Case 7 failed. *****" << endl;
@@ -154,7 +153,15 @@ int main() {
 		cout << "***** [FAIL] QE Test Case 7 failed. *****" << endl;
 		return fail;
 	}
-	
+
+/*
+	for(int i=0;i<10;i++){
+	    string a = "right_join", b = "left_join";
+	    a+=to_string(i); b +=to_string(i);
+	    remove(a.c_str());
+	    remove(b.c_str());
+	}
+*/	
 	if (testCase_7() != success) {
 		cout << "***** [FAIL] QE Test Case 7 failed. *****" << endl;
 		return fail;

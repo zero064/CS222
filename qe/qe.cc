@@ -84,7 +84,7 @@ RC Iterator::join( vector<Attribute> lAttrs, void *ldata, vector<Attribute>rAttr
     	bool tempnull = false;
     	//calculate the correct position for null bit
     	int tempoffset  = i + lAttrs.size() - 8*floor((i+lAttrs.size())/8);
-    	printf("tempoffset is %d\n",tempoffset);
+//    	printf("tempoffset is %d\n",tempoffset);
     	if(rIndicator[ i/8 ] & ( 1 << 7-(i%8) ) != 0){
     		tempnull =true;
 
@@ -736,9 +736,10 @@ void INLJoin::getAttributes(vector<Attribute> &attrs) const
 
 GHJoin::GHJoin( Iterator *leftIn, Iterator *rightIn, const Condition &condition,const unsigned numPartitions)
 {
-    RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
+    this->rbfm = RecordBasedFileManager::instance();
     this->condition = condition; 
     this->numPartitions = numPartitions;
+    this->rpt = NULL;
     bool nullValue;
     //    this->leftIn = leftIn;
     //    this->rightIn = rightIn;
@@ -746,7 +747,7 @@ GHJoin::GHJoin( Iterator *leftIn, Iterator *rightIn, const Condition &condition,
     //    vector<FileHandle> leftPart;
     for( int i=0; i<numPartitions; i++){
 	FileHandle fileHandle;
-	string tableName = "left_join"+('0'+i);
+	string tableName = "left_join"+to_string(i);
 	rbfm->createFile(tableName);
 	rbfm->openFile(tableName,fileHandle);
 	leftPart.push_back(fileHandle);
@@ -754,7 +755,7 @@ GHJoin::GHJoin( Iterator *leftIn, Iterator *rightIn, const Condition &condition,
     //    vector<FileHandle> rightPart;
     for( int i=0; i<numPartitions; i++){
 	FileHandle fileHandle;
-	string tableName = "right_join"+('0'+i);
+	string tableName = "right_join"+to_string(i);
 	rbfm->createFile(tableName);
 	rbfm->openFile(tableName,fileHandle);
 	rightPart.push_back(fileHandle);
@@ -773,6 +774,9 @@ GHJoin::GHJoin( Iterator *leftIn, Iterator *rightIn, const Condition &condition,
 	int hashNum = getHash( value , type , numPartitions );
 	RID rid;
 	rbfm->insertRecord( leftPart[hashNum], lAttrs, data, rid);
+	//printf("hash %d\n", hashNum );
+	//rbfm->printRecord( lAttrs , data );
+
     } 
 
     rightIn->getAttributes(rAttrs);
@@ -787,6 +791,7 @@ GHJoin::GHJoin( Iterator *leftIn, Iterator *rightIn, const Condition &condition,
     } 
 
     partition = 0;
+    getPartition();
     free(data);
     free(value);
 }
@@ -795,16 +800,22 @@ RC GHJoin::getNextTuple( void *data )
 {
     RID rid;
     void *tuple = malloc( 2000 );
-    void *value = malloc( 300 );
+    void *rvalue = malloc( 300 );
+    void *lvalue = malloc( 300 );
     bool nullValue;
-    while( rpt.getNextRecord( rid, tuple ) != RBFM_EOF ){
-	AttrType type = getAttrValue( rAttrs, condition.rhsAttr, tuple, value , nullValue);
+    while( rpt->getNextRecord( rid, tuple ) != RBFM_EOF ){
+	AttrType rtype = getAttrValue( rAttrs, condition.rhsAttr, tuple, rvalue , nullValue);
+//	if( type == TypeReal ) printf("Correct\n");
+//	rbfm->printRecord( rAttrs, tuple );
 	for( int i=0; i<lBuffer.size(); i++){
-	    if( compare( condition.op , type , lBuffer[i], value ) ){
+	    AttrType ltype = getAttrValue( lAttrs, condition.lhsAttr, lBuffer[i], lvalue , nullValue);
+	    assert( rtype == ltype );
+	    if( compare( condition.op , ltype , lvalue, rvalue ) ){
 		join( lAttrs, lBuffer[i], rAttrs, tuple );
-		memcpy( data , lBuffer[i], 2000 );
+		memcpy( data , lBuffer[i], 200 );
 		free(tuple);
-		free(value);
+		free(lvalue);
+		free(rvalue);
 		return SUCCESS;
 	    }
 	}
@@ -815,6 +826,11 @@ RC GHJoin::getNextTuple( void *data )
 	return QE_EOF;
     }
     getNextTuple( data );
+    free(tuple);
+    free(lvalue);
+    free(rvalue);
+    return SUCCESS;
+
 }
 
 RC GHJoin::getPartition()
@@ -827,12 +843,15 @@ RC GHJoin::getPartition()
 	free( lBuffer[i] );
     }
     lBuffer.clear();
+
+
     RC rc;
-    RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
+    RBFM_ScanIterator lpt;
     rc = rbfm->scan(leftPart[partition], lAttrs, "", NO_OP, NULL, lAttrsName, lpt); 
     assert( rc == SUCCESS );
     // Load all tuples in partition into memory
     RID rid;
+
     void *tuple = malloc( 2000 );
     while( lpt.getNextRecord( rid , tuple ) != RBFM_EOF ){
 	void *temp = malloc( 2000 );
@@ -840,10 +859,25 @@ RC GHJoin::getPartition()
 	lBuffer.push_back(temp);
     }
     lpt.close();
+    
+//  debug
+/*
+    for(int i=0; i<lBuffer.size(); i++){
+	rbfm->printRecord( lAttrs, lBuffer[i] );
+    }
+    printf("size of lbuffer %d\n",lBuffer.size());
+*/
 
-    rc = rbfm->scan(rightPart[partition], rAttrs, "", NO_OP, NULL, rAttrsName, rpt); 
+    if( rpt != NULL ){
+	delete rpt;
+//	assert(false && "wtf");
+    }
+
+    rpt = new RBFM_ScanIterator();
+    rc = rbfm->scan(rightPart[partition], rAttrs, "", NO_OP, NULL, rAttrsName, *rpt); 
     assert( rc == SUCCESS );
-    partition++;    
+    partition++;   
+//    assert(false); 
 }
 
 GHJoin::~GHJoin()
@@ -853,8 +887,8 @@ GHJoin::~GHJoin()
     for( int i=0; i<numPartitions; i++){
 	rbfm->closeFile(leftPart[i]);
 	rbfm->closeFile(rightPart[i]);
-	string lTableName = "left_join"+('0'+i);
-	string rTableName = "right_join"+('0'+i);
+	string lTableName = "left_join"+to_string(i);
+	string rTableName = "right_join"+to_string(i);
 	rbfm->destroyFile(lTableName);
 	rbfm->destroyFile(rTableName);
     }
