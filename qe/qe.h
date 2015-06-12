@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <queue>
+#include <map>
 #include "../rbf/rbfm.h"
 #include "../rm/rm.h"
 #include "../ix/ix.h"
@@ -18,6 +19,17 @@ typedef enum{ COUNT=0, SUM, AVG, MIN, MAX } AggregateOp;
 //    For INT and REAL: use 4 bytes
 //    For VARCHAR: use 4 bytes for the length followed by
 //                 the characters
+const int int_pinf = numeric_limits<int>::max();
+const int int_ninf = numeric_limits<int>::min();
+const float float_pinf = numeric_limits<float>::max();
+const float float_ninf = numeric_limits<float>::min();
+struct Agrregation {
+	float count = 0;
+	float sum = 0;
+	float avg = 0;
+	float max = float_ninf;
+	float min = float_pinf;
+};
 
 struct Value {
     AttrType type;          // type of value
@@ -319,7 +331,7 @@ class Aggregate : public Iterator {
         Aggregate(Iterator *input,          // Iterator of input R
                   Attribute aggAttr,        // The attribute over which we are computing an aggregate
                   AggregateOp op            // Aggregate operation
-        ){};
+        );
 
         // Optional for everyone. 5 extra-credit points
         // Group-based hash aggregation
@@ -327,14 +339,21 @@ class Aggregate : public Iterator {
                   Attribute aggAttr,           // The attribute over which we are computing an aggregate
                   Attribute groupAttr,         // The attribute over which we are grouping the tuples
                   AggregateOp op              // Aggregate operation
-        ){};
+        );
         ~Aggregate(){};
 
-        RC getNextTuple(void *data){return QE_EOF;};
+        RC getNextTuple(void *data);
         // Please name the output attribute as aggregateOp(aggAttr)
         // E.g. Relation=rel, attribute=attr, aggregateOp=MAX
         // output attrname = "MAX(rel.attr)"
         void getAttributes(vector<Attribute> &attrs) const{};
+    private:
+        Iterator* input;
+        vector<Attribute> attrs;
+        bool isGroupby = false;
+        Attribute aggAttr;
+        Attribute groupAttr;
+        AggregateOp op;
 };
 
 #endif

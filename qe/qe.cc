@@ -733,6 +733,207 @@ void INLJoin::getAttributes(vector<Attribute> &attrs) const
     attrs.insert(attrs.begin(), leftattrs.begin(), leftattrs.end() );
     attrs.insert(attrs.end(), rightattrs.begin(),rightattrs.end() );
 }
+Aggregate::Aggregate(Iterator *input, Attribute aggAttr, AggregateOp op)
+{
+	this->input = input;
+	input->getAttributes(attrs);
+	this->aggAttr = aggAttr;
+	this->op = op;
+	// No group by block
+
+	//while loop, fetch next tuple from input
+
+	//fetch key value for aggAttr
+
+	//if null key value , continue
+
+	//transform key value of aggAttr to float value
+
+	//switch on op
+
+	//COUNT, count++
+
+	//SUM, sum++
+
+	//AVG, sum++ and count ++
+
+	//MIN, if new value < stored value, replace it
+
+	//MAX, if new value > stored value, replace it
+
+	//close iterator
+
+	//if op is AVG, calculate result
+
+	//set iterator to begin
+
+
+
+
+}
+Aggregate::Aggregate(Iterator *input, Attribute aggAttr, Attribute groupAttr, AggregateOp op)
+{
+	this->input = input;
+	input->getAttributes(attrs);
+	this->aggAttr = aggAttr;
+	this->groupAttr = groupAttr;
+	isGroupby = true;
+	this->op = op;
+
+	//Group by block
+
+
+
+
+	//while loop, fetch next tuple from input
+
+	//fetch key value for aggAttr
+
+	//if null key value , continue
+
+	//transform key value of aggAttr to float value
+
+
+	//fetch key value for groupAttr
+
+	//if null key value , continue
+
+
+	//if groupAttr is float or int,transform key value of groupAttr to float value
+
+	//if groupAttr is VarChar ,transform key value of groupAttr to string
+
+	//switch on op
+
+	//COUNT, count++
+
+	//SUM, sum++
+
+	//AVG, sum++ and count ++
+
+	//MIN, if new value < stored value, replace it
+
+	//MAX, if new value > stored value, replace it
+
+	//close iterator
+
+	//if op is AVG, calculate result
+
+	//free allocated memory block
+
+	//set iterator to begin
+
+}
+RC Aggregate::getNextTuple(void *data)
+{
+	//create null indicator
+
+	//no group by
+	//if ite != end
+
+	//switch on op
+
+	//COUNT, count++
+
+	//copy null indicator
+
+	//SUM, sum++
+
+	//copy null indicator
+
+
+	//AVG, sum++ and count ++
+
+	//copy null indicator
+
+
+	//MIN
+
+	//copy null indicator
+
+
+	//MAX
+
+	//copy null indicator
+
+	//if ite == end, return QE_EOF
+
+	//free allocated memory block
+
+	//Group by , groupAttr is float or int
+
+	//if ite != end
+
+	//if groupAttr is int, type conversion to tempbuffer
+
+
+	//switch on op
+
+	//COUNT, count++
+
+	//copy null indicator
+
+
+	//SUM, sum++
+
+	//copy null indicator
+
+
+	//AVG, sum++ and count ++
+
+	//copy null indicator
+
+
+	//MIN
+
+	//copy null indicator
+
+
+	//MAX
+
+	//copy null indicator
+
+	//if ite == end, return QE_EOF
+
+	//Group by , groupAttr is string
+
+	//if ite != end
+
+	//transform groupAttr to VarChar, copy to tempbuffer
+
+
+	//switch on op
+
+	//COUNT, count++
+
+	//copy null indicator
+
+
+	//SUM, sum++
+
+	//copy null indicator
+
+
+	//AVG, sum++ and count ++
+
+	//copy null indicator
+
+
+	//MIN
+
+	//copy null indicator
+
+
+	//MAX
+
+	//copy null indicator
+
+	//if ite == end, return QE_EOF
+
+
+
+}
+
 
 GHJoin::GHJoin( Iterator *leftIn, Iterator *rightIn, const Condition &condition,const unsigned numPartitions)
 {
