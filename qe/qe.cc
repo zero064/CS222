@@ -740,6 +740,7 @@ GHJoin::GHJoin( Iterator *leftIn, Iterator *rightIn, const Condition &condition,
     this->condition = condition; 
     this->numPartitions = numPartitions;
     this->rpt = NULL;
+    this->secHash = 14;
     bool nullValue;
     //    this->leftIn = leftIn;
     //    this->rightIn = rightIn;
@@ -804,9 +805,26 @@ RC GHJoin::getNextTuple( void *data )
     void *lvalue = malloc( 300 );
     bool nullValue;
     while( rpt->getNextRecord( rid, tuple ) != RBFM_EOF ){
-	AttrType rtype = getAttrValue( rAttrs, condition.rhsAttr, tuple, rvalue , nullValue);
+	AttrType rtype = getAttrValue( rAttrs, condition.rhsAttr, tuple, rvalue, nullValue);
 //	if( type == TypeReal ) printf("Correct\n");
 //	rbfm->printRecord( rAttrs, tuple );
+
+	// hash version
+	int hashNum = getHash( rvalue , rtype , secHash );	
+	assert( hashNum < secHash && "map key counts should < sechash ");
+	for( int i=0; i<lBuffer[hashNum].size(); i++){
+	    AttrType ltype = getAttrValue( lAttrs, condition.lhsAttr, lBuffer[hashNum][i], lvalue , nullValue);
+	    if( compare( condition.op , ltype , lvalue, rvalue ) ){
+		join( lAttrs, lBuffer[hashNum][i], rAttrs, tuple );
+		memcpy( data , lBuffer[hashNum][i], 200 );
+		free(tuple);
+		free(lvalue);
+		free(rvalue);
+		return SUCCESS;
+	    }
+	}
+
+	/*	vector version 
 	for( int i=0; i<lBuffer.size(); i++){
 	    AttrType ltype = getAttrValue( lAttrs, condition.lhsAttr, lBuffer[i], lvalue , nullValue);
 	    assert( rtype == ltype );
@@ -819,7 +837,7 @@ RC GHJoin::getNextTuple( void *data )
 		return SUCCESS;
 	    }
 	}
-
+	*/
     }
 
     if( getPartition() == QE_EOF ){
@@ -839,11 +857,22 @@ RC GHJoin::getPartition()
 	return QE_EOF;
     }
     // free all memeory
+    // vector version
+    /*
     for( int i=0; i<lBuffer.size(); i++){
 	free( lBuffer[i] );
     }
+    */
+    // hash version
+    for( int i=0; i<lBuffer.size(); i++){
+	for( int j=0; j<lBuffer[i].size(); j++){
+	   free( lBuffer[i][j] );
+	}
+	lBuffer[i].clear();
+    }
     lBuffer.clear();
 
+    
 
     RC rc;
     RBFM_ScanIterator lpt;
@@ -852,11 +881,29 @@ RC GHJoin::getPartition()
     // Load all tuples in partition into memory
     RID rid;
 
+    // hash version
+    for( int i=0; i< secHash ; i++){
+	vector<void*> inner_partition;
+	lBuffer.push_back( inner_partition );
+    }
+
     void *tuple = malloc( 2000 );
     while( lpt.getNextRecord( rid , tuple ) != RBFM_EOF ){
 	void *temp = malloc( 2000 );
 	memcpy( temp , tuple , 2000 );
+	/*
+	// vector version
 	lBuffer.push_back(temp);
+	*/
+	
+	// hash version
+	void *value = malloc(300);
+	bool nullValue;	
+	AttrType type = getAttrValue( lAttrs, condition.lhsAttr, tuple , value , nullValue);
+	int hashNum = getHash( value , type , secHash );
+	lBuffer[hashNum].push_back( temp );		
+	free(value);
+	
     }
     lpt.close();
     

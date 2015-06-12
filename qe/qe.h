@@ -304,12 +304,13 @@ class GHJoin : public Iterator {
 	vector<FileHandle> leftPart,rightPart;
 	vector<Attribute> lAttrs,rAttrs;
 	vector<string> lAttrsName,rAttrsName;
-	vector<void*> lBuffer,rBuffer;
+//	vector<void*> lBuffer,rBuffer;
+	vector< vector<void*> > lBuffer;
 	int getHash( void *value, AttrType type , int numPartitions );
 	RC getPartition();
 	RecordBasedFileManager *rbfm;
 	RBFM_ScanIterator *rpt; // lpt;
-	int partition,numPartitions;
+	int partition,numPartitions, secHash;
 };
 
 class Aggregate : public Iterator {
