@@ -1,0 +1,36 @@
+In the project, we've implemented several different join method.
+
+IndexScan
+
+It's the simplest join method which bascially is just scan through both table with a loop, if there is a match, return the joined table.
+If the rightIn reaches the end of the file, re-set it to the head and scan again. Repeat the process until all the tuples in leftIn has been
+traversed and the join method terminates.
+
+BlockNest Join
+
+In order to maintain a block of memory, I use a vector<void*> as my container to hold a list of block of memory.
+Each time the join will start to pull a block of data from leftIn and store it into memory metioned above.
+It starts to scan through whole file from the rightIn, each tuple from rightIn will compare every tuples in the leftIn Block,
+if's there is a match, join the leftIn tuple with rightTuple and push it to the queue in order to maintain the order.
+After the rightIn file scan is done, we can start to pop the joined tuple out to user. 
+Repeat this step until all the tuples in leftIn have been processed and will terminate the join class.
+
+GraceHash
+
+In grace hash, the first partition I use the RecordBasedFileManager to write the partition for me. The number of partition indicates
+how many FileHandle objects would exist in memory. In the first partition step, I would allocate two sets of FileHandle object for 
+leftIn and rightIn partition. Scan the table and write the each tuple into partition via RBFM, and the partition index is based on a hash function
+which is a simple modular function on the value of target attribute. 
+
+After the first paritition is done. When join method gets called, start to load one of the leftIn partition into memory and use a different 
+hash function to split the tuple into different partition. The 2nd hash function is also a modular function but with different value of modular.
+After it's done, start to load rightIn partition as probe table, apply the same 2nd hash function to the target and go to the hash to find the 
+possible match. If one of the rightIn partition reaches the end of the file. Gets another partition for both left and right partition and repeat
+the same process until no partition left to scan. 
+
+The hash function determine the performance of the join method, if the hash can split the data very evenly, the join performance will be very fast.
+The first version of my grace hash join, I didn't use hash on build and probe step. The search performance is linear which is very bad. The hash version
+has done way much better job. 
+
+
+
