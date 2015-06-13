@@ -1,7 +1,7 @@
 
 include ../makefile.inc
 
-all: libqe.a qetest_000 qetest_00 qetest_01 qetest_02 qetest_03 qetest_03b qetest_03c qetest_04 qetest_05 qetest_05b qetest_06 qetest_06b qetest_07 qetest_07b qetest_08 qetest_08b qetest_09 qetest_09b
+all: libqe.a qetest_01 qetest_02 qetest_03 qetest_03b qetest_03c qetest_04 qetest_05 qetest_05b qetest_06 qetest_06b qetest_07 qetest_07b qetest_08 qetest_08b qetest_09 qetest_09b
 
 # lib file dependencies
 libqe.a: libqe.a(qe.o)  # and possibly other .o files
@@ -12,7 +12,7 @@ qe.o: qe.h
 qetest.o: qe.h
 
 # binary dependencies
-qetest_000: qetest_000.o libqe.a $(CODEROOT)/ix/libix.a $(CODEROOT)/rm/librm.a $(CODEROOT)/rbf/librbf.a
+#qetest_000: qetest_000.o libqe.a $(CODEROOT)/ix/libix.a $(CODEROOT)/rm/librm.a $(CODEROOT)/rbf/librbf.a
 qetest_00: qetest_00.o libqe.a $(CODEROOT)/ix/libix.a $(CODEROOT)/rm/librm.a $(CODEROOT)/rbf/librbf.a
 qetest_01: qetest_01.o libqe.a $(CODEROOT)/ix/libix.a $(CODEROOT)/rm/librm.a $(CODEROOT)/rbf/librbf.a
 qetest_02: qetest_02.o libqe.a $(CODEROOT)/ix/libix.a $(CODEROOT)/rm/librm.a $(CODEROOT)/rbf/librbf.a
