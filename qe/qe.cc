@@ -1305,6 +1305,49 @@ RC Aggregate::getNextTuple(void *data)
 
 
 }
+void Aggregate::getAttributes(vector<Attribute> &attrs) const{
+	attrs.clear();
+	Attribute resultAttr;
+	resultAttr.type = TypeReal;
+	resultAttr.length = 4;
+	switch( op ){
+	case COUNT :
+		resultAttr.name = "COUNT(";
+		resultAttr.name += aggAttr.name;
+		resultAttr.name += ")";
+		break;
+	case  SUM :
+		resultAttr.name = "SUM(";
+		resultAttr.name += aggAttr.name;
+		resultAttr.name += ")";
+		break;
+	case AVG :
+		resultAttr.name = "AVG(";
+		resultAttr.name += aggAttr.name;
+		resultAttr.name += ")";
+		break;
+	case MIN :
+		resultAttr.name = "MIN(";
+		resultAttr.name += aggAttr.name;
+		resultAttr.name += ")";
+		break;
+	case MAX:
+		resultAttr.name = "MAX(";
+		resultAttr.name += aggAttr.name;
+		resultAttr.name += ")";
+		break;
+	}
+	if(!isGroupby){
+		resultAttr.position =1;
+		attrs.push_back(resultAttr);
+
+
+	}else{
+		resultAttr.position=2;
+		attrs.push_back(groupAttr);
+		attrs.push_back(resultAttr);
+	}
+}
 
 
 GHJoin::GHJoin( Iterator *leftIn, Iterator *rightIn, const Condition &condition,const unsigned numPartitions)

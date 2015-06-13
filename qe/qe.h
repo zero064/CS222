@@ -351,7 +351,7 @@ class Aggregate : public Iterator , public DebugMsg{
         // Please name the output attribute as aggregateOp(aggAttr)
         // E.g. Relation=rel, attribute=attr, aggregateOp=MAX
         // output attrname = "MAX(rel.attr)"
-        void getAttributes(vector<Attribute> &attrs) const{};
+        void getAttributes(vector<Attribute> &attrs) const;
     private:
         Iterator* input;
         vector<Attribute> attrs;
