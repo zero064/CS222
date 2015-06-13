@@ -579,7 +579,45 @@ clean_up:
 	free(buf);
 	return rc;
 }
+int populateLeftVarCharTable1() {
+	// Functions Tested
+	// 1. InsertTuple
+	RC rc = success;
+	RID rid;
+	void *buf = malloc(bufSize);
 
+	// GetAttributes
+    vector<Attribute> attrs;
+    rc = rm->getAttributes("leftvarchar", attrs);
+    assert(rc == success && "RelationManager::getAttributes() should not fail.");
+
+    int nullAttributesIndicatorActualSize = getActualByteForNullsIndicator(attrs.size());
+    unsigned char *nullsIndicator = (unsigned char *) malloc(nullAttributesIndicatorActualSize);
+	memset(nullsIndicator, 0, nullAttributesIndicatorActualSize);
+
+	for (int i = 0; i < 52; ++i) {
+		memset(buf, 0, bufSize);
+
+		// Prepare the tuple data for insertion
+		int a = i + 20;
+
+		int length = (i % 26) + 1;
+		string b = string(length, '\0');
+		for (int j = 0; j < length; j++) {
+			b[j] = 96 + length;
+		}
+		prepareLeftVarCharTuple(attrs.size(), nullsIndicator, a, length, b, buf);
+
+		rc = rm->insertTuple("leftvarchar", buf, rid);
+		if (rc != success) {
+			goto clean_up;
+		}
+	}
+
+clean_up:
+	free(buf);
+	return rc;
+}
 int populateRightVarCharTable() {
 	// Functions Tested
 	// 1. InsertTuple
