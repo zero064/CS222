@@ -367,7 +367,7 @@ RC Iterator::CreateVarChar(void *data,const string &str){
 Filter::Filter(Iterator *input, const Condition &condition  )
 {
 
-    debug = true;
+    //debug = true;
 	dprintf("Filter constructor\n");
     // Get Attributes from iterator
     input->getAttributes(attrs);
@@ -433,7 +433,7 @@ void Filter::getAttributes(vector<Attribute> &attrs) const
 
 Project::Project(Iterator *input, const vector<string> &attrNames)
 {
-    debug =true;
+    //debug =true;
 	assert( input != NULL && "Yo iterator shouldn't be null okay?\n");
     this->input = input;
     this->attrNames = attrNames;
@@ -688,7 +688,7 @@ void BNLJoin::getAttributes(vector<Attribute> &attrs) const
 
 INLJoin::INLJoin(Iterator *leftIn, IndexScan *rightIn, const Condition &condition   )
 {
-	debug = true;
+	//debug = true;
 	//assign value to member
 	dprintf("INLJoin constructor\n");
 	//leftIn->getAttributes(leftattrs);
@@ -791,7 +791,7 @@ void INLJoin::getAttributes(vector<Attribute> &attrs) const
 }
 Aggregate::Aggregate(Iterator *input, Attribute aggAttr, AggregateOp op)
 {
-	debug = true;
+	//debug = true;
 	this->input = input;
 	input->getAttributes(attrs);
 	this->aggAttr = aggAttr;
@@ -883,7 +883,7 @@ Aggregate::Aggregate(Iterator *input, Attribute aggAttr, AggregateOp op)
 }
 Aggregate::Aggregate(Iterator *input, Attribute aggAttr, Attribute groupAttr, AggregateOp op)
 {
-	debug = true;
+	//debug = true;
 	this->input = input;
 	input->getAttributes(attrs);
 	this->aggAttr = aggAttr;
