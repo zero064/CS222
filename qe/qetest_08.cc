@@ -28,7 +28,17 @@ RC testCase_8() {
     aggAttr.type = TypeInt;
     aggAttr.length = 4;
     Aggregate *agg = new Aggregate(input, aggAttr, MAX);
+    /*vector<Attribute> attrs111;
+    agg->getAttributes(attrs111);
+    for(int jk=0; jk<attrs111.size();jk++){
+    	cout<<attrs111[jk].name<<endl;
+    	if(attrs111[jk].type == TypeReal){
+    		printf("TypeReal\n");
+    	}else if(attrs111[jk].type == TypeInt){
+    		printf("TypeInt\n");
 
+    	}
+    }*/
 	int count = 0;
     void *data = malloc(bufSize);
     
