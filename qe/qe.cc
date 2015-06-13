@@ -1241,7 +1241,7 @@ RC Aggregate::getNextTuple(void *data)
 					//copy groupAttr's value
 					memcpy((char *)data+offset,tempbuffer,sizeof(int)+(stringIt->first).size());
 					offset+= (sizeof(int)+(stringIt->first).size() );
-					memcpy((char *)data+offset,&((floatIt->second).count),4 );
+					memcpy((char *)data+offset,&((stringIt->second).count),4 );
 					break;
 					//SUM, sum++
 				case SUM :
@@ -1251,7 +1251,7 @@ RC Aggregate::getNextTuple(void *data)
 					//copy groupAttr's value
 					memcpy((char *)data+offset,tempbuffer,sizeof(int)+(stringIt->first).size());
 					offset+= (sizeof(int)+(stringIt->first).size() );
-					memcpy((char *)data+offset,&((floatIt->second).sum),4 );
+					memcpy((char *)data+offset,&((stringIt->second).sum),4 );
 					break;
 				//AVG, sum++ and count ++
 				case AVG:
@@ -1261,7 +1261,7 @@ RC Aggregate::getNextTuple(void *data)
 					//copy groupAttr's value
 					memcpy((char *)data+offset,tempbuffer,sizeof(int)+(stringIt->first).size());
 					offset+= (sizeof(int)+(stringIt->first).size() );
-					memcpy((char *)data+offset,&((floatIt->second).avg),4 );
+					memcpy((char *)data+offset,&((stringIt->second).avg),4 );
 					break;
 				//MIN
 				case MIN:
@@ -1271,7 +1271,8 @@ RC Aggregate::getNextTuple(void *data)
 					//copy groupAttr's value
 					memcpy((char *)data+offset,tempbuffer,sizeof(int)+(stringIt->first).size());
 					offset+= (sizeof(int)+(stringIt->first).size() );
-					memcpy((char *)data+offset,&((floatIt->second).min),4 );
+					memcpy((char *)data+offset,&((stringIt->second).min),4 );
+					dprintf("MIN is %f\n",(stringIt->second).min);
 					break;
 				//MAX
 				case MAX :
@@ -1281,7 +1282,7 @@ RC Aggregate::getNextTuple(void *data)
 					//copy groupAttr's value
 					memcpy((char *)data+offset,tempbuffer,sizeof(int)+(stringIt->first).size());
 					offset+= (sizeof(int)+(stringIt->first).size() );
-					memcpy((char *)data+offset,&((floatIt->second).max),4 );
+					memcpy((char *)data+offset,&((stringIt->second).max),4 );
 					break;
 				}
 
