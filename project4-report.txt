@@ -1,5 +1,9 @@
 In the project, we've implemented several different join method.
 
+RelationManager:
+In catalog, we add a new relation,Indexes. It records all the information about every relation's index file. We also add updating index function to RelationManager. Therefore, when a new tuple is inserted to the relation, RelationManager will look up the category to learn its index files' information and  update all the index file relating to this relation. If a table is deleted, RelationManager will delete all the index file for this relation.
+
+
 IndexScan
 
 It's the simplest join method which bascially is just scan through both table with a loop, if there is a match, return the joined table.
@@ -32,5 +36,6 @@ The hash function determine the performance of the join method, if the hash can 
 The first version of my grace hash join, I didn't use hash on build and probe step. The search performance is linear which is very bad. The hash version
 has done way much better job. 
 
-
+Aggregate:
+Our aggregate support group by function. In aggregae, we have two map member. When the group-by attribute is VarChar, we use map<string,float> container to store to-be-returned tuples. If the group-by attribute is float, we use map<float, float> container to store to-be-returned tuples. Eevery time the getNextTuple function is called, we fectch one tuple from the container. If all the tuples in the container has been fetched, we return QE_EOF.
 
