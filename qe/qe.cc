@@ -1070,8 +1070,8 @@ RC Aggregate::getNextTuple(void *data)
 	dprintf("In Aggregate::getNextTuple\n");
 	//create null indicator
 	char nullIndicator[1];
-	memset(nullIndicator,false,1);
-	dprintf("nullIndicator is %d\n",nullIndicator[1]);
+	memset(nullIndicator,0,1);
+	dprintf("nullIndicator is %d\n",nullIndicator[0]);
 	//no group by
 	if(!isGroupby){
 		dprintf("!isGroupby\n");
