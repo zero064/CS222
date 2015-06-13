@@ -1549,8 +1549,6 @@ GHJoin::~GHJoin()
     RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
     int numPartitions = leftPart.size();
     for( int i=0; i<numPartitions; i++){
-	rbfm->closeFile(leftPart[i]);
-	rbfm->closeFile(rightPart[i]);
 	string lTableName = "left_join"+to_string(i);
 	string rTableName = "right_join"+to_string(i);
 	rbfm->destroyFile(lTableName);
