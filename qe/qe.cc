@@ -1489,6 +1489,7 @@ RC GHJoin::getPartition()
 */
 
     if( rpt != NULL ){
+	rpt->close();
 	delete rpt;
 //	assert(false && "wtf");
     }
