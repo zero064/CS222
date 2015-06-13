@@ -738,7 +738,7 @@ RC INLJoin::getNextTuple(void *data)
 	while(leftIn->getNextTuple(leftdata) != QE_EOF){
 
 		//get leftIn tuple's size
-		leftdatasize = getDataSize(leftattrs,leftdata,true);
+		leftdatasize = getDataSize(leftattrs,leftdata,false);
 		//debug:leftsize
 		dprintf("leftdatasize is %d\n",leftdatasize);
 		//get lowKey and highKey for leftIn
@@ -758,13 +758,13 @@ RC INLJoin::getNextTuple(void *data)
 		while(rightIn->getNextTuple(rightdata) != QE_EOF){
 			dprintf("entering inner loop\n");
 			//get rightIn tuple's size
-			rightdatasize = getDataSize(rightattrs,rightdata,true);
+			rightdatasize = getDataSize(rightattrs,rightdata,false);
 			//debug:rightsize
 			dprintf("rightdatasize is %d\n",rightdatasize);
 			//concatenate leftIn's tuple and rightIn's tuple
 			join(leftattrs, leftdata, rightattrs, rightdata);
 			//get data size for joined tuple
-			totaldatasize = getDataSize(joindescriptor, leftdata,true);
+			totaldatasize = getDataSize(joindescriptor, leftdata,false);
 			//copy leftdata to data
 			memcpy(data,leftdata,totaldatasize);
 			//free allocated memory
