@@ -2171,7 +2171,7 @@ void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attri
 
 IX_ScanIterator::IX_ScanIterator()
 {
-	debug = true;
+	//debug = true;
 }
 
 IX_ScanIterator::~IX_ScanIterator()
@@ -2487,7 +2487,7 @@ RC IX_ScanIterator::close()
 IXFileHandle::IXFileHandle()
 {
 	error = -1;
-	debug = true;
+	//debug = true;
 }
 
 
