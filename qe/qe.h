@@ -272,10 +272,14 @@ class BNLJoin : public Iterator , public DebugMsg{
 	Condition condition;
 	unsigned numRecords;
 	int finishedFlag;
+	RC rightFlag;
+	RC noBlock;
 //	vector<void*> buffer;
 	void *buffer;
+	void *probe;
+	int leftposition;
+	int bound;
 	vector<Attribute> lAttrs,rAttrs;
-	queue<int> joinedQueue;
 };
 
 

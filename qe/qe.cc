@@ -544,7 +544,7 @@ BNLJoin::BNLJoin(Iterator *leftIn,TableScan *rightIn,const Condition &condition,
 {
     assert( leftIn != NULL );
     assert( rightIn != NULL );
-
+    //debug = true;
     this->leftIn = leftIn;
     this->rightIn = rightIn;
     this->condition = condition;
@@ -557,11 +557,16 @@ BNLJoin::BNLJoin(Iterator *leftIn,TableScan *rightIn,const Condition &condition,
        }
      */
     printf("%d\n",numRecords);
-    buffer = malloc(1000*numRecords);
-    finishedFlag = SUCCESS;
+    buffer = malloc(PAGE_SIZE*numRecords);
+    probe =  malloc(PAGE_SIZE);
+    finishedFlag = 0;
+    noBlock = 0;
     leftIn->getAttributes( lAttrs );
     rightIn->getAttributes( rAttrs );
     //debug = true;
+    //first time to load BLock
+    updateBlock();
+    rightFlag = rightIn->getNextTuple( probe );
 }
 
 BNLJoin::~BNLJoin()
@@ -573,102 +578,135 @@ BNLJoin::~BNLJoin()
        }
      */
     free(buffer);
+    free(probe);
 }
 
 RC BNLJoin::getNextTuple(void *data)
 {
-    while( joinedQueue.empty() && finishedFlag != QE_EOF){
-	updateBlock();
-    }
-    if( !joinedQueue.empty() ){
-	int i = joinedQueue.front();
+	void *leftvalue = malloc(PAGE_SIZE);
+	void *rightvalue = malloc(PAGE_SIZE);
+	void *tempbuffer = malloc(PAGE_SIZE);
+	size_t leftsize;
+	bool nullValue;
+	AttrType lType;
+	AttrType rType;
+	dprintf("In BNJoin::getNextTuple\n");
 
-	joinedQueue.pop();  
-	assert( i<numRecords ); 
-	memcpy( data , (char*)buffer+i*1000 , 200 );
-    }
 
-    return finishedFlag;
+	//while loop(noBlock != QE_EOF), go through block
+	while(noBlock != QE_EOF)
+	{
+		dprintf("noBlock != QE_EOF\n");
+		//while loop(rightFlag != QE_EOF), go through right tuple
+		while(rightFlag != QE_EOF)
+		{
+			dprintf("rightFlag != QE_EOF\n");
+			//while loop(leftposition < bound), go through tuple in block,
+			while( leftposition < bound)
+			{
+				dprintf("leftposition < bound\n");
+
+				//fetch key value for  right tuple
+				rType = getAttrValue(rAttrs,condition.rhsAttr,probe,rightvalue, nullValue);
+				//if null value, break
+				if(nullValue){
+					break;
+				}
+				//fetch key value from left tuple pointed by leftposition
+				//!reuse nullValue
+				lType = getAttrValue(lAttrs,condition.lhsAttr,(char *)buffer+leftposition*PAGE_SIZE,leftvalue, nullValue);
+				//copy data to tempbuffer
+				memcpy(tempbuffer, (char *)buffer+leftposition*PAGE_SIZE, PAGE_SIZE);
+				//printValue(condition.op, condition.lhsAttr,lType, leftvalue, condition.rhsAttr,rType,rightvalue);
+				//increase leftposition
+				leftposition += 1;
+				//if null value, continue
+				if(nullValue){
+					continue;
+				}
+				//compare left tuple and right tuple
+				if( compare(condition.op,lType, leftvalue, rightvalue) ){
+					dprintf("compare(condition.op,lType, leftvalue, rightvalue)\n");
+
+					//if match join the tuples
+					leftsize = getDataSize(lAttrs, tempbuffer, false);
+					memcpy(data, tempbuffer, leftsize);
+					join(lAttrs, data, rAttrs, probe);
+					//free allocated memory
+					free(leftvalue);
+					free(rightvalue);
+					free(tempbuffer);
+
+					//return
+					return 0;
+				}
+
+				//while loop for tuples in block end
+			}
+			//reset leftposition
+			leftposition = 0;
+			//get next right tuple
+			rightFlag = rightIn->getNextTuple(probe);
+			//while loop for right tuple end
+		}
+		//reset iterator for right tuple
+		rightIn->setIterator();
+		//get next right tuple
+		rightFlag = rightIn->getNextTuple(probe);
+		//updateblock
+		updateBlock();
+		//while loop for go through block end
+	}
+	//free allocated memory
+	free(leftvalue);
+	free(rightvalue);
+	free(tempbuffer);
+	//return QE_EOF
+	dprintf("QE_EOF\n");
+
+	return QE_EOF;
+
+
 
 }
 
 RC BNLJoin::updateBlock()
 {
-
-    // table to record outter block's tuple has been joined 
-    bool joined[numRecords];
-    bool nullValue;
-    memset( joined, false, numRecords*sizeof(bool) );
-    memset( buffer, 0 , 10000);
-    int counter = 0;
+	dprintf("In BNLJoin::updateBlock\n");
+    memset( buffer, 0 , PAGE_SIZE*numRecords);
     // read tuples into block
+    if(finishedFlag == QE_EOF){
+    	dprintf("finishedFlag == QE_EOF\n");
+    	noBlock = QE_EOF;
+    	return 0;
+    }
+
     for( int i=0; i<numRecords; i++){
 
-	//	printf("%p\n",buffer[i]);
-	finishedFlag = leftIn->getNextTuple( (char*)buffer+i*1000 );
-	//	printf("%f\n",*(float*)((char*)buffer[i]+1+sizeof(int)+sizeof(int) ));
-	if( finishedFlag == QE_EOF ){ break; }
-	counter = i;
+		//	printf("%p\n",buffer[i]);
+		finishedFlag = leftIn->getNextTuple( (char*)buffer+i*PAGE_SIZE );
+		//	printf("%f\n",*(float*)((char*)buffer[i]+1+sizeof(int)+sizeof(int) ));
+		if(i == 0 && finishedFlag ==QE_EOF){
+			dprintf("i == 0 && finishedFlag ==QE_EOF\n");
+			finishedFlag = leftIn->getNextTuple( (char*)buffer+i*PAGE_SIZE );
+			dprintf("finishedFlag is %d\n",finishedFlag);
+			noBlock = QE_EOF;
+			return 0;
+
+		}else if( finishedFlag == QE_EOF ){
+			//reset leftposition to 0
+			leftposition = 0;
+			dprintf("bound is %d\nleftposition is %d\n",bound,leftposition);
+
+			return 0;
+		}
+		bound = i + 1;
 
     }
-
-
-    void *probe = malloc(1000);
-
-
-    // reset iterator 
-    rightIn->setIterator();
-
-
-    void *rvalue = malloc(200);
-    void *lvalue = malloc(200);
-
-    while( rightIn->getNextTuple( probe ) != QE_EOF ){
-	// find comparison attribute offset 
-	AttrType rtype;
-	if( condition.bRhsIsAttr ){
-		dprintf("condition.bRhsIsAttr\n");
-	    rtype = getAttrValue( rAttrs, condition.rhsAttr, probe, rvalue, nullValue);
-	    dprintf("lAttrs.size is %d\nrAttrs.size is %d\n",lAttrs.size(),rAttrs.size() );
-
-	}else{
-		dprintf("!condition.bRhsIsAttr\n");
-		rtype = condition.rhsValue.type;
-	    memcpy( rvalue, condition.rhsValue.data, 200 );
-	}
-
-
-	for( int i=0; i<=counter; i++){
-	    if( joined[i] ) continue;
-	    // get left value
-	    AttrType ltype = getAttrValue( lAttrs, condition.lhsAttr, (char*)buffer+i*1000, lvalue, nullValue);
-
-	    assert( ltype == rtype );
-	    // compare the attribtue & value
-	    if( compare( condition.op, ltype, lvalue, rvalue) ){
-		joined[i] = true;
-		// join right record to left record 
-		join( lAttrs, (char*)buffer+i*1000, rAttrs, probe );
-		//		cout<< *(float*)((char*)buffer[i]+1+16) << endl;
-		//		printf("%f\n",*(float*)((char*)buffer[i]+1+20));
-	    }
-
-	}
-
-
-    }
-
-
-    // free pointers
-    free(rvalue); free(lvalue); free(probe);
-
-    // push joined results (pointers) into queue
-    for( int i=0; i<=counter; i++){
-	if( joined[i] ){
-	    joinedQueue.push(i);
-	    //		printf("yoyoyo %d\n",*(int*)((char*)buffer[i]+1));
-	}
-    }
+    leftposition = 0;
+	dprintf("bound is %d\nleftposition is %d\n",bound,leftposition);
+    return 0;
+//////////////////////////////////don't need the following
 
 
 
