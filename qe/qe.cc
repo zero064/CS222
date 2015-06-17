@@ -20,11 +20,13 @@ int Iterator::getAttrSize(Attribute attr, void *data)
 
 AttrType Iterator::getAttrValue(vector<Attribute> attrs, string attr, void *data, void *value, bool &nullValue)
 {
-    assert( data != NULL); assert(value != NULL); assert(attrs.size() > 0 );
+    //printf("in Iterator::getAttrValue\n");
+	assert( data != NULL); assert(value != NULL); assert(attrs.size() > 0 );
     int nullSize = ceil( (double)attrs.size() / 8 ) ;
     unsigned char nullIndicator[nullSize];
     nullValue = false;
-    memcpy( &nullIndicator, data, nullSize);
+    memcpy( nullIndicator, data, nullSize);
+    //printf("nullIndicator is %d\n",nullIndicator[0]);
     int offset = nullSize; // offset to find value
     for( int i=0; i<attrs.size(); i++){
 	//size only used in this scope
@@ -33,11 +35,16 @@ AttrType Iterator::getAttrValue(vector<Attribute> attrs, string attr, void *data
 	// check if attrs[i] is desired attribute
 	if( attrs[i].name.compare( attr ) == 0 ){
 	    // if null indicator is 1, no value for desired attribute
-	    if( nullIndicator[i/8] & ( 1 << (7-(i%8)) ) ){
+		//printf("nuattrs[i].name.compare( attr )\nattrs[i].name is %s\nattr is %s\n",attrs[i].name.c_str(),attr.c_str() );
+
+		if( nullIndicator[i/8] & ( 1 << (7-(i%8)) ) ){
 		nullValue = true;
+		//printf("nullIndicator[i/8] & ( 1 << (7-(i%8))\n" );
+	    //printf("offset is %d\n",offset);
 		return attrs[i].type;
 	    }
 	    // get attribute value size
+	    //printf("offset is %d\n",offset);
 	    size = getAttrSize( attrs[i], (char*)data+offset );
 	    memcpy( value, (char*)data+offset, size );
 	    return attrs[i].type;
@@ -388,31 +395,34 @@ RC Filter::getNextTuple(void *data)
 //    for(int i=0; i<attrs.size(); i++) printf("%s\n",attrs[i].name.c_str());
     dprintf("In Filter, before entering while loop\n");
     while(input->getNextTuple(data) != QE_EOF){
-	attrtype = getAttrValue(attrs, condition.lhsAttr, data, vleft, leftnullValue);
-	if(leftnullValue) continue;
-	if(condition.bRhsIsAttr){
-	    dprintf("condition.bRhsIsAttr\n");
-		//righthand-side is attribute
-	    //get value for right attribute
-	    getAttrValue(attrs, condition.rhsAttr, data, vright, rightnullValue);
-	    if(rightnullValue) continue;
-	    //if tuple match predicate, break
-	    if(compare(condition.op, attrtype, vleft, vright)){
-		free(vleft);
-		free(vright);
-		return 0;
-	    }
+		attrtype = getAttrValue(attrs, condition.lhsAttr, data, vleft, leftnullValue);
+		//printValue(condition.op,condition.lhsAttr, attrtype, vleft, "", attrtype, NULL);
+		if(leftnullValue) continue;
+		if(condition.bRhsIsAttr){
+			dprintf("condition.bRhsIsAttr\n");
+			//righthand-side is attribute
+			//get value for right attribute
+			getAttrValue(attrs, condition.rhsAttr, data, vright, rightnullValue);
+			if(rightnullValue) continue;
+			//if tuple match predicate, break
+			if(compare(condition.op, attrtype, vleft, vright)){
+				//printValue(condition.op,condition.lhsAttr, attrtype, vleft, condition.rhsAttr, attrtype, vright);
+				free(vleft);
+				free(vright);
+				return 0;
+			}
 
-	}else{
-	    dprintf("!condition.bRhsIsAttr\n");
-		//righthand-side is value
-	    //if tuple match predicate, break
-	    if(compare(condition.op, attrtype, vleft, condition.rhsValue.data)){
-		free(vleft);
-		free(vright);
-		return 0;
-	    }
-	}
+		}else{
+			dprintf("!condition.bRhsIsAttr\n");
+			//righthand-side is value
+			//if tuple match predicate, break
+			if(compare(condition.op, attrtype, vleft, condition.rhsValue.data)){
+				//printValue(condition.op,condition.lhsAttr, attrtype, vleft,"fixed value", attrtype, condition.rhsValue.data);
+				free(vleft);
+				free(vright);
+				return 0;
+			}
+		}
     }
     free(vleft);
     free(vright);
@@ -1390,12 +1400,15 @@ void Aggregate::getAttributes(vector<Attribute> &attrs) const{
 
 GHJoin::GHJoin( Iterator *leftIn, Iterator *rightIn, const Condition &condition,const unsigned numPartitions)
 {
-    this->rbfm = RecordBasedFileManager::instance();
+    //debug =true;
+	this->rbfm = RecordBasedFileManager::instance();
     this->condition = condition; 
     this->numPartitions = numPartitions;
     this->rpt = NULL;
     this->secHash = 14;
+    this->rightFlag = 0;
     bool nullValue;
+    probeT = malloc(PAGE_SIZE);
     //    this->leftIn = leftIn;
     //    this->rightIn = rightIn;
 
@@ -1453,61 +1466,59 @@ GHJoin::GHJoin( Iterator *leftIn, Iterator *rightIn, const Condition &condition,
 
 RC GHJoin::getNextTuple( void *data )
 {
-    RID rid;
-    void *tuple = malloc( 2000 );
+    dprintf("in GHJoin::getNextTuple\n");
+	RID rid;
     void *rvalue = malloc( 300 );
     void *lvalue = malloc( 300 );
     bool nullValue;
-    while( rpt->getNextRecord( rid, tuple ) != RBFM_EOF ){
-	AttrType rtype = getAttrValue( rAttrs, condition.rhsAttr, tuple, rvalue, nullValue);
-//	if( type == TypeReal ) printf("Correct\n");
-//	rbfm->printRecord( rAttrs, tuple );
+    //while loop(rightFlag != RBFM_EOF) go through right tuple
+    while( rightFlag != RBFM_EOF ){
+        dprintf("rightFlag != RBFM_EOF\n");
+    	AttrType rtype = getAttrValue( rAttrs, condition.rhsAttr, probeT, rvalue, nullValue);
+	//	if( type == TypeReal ) printf("Correct\n");
+	//	rbfm->printRecord( rAttrs, tuple );
 
-	// hash version
-	int hashNum = getHash( rvalue , rtype , secHash );	
-	assert( hashNum < secHash && "map key counts should < sechash ");
-	for( int i=0; i<lBuffer[hashNum].size(); i++){
-	    AttrType ltype = getAttrValue( lAttrs, condition.lhsAttr, lBuffer[hashNum][i], lvalue , nullValue);
-	    if( compare( condition.op , ltype , lvalue, rvalue ) ){
-		join( lAttrs, lBuffer[hashNum][i], rAttrs, tuple );
-		memcpy( data , lBuffer[hashNum][i], 200 );
-		free(tuple);
-		free(lvalue);
-		free(rvalue);
-		return SUCCESS;
-	    }
-	}
+		// hash version
+		int hashNum = getHash( rvalue , rtype , secHash );
+		assert( hashNum < secHash && "map key counts should < sechash ");
+		while( leftposition <lBuffer[hashNum].size()){
+	        dprintf("leftposition <lBuffer[hashNum].size()\n");
+			AttrType ltype = getAttrValue( lAttrs, condition.lhsAttr, lBuffer[hashNum][leftposition], lvalue , nullValue);
+			if( compare( condition.op , ltype , lvalue, rvalue ) ){
+		        dprintf("compare( condition.op , ltype , lvalue, rvalue )\nleftposition is %d\n",leftposition);
+				//printValue(condition.op,condition.lhsAttr,ltype,lvalue,condition.rhsAttr, rtype, rvalue);
+		        join( lAttrs, lBuffer[hashNum][leftposition], rAttrs, probeT );
+				memcpy( data , lBuffer[hashNum][leftposition], 200 );
+				//increase i
+				leftposition++;
+				free(lvalue);
+				free(rvalue);
+				return SUCCESS;
+			}
+			//increase i
+			leftposition++;
 
-	/*	vector version 
-	for( int i=0; i<lBuffer.size(); i++){
-	    AttrType ltype = getAttrValue( lAttrs, condition.lhsAttr, lBuffer[i], lvalue , nullValue);
-	    assert( rtype == ltype );
-	    if( compare( condition.op , ltype , lvalue, rvalue ) ){
-		join( lAttrs, lBuffer[i], rAttrs, tuple );
-		memcpy( data , lBuffer[i], 200 );
-		free(tuple);
-		free(lvalue);
-		free(rvalue);
-		return SUCCESS;
-	    }
-	}
-	*/
+		}
+		//reset leftposition
+		leftposition = 0;
+		//fetch next record
+		rightFlag = rpt->getNextRecord( ridT, probeT );
+
     }
 
     if( getPartition() == QE_EOF ){
 	return QE_EOF;
     }
-    getNextTuple( data );
-    free(tuple);
     free(lvalue);
     free(rvalue);
-    return SUCCESS;
+    return getNextTuple( data );
 
 }
 
 RC GHJoin::getPartition()
 {
-    if( partition >= numPartitions ){
+    dprintf("GHJoin::getPartition\npartition is %d\n",partition);
+	if( partition >= numPartitions ){
 	return QE_EOF;
     }
     // free all memeory
@@ -1555,11 +1566,15 @@ RC GHJoin::getPartition()
 	bool nullValue;	
 	AttrType type = getAttrValue( lAttrs, condition.lhsAttr, tuple , value , nullValue);
 	int hashNum = getHash( value , type , secHash );
+	dprintf("hashNum is %d\n");
+	//printValue(condition.op, condition.lhsAttr, type, value, condition.rhsAttr,type, NULL);
+
 	lBuffer[hashNum].push_back( temp );		
 	free(value);
 	
     }
     lpt.close();
+
     
 //  debug
 /*
@@ -1577,6 +1592,8 @@ RC GHJoin::getPartition()
 
     rpt = new RBFM_ScanIterator();
     rc = rbfm->scan(rightPart[partition], rAttrs, "", NO_OP, NULL, rAttrsName, *rpt); 
+    //fetch the tuple from the right partition
+    rightFlag = rpt->getNextRecord(ridT,probeT);
     assert( rc == SUCCESS );
     partition++;   
 //    assert(false); 
@@ -1586,6 +1603,7 @@ GHJoin::~GHJoin()
 {
     RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
     int numPartitions = leftPart.size();
+    free(probeT);
     for( int i=0; i<numPartitions; i++){
 	string lTableName = "left_join"+to_string(i);
 	string rTableName = "right_join"+to_string(i);

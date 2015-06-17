@@ -304,7 +304,7 @@ class INLJoin : public Iterator , public DebugMsg{
 };
 
 // Optional for everyone. 10 extra-credit points
-class GHJoin : public Iterator {
+class GHJoin : public Iterator , public DebugMsg{
     // Grace hash join operator
     public:
       GHJoin(Iterator *leftIn,               // Iterator of input R
@@ -329,7 +329,10 @@ class GHJoin : public Iterator {
 	RC getPartition();
 	RecordBasedFileManager *rbfm;
 	RBFM_ScanIterator *rpt; // lpt;
-	int partition,numPartitions, secHash;
+	RC rightFlag;
+	void *probeT;
+	RID ridT;
+	int leftposition,partition,numPartitions, secHash;
 };
 
 class Aggregate : public Iterator , public DebugMsg{

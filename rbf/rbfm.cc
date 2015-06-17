@@ -17,7 +17,7 @@ RecordBasedFileManager* RecordBasedFileManager::instance()
 RecordBasedFileManager::RecordBasedFileManager()
 {
     pagedFileManager = PagedFileManager::instance();
-    debug = false;
+    //debug = true;
 }
 
 RecordBasedFileManager::~RecordBasedFileManager()
@@ -185,6 +185,7 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
 
     // we have the offset, read data from page
     void *formattedData = malloc(rOffset.length);
+    //printf("rOffset.offset is %d\nrOffset.length is %d\n",rOffset.offset,rOffset.length);
     memcpy( formattedData, (char*)page+rOffset.offset, rOffset.length );
     // check if the record is actually a tombstone, if it is, use tombstone to find actual data
     FieldSize fieldSize;
@@ -524,10 +525,11 @@ RC RecordBasedFileManager::readDataFromBuffer(const vector<Attribute> &recordDes
     // get descriptor length
     int descriptorLength = sizeof(FieldSize) + fieldOffsetDescriptorSize;  //getDataSize( recordDescriptor,data,false)
 
-    char * nullIndicator=(char *)malloc(PAGE_SIZE);
+    unsigned char * nullIndicator=(unsigned char *)malloc(PAGE_SIZE);
 
     //CREATE null indicator for data
     memcpy(nullIndicator,(char *)formattedData+descriptorLength,nullFieldsIndicatorActualSize);
+    dprintf("In readDataFromBuffer\nnullIndicator is %d\n",nullIndicator[0]);
     int pastNonNullAttr=0;
     int currentNonNullAttr=0;
     int currentNonNull=0;
@@ -540,9 +542,13 @@ RC RecordBasedFileManager::readDataFromBuffer(const vector<Attribute> &recordDes
     	dprintf("\n%d at the beginning currentoffset is %d pastoffset is %d\n",i1,currentoffset,pastoffset);
     	if(i1<pastdescriptor.size()){
 	    if(pastdescriptor[i1].length != 0){
+	    	dprintf("pastdescriptor[i1].length != 0\n");
 	    	if(recordDescriptor[i1].length != 0){
-		    if(nullIndicator[pastNonNullAttr / 8] & (1 << (7-(pastNonNullAttr%8)))){
-			newnullIndicator[currentNonNullAttr / 8] += (1 << (7-(currentNonNullAttr%8)));
+		    	dprintf("recordDescriptor[i1].length != 0\n");
+	    		if(nullIndicator[pastNonNullAttr / 8] & (1 << (7-(pastNonNullAttr%8)))){
+	    			dprintf("nullIndicator[pastNonNullAttr / 8] & (1 << (7-(pastNonNullAttr%8))\n");
+	    			dprintf("pastNonNullAttr is %d\ncurrentNonNullAttr is %d\n",pastNonNullAttr,currentNonNullAttr);
+	    			newnullIndicator[currentNonNullAttr / 8] += (1 << (7-(currentNonNullAttr%8)));
 		    }else{
 	        	if( pastdescriptor[i1].type == TypeVarChar ){
 	        	    int len;
@@ -565,7 +571,7 @@ RC RecordBasedFileManager::readDataFromBuffer(const vector<Attribute> &recordDes
 	        	    dprintf("\nTypeInt copy current offset is %d pastoffset is %d\n",currentoffset,pastoffset);
 	        	}
 		    }
-
+			    pastNonNullAttr++;
     		    currentNonNullAttr++;
     		}else{
 

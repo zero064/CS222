@@ -1161,11 +1161,17 @@ RC RelationManager::readTuple(const string &tableName, const RID &rid, void *dat
 	FileHandle filehandle;
 	vector<Attribute> descriptor;
 	getAttributes(tableName,descriptor);
+	unsigned char * nullIndicator =(unsigned char *)malloc(PAGE_SIZE);
+	memset(nullIndicator,0,PAGE_SIZE);
 	if(rbfm->openFile(tableName,filehandle)==0){
 		if(rbfm->readRecord(filehandle,descriptor,rid,data)==0){
+			memcpy(nullIndicator,data,1);
+			dprintf("nullIndicator is %d\n",nullIndicator[0]);
+			dprintf("rid.pageNum is %d\nrid.slotNum is %d\n",rid.pageNum,rid.slotNum);
 			dprintf("Successfully read tuple \n");
 			RC rc = rbfm->closeFile(filehandle);
 			assert( rc == 0 && "something wrong in rbfm->closeFile ");
+			free(nullIndicator);
 			return 0;
 		}
 	}
