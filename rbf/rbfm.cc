@@ -17,7 +17,7 @@ RecordBasedFileManager* RecordBasedFileManager::instance()
 RecordBasedFileManager::RecordBasedFileManager()
 {
     pagedFileManager = PagedFileManager::instance();
-    //debug = true;
+    debug = true;
 }
 
 RecordBasedFileManager::~RecordBasedFileManager()
@@ -163,7 +163,9 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 
 
 RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, void *data) {
-    void *page = malloc(PAGE_SIZE);
+    dprintf("In RecordBasedFileManager::readRecord\n");
+    dprintf("rid.pageNum is %d\nrid.slotNum is %d\n",rid.pageNum,rid.slotNum);
+	void *page = malloc(PAGE_SIZE);
     if( fileHandle.readPage(rid.pageNum,page) == FAILURE ){
 	assert(false && "Yo readRecord failed dude (wrong page)\n");
 	return FAILURE;
@@ -921,10 +923,12 @@ RC RBFM_ScanIterator::initScanIterator(FileHandle &fileHandle, const vector<Attr
     this->compOp = compOp;
     this->value = (char*)value;
     this->page = malloc(PAGE_SIZE);
+    memset(this->page,0,PAGE_SIZE);
      // init, start from 1st record, <1,0>
     this->c_rid.pageNum = 0;
     this->c_rid.slotNum = 0;
     pageDesc.numOfSlot = -1;
+    //debug = true;
     return SUCCESS;
 }
 
@@ -995,7 +999,9 @@ RC RBFM_ScanIterator::getFormattedRecord(void *returnedData, void *data)
 
 RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 {
-    bool found = false;
+    dprintf("In RBFM_ScanIterator::getNextRecord\n");
+    dprintf("c_rid.pageNum is %d\nc_rid.slotNum is %d\n",c_rid.pageNum,c_rid.slotNum);
+	bool found = false;
     RecordOffset rOffset;
     // get field offset descriptor array length
     int fieldOffsetDescriptorSize = sizeof(unsigned short int) * recordDescriptor.size();
@@ -1008,16 +1014,19 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 	rid = c_rid;
     	// finish reading all records in a page
 	if( (int)c_rid.slotNum+1 > (int)pageDesc.numOfSlot){
-	    c_rid.slotNum = 0;
+	    dprintf("c_rid.slotNum+1 > (int)pageDesc.numOfSlot\n");
+		c_rid.slotNum = 0;
 	    c_rid.pageNum++;
 	    if( c_rid.pageNum % 512 == 0 ) c_rid.pageNum++;
 
 	    if( fileHandle.readPage( c_rid.pageNum, page ) == FAILURE){
-		 free(returnedData);
-		 return RBFM_EOF;
+		    dprintf("fileHandle.readPage( c_rid.pageNum, page ) == FAILURE\n");
+	    	free(returnedData);
+	    	return RBFM_EOF;
 	    }
 	    memcpy( &pageDesc, (char*)page+PAGE_SIZE-sizeof(PageDesc), sizeof(PageDesc) );
 	    if( pageDesc.numOfSlot < 0 ) pageDesc.numOfSlot*=-1; // if it's an inconsistent page
+	    dprintf("c_rid.pageNum is %d\nc_rid.slotNum is %d\n",c_rid.pageNum,c_rid.slotNum);
 	} 
 
 	
@@ -1025,7 +1034,8 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 	memcpy( &rOffset, (char*)page+PAGE_SIZE-sizeof(PageDesc)-sizeof(RecordOffset)*(c_rid.slotNum+1), sizeof(RecordOffset) );
 	dprintf("rOffset %d %d\n",rOffset.offset,rOffset.length);
 	if( rOffset.offset == DeletedSlotMark ){
-	    c_rid.slotNum++;
+	    dprintf("rOffset.offset == DeletedSlotMark\n");
+		c_rid.slotNum++;
 	    continue;
 	}
 
@@ -1033,7 +1043,8 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 	FieldSize fieldSize;
 	memcpy( &fieldSize, (char*)page+rOffset.offset, sizeof(FieldSize) );
 	if( fieldSize == TombStoneMark ){
-	    RID trid;
+	    dprintf("fieldSize == TombStoneMark\n");
+		RID trid;
 	    memcpy( &trid, (char*)page+rOffset.offset+sizeof(FieldSize), sizeof(RID) );
 	    void *t_page = malloc(PAGE_SIZE);
 	    fileHandle.readPage(trid.pageNum,t_page);
@@ -1041,12 +1052,16 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data)
 	    memcpy( returnedData, (char*)t_page+rOffset.offset, rOffset.length);
 	    free(t_page); 
 	}else{
-	    memcpy( returnedData, (char*)page+rOffset.offset, rOffset.length );
+	    dprintf("fieldSize != TombStoneMark\n");
+		memcpy( returnedData, (char*)page+rOffset.offset, rOffset.length );
 	}
 
 	if( compOp == NO_OP ){
-	     getFormattedRecord(returnedData,data);
+	    dprintf("compOp == NO_OP\n");
+		getFormattedRecord(returnedData,data);
 	     found = true;
+	     rid = c_rid;
+		 dprintf("rid.pageNum is %d\nrid.slotNum is %d\n",rid.pageNum,rid.slotNum);
 	     c_rid.slotNum++;
 	     break;
 	}

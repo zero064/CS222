@@ -122,7 +122,15 @@ bool Iterator::compare(CompOp op, AttrType type, void *v1, void *v2)
 	    float fa,fb;
 	    memcpy( &fa, v1, sizeof(float));
 	    memcpy( &fb, v2, sizeof(float));
-	    compareValue = ( ( fa-fb ) * 10000000.0 );
+	    if(fa > fb){
+	    	compareValue = 1;
+	    }else if(fa < fb){
+	    	compareValue = -1;
+	    }else{
+	    	compareValue = 0;
+	    }
+	    printf("fa is %f\nfb is %f\ncompareValue is %d\n",fa,fb,compareValue);
+
 	    break;
 	case TypeVarChar:
 	    int la,lb;
@@ -374,7 +382,7 @@ RC Iterator::CreateVarChar(void *data,const string &str){
 Filter::Filter(Iterator *input, const Condition &condition  )
 {
 
-    //debug = true;
+    debug = true;
 	dprintf("Filter constructor\n");
     // Get Attributes from iterator
     input->getAttributes(attrs);
@@ -417,7 +425,7 @@ RC Filter::getNextTuple(void *data)
 			//righthand-side is value
 			//if tuple match predicate, break
 			if(compare(condition.op, attrtype, vleft, condition.rhsValue.data)){
-				//printValue(condition.op,condition.lhsAttr, attrtype, vleft,"fixed value", attrtype, condition.rhsValue.data);
+				printValue(condition.op,condition.lhsAttr, attrtype, vleft,"fixed value", attrtype, condition.rhsValue.data);
 				free(vleft);
 				free(vright);
 				return 0;
@@ -736,7 +744,7 @@ void BNLJoin::getAttributes(vector<Attribute> &attrs) const
 
 INLJoin::INLJoin(Iterator *leftIn, IndexScan *rightIn, const Condition &condition   )
 {
-	//debug = true;
+	debug = true;
 	//assign value to member
 	dprintf("INLJoin constructor\n");
 	//leftIn->getAttributes(leftattrs);
@@ -753,6 +761,7 @@ INLJoin::INLJoin(Iterator *leftIn, IndexScan *rightIn, const Condition &conditio
 }
 RC INLJoin::getNextTuple(void *data)
 {
+	dprintf("INLJoin::getNextTupl\n");
 	void * leftdata =  malloc(PAGE_SIZE);
 	void * rightdata =  malloc(PAGE_SIZE);
 	void * leftvalue = malloc(PAGE_SIZE);
@@ -801,6 +810,7 @@ RC INLJoin::getNextTuple(void *data)
 		//reset iterator for rightIn
 		dprintf("before reset Iterator\n");
 		rightIn->setIterator(leftvalue, leftvalue, true, true);
+		printValue(condition.op,condition.lhsAttr, attr.type, leftvalue, "", attr.type, NULL);
 		//inner loop for rightIn
 		dprintf("before entering inner loop\n");
 		while(rightIn->getNextTuple(rightdata) != QE_EOF){
@@ -931,7 +941,7 @@ Aggregate::Aggregate(Iterator *input, Attribute aggAttr, AggregateOp op)
 }
 Aggregate::Aggregate(Iterator *input, Attribute aggAttr, Attribute groupAttr, AggregateOp op)
 {
-	//debug = true;
+	debug = true;
 	this->input = input;
 	input->getAttributes(attrs);
 	this->aggAttr = aggAttr;
@@ -1400,7 +1410,7 @@ void Aggregate::getAttributes(vector<Attribute> &attrs) const{
 
 GHJoin::GHJoin( Iterator *leftIn, Iterator *rightIn, const Condition &condition,const unsigned numPartitions)
 {
-    //debug =true;
+    debug =true;
 	this->rbfm = RecordBasedFileManager::instance();
     this->condition = condition; 
     this->numPartitions = numPartitions;
@@ -1486,7 +1496,7 @@ RC GHJoin::getNextTuple( void *data )
 			AttrType ltype = getAttrValue( lAttrs, condition.lhsAttr, lBuffer[hashNum][leftposition], lvalue , nullValue);
 			if( compare( condition.op , ltype , lvalue, rvalue ) ){
 		        dprintf("compare( condition.op , ltype , lvalue, rvalue )\nleftposition is %d\n",leftposition);
-				//printValue(condition.op,condition.lhsAttr,ltype,lvalue,condition.rhsAttr, rtype, rvalue);
+				printValue(condition.op,condition.lhsAttr,ltype,lvalue,condition.rhsAttr, rtype, rvalue);
 		        join( lAttrs, lBuffer[hashNum][leftposition], rAttrs, probeT );
 				memcpy( data , lBuffer[hashNum][leftposition], 200 );
 				//increase i

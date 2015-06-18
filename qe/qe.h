@@ -22,7 +22,7 @@ typedef enum{ COUNT=0, SUM, AVG, MIN, MAX } AggregateOp;
 const int int_pinf = numeric_limits<int>::max();
 const int int_ninf = numeric_limits<int>::min();
 const float float_pinf = numeric_limits<float>::max();
-const float float_ninf = numeric_limits<float>::min();
+const float float_ninf = -numeric_limits<float>::max();
 struct Aggregation {
 	float count = 0;
 	float sum = 0;

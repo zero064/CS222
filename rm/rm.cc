@@ -320,7 +320,7 @@ RelationManager* RelationManager::instance()
 
 RelationManager::RelationManager()
 {  
-    //debug = true;
+    debug = true;
     rbfm = RecordBasedFileManager::instance();
 }
 
@@ -559,6 +559,7 @@ RC RelationManager::loadIndexAttr(const string &tableName, const string &attribu
 }
 RC RelationManager::createIndex(const string &tableName, const string &attributeName)
 {
+	dprintf("RelationManager::createIndex\n");
 	RM_ScanIterator rm_ScanIterator;
 	IndexManager *indexManager=IndexManager::instance();
 	IXFileHandle ixfileHandle;
@@ -645,6 +646,7 @@ RC RelationManager::createIndex(const string &tableName, const string &attribute
 				    default:
 				    	dprintf("Invalid attribute type");
 				}
+			    dprintf("rid.pageNum is %d\nrid.slotNum is %d\n",rid.pageNum,rid.slotNum);
 				indexManager->insertEntry(ixfileHandle,attr,key,rid);
 			}
 		}
@@ -1158,6 +1160,7 @@ RC RelationManager::updateTuple(const string &tableName, const void *data, const
 
 RC RelationManager::readTuple(const string &tableName, const RID &rid, void *data)
 {
+	dprintf("In RelationManager::readTuple\n");
 	FileHandle filehandle;
 	vector<Attribute> descriptor;
 	getAttributes(tableName,descriptor);
@@ -1216,6 +1219,7 @@ RC RelationManager::scan(const string &tableName,
       const vector<string> &attributeNames,
       RM_ScanIterator &rm_ScanIterator)
 {
+	dprintf("RelationManager::scan\n");
 	FileHandle filehandle;
 	vector<Attribute> descriptor;
 	if(tableName.compare("Tables")==0){
