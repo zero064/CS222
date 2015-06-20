@@ -9,16 +9,6 @@
 
 IndexManager *indexManager;
 
-void fillUpKeyRid(const unsigned count, const unsigned i, char* key, RID &rid){
-    *(int *)key = count;
-    for(unsigned j = 0; j < count; j++)
-    {
-        *(key+4+j) = 96+i;
-    }
-    rid.pageNum = i;
-    rid.slotNum = i;
-}
-
 int testCase_VerifyTopDownDeletion(const string &indexFileName, 
         const Attribute &attribute){
     // Checks whether the deletion is in the TopDown manner
@@ -48,7 +38,7 @@ int testCase_VerifyTopDownDeletion(const string &indexFileName,
     unsigned i = 1;
     for(; i <= numOfTuples; i++)
     {
-        fillUpKeyRid(count, i, key, rid);
+        fillUpKeyRid(count, i*10, key, rid);
         assertInsertEntry(success, indexManager, ixfileHandle, attribute, key, rid);
     }
 
@@ -56,7 +46,13 @@ int testCase_VerifyTopDownDeletion(const string &indexFileName,
     indexManager->printBtree(ixfileHandle, attribute);
 
     // delete the 2nd
-    fillUpKeyRid(count, 2, key, rid);
+    fillUpKeyRid(count, 2 * 10, key, rid);
+    assertDeleteEntry(success, indexManager, ixfileHandle, attribute, key, rid);
+    // print BTree, by this time the BTree may have 2 level
+    indexManager->printBtree(ixfileHandle, attribute);
+    
+    // delete the 1st
+    fillUpKeyRid(count, 1 * 10, key, rid);
     assertDeleteEntry(success, indexManager, ixfileHandle, attribute, key, rid);
     // print BTree, by this time the BTree should have 2 level
     indexManager->printBtree(ixfileHandle, attribute);

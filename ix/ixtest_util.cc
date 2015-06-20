@@ -24,7 +24,7 @@ using namespace std;
 
 void assertRC(RC expected, RC real){
     if (expected == success){
-        cerr << "Succeeded as expected, correct!" << endl;
+        //cerr << "Succeeded as expected, correct!" << endl;
         assert(real == success);
     } else {
         cerr << "Failed as expected, correct!" << endl;
@@ -139,4 +139,16 @@ void assertCloseIterator(RC expected, IX_ScanIterator &ix_ScanIterator){
     }
     assertRC(expected, rc);
 }
+
+void fillUpKeyRid(const unsigned count, const unsigned i, char* key, RID &rid){
+    *(int *)key = count;
+    unsigned j = 0;
+    for(; j < count; j+=4)
+    {
+        sprintf(key + 4 + j, "%04d", i); 
+    }
+    rid.pageNum = i;
+    rid.slotNum = i;
+}
+
 

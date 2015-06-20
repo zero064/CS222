@@ -1676,11 +1676,14 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 		PageNum pageNum, KeyDesc &keyDesc, int rightMost)
 
 {   
+	dprintf("in IndexManager::deleteFromLeaf\n");
 	//checkPageInt(ixfileHandle, page, pageNum);
 	TreeOp operation = OP_None;
 	// retrieve node info
 	NodeDesc nodeDesc;
 	memcpy( &nodeDesc, (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
+	dprintf("Before deletion, nodeDesc.size is %d\n",nodeDesc.size);
+
 	int offset = 0 ;
 	// potential split page buffer
 	void *nextPage = malloc(PAGE_SIZE);
@@ -1699,8 +1702,10 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 //		printf("pageNum %u key %d result %d offset %d nodeDesc.size %d",pageNum,*(int*)key, *(int*)ded.keyValue, offset, nodeDesc.size);
 //		printf(" entry size %d\n", sizeof(DataEntryDesc)+ded.keySize+ded.numOfRID*sizeof(RID) );
 		// if it only contains 1 RID , remove whole entries
+		dprintf("result is %d\nded.numOfRID is %d\nded.overflow is %d\n",result,ded.numOfRID,ded.overflow);
 		if( result == 0 && ded.numOfRID == 1 && ded.overflow == InvalidPage){
-
+			dprintf("result == 0 && ded.numOfRID == 1 && ded.overflow == InvalidPage\n");
+			unsync = true;
 			// use nextPage as temp buffer
 			dprintf("result ==0\n offset is %d\n rid.pageNum is %d\n rid.slotNum is %d\n",offset,rid.pageNum,rid.slotNum);
 			int entrySize = sizeof(DataEntryDesc) + ded.keySize + sizeof(RID);
@@ -1711,6 +1716,7 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 			nodeDesc.size -= entrySize;
 			memcpy( (char*)page+PAGE_SIZE-sizeof(NodeDesc), &nodeDesc, sizeof(NodeDesc) );
 			found = true;
+			dprintf("After deletion, nodeDesc.size is %d\n",nodeDesc.size);
 			free(ded.keyValue);		
 			break;
 		}
@@ -1741,6 +1747,7 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 		else if( result == 0 ) {
 			// if it has more than two RIDs, remove the one in the list
 			//printf("RID List offset is %d rid.pageNum is %d rid.slotNum is %d numrid %d\n",offset,rid.pageNum,rid.slotNum,ded.numOfRID);
+			dprintf("in else if result == 0\n");
 
 			unsync = true;
 			for( int i=0; i<ded.numOfRID; i++){
@@ -1835,7 +1842,9 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 	}
 
 
-	if( !found ) { return OP_Error; }
+	if( !found ) {
+		dprintf("!found\n");
+		return OP_Error; }
 
 	// if this page is root page, dont apply merge / redistribution.
 	if( nodeDesc.size < LowerThreshold && pageNum != ixfileHandle.findRootPage() ){
@@ -2013,7 +2022,13 @@ int IndexManager::keyCompare(const Attribute &attribute, const void *keyA, const
 			float f_a, f_b;
 			memcpy( &f_a , keyA , sizeof(float));
 			memcpy( &f_b , keyB , sizeof(float));
-			f_a = (f_a-f_b) * 100000; 
+			if(f_a > f_b){
+				f_a = 1;
+			}else if(f_a < f_b){
+				f_a = -1;
+			}else{
+				f_a = 0;
+			}
 			return (int)f_a;
 			break;
 		case TypeVarChar:
@@ -2171,7 +2186,7 @@ void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attri
 
 IX_ScanIterator::IX_ScanIterator()
 {
-	//debug = true;
+	debug = true;
 }
 
 IX_ScanIterator::~IX_ScanIterator()
@@ -2196,11 +2211,14 @@ RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
 	this->highKeyInclusive = highKeyInclusive;
 	this->page = malloc(PAGE_SIZE);
 	this->overflowPage = malloc(PAGE_SIZE);
+	this->oldkey = malloc(PAGE_SIZE);
 	this->lowKeyNull = false;
 	this->highKeyNull = false;
 	im = IndexManager::instance();
 	im->unsync = false;
 	float INF = INFINITY/2, NINF = -INFINITY/2;
+	//copy NINF to oldkey
+	memcpy(this->oldkey, &ninf,sizeof(int));
 
 	if( lowKey == NULL ){
 		this->lowKeyNull = true;
@@ -2301,11 +2319,15 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 {
 	RC rc;
 	dprintf("in IX_ScanIterator getNextEntry\n");
+	dprintf("In beginning\noldRid.pageNume is %d\noldRid.slotNum is %d\n",oldRid.pageNum,oldRid.slotNum);
 
 	// check if someone called deleteEntry in indexManager
 	// if someone did, sync the location
-	if( im->unsync ){
-	    //assert(false);
+	if( *(int *)oldkey != ninf ){
+		dprintf("In beginning\ndebugRid1.pageNume is %d\ndebugRid1.slotNum is %d\n",debugRid1->pageNum,debugRid1->slotNum);
+
+		dprintf("*(int *)oldkey != ninf\n");
+		//assert(false);
 	    // find root first
 	    PageNum root = ixfileHandle.findRootPage();
 	    rc = ixfileHandle.readPage(root,page);
@@ -2314,10 +2336,12 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 	    memcpy( &nodeDesc, (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
 	    PageNum returnPageNum = 0;
 	    if( nodeDesc.type == NonLeaf ){
-		im->TraverseTree( ixfileHandle, attribute, key,  page, root, returnPageNum);
+		im->TraverseTree( ixfileHandle, attribute, oldkey,  page, root, returnPageNum);
 		assert( root != returnPageNum && "root should not be leaf in this case" );
 		assert( returnPageNum >=1 && "something went wrong when traversing tree in scan ");
-		rc = ixfileHandle.readPage(returnPageNum,page);  
+		rc = ixfileHandle.readPage(returnPageNum,page);
+		//fetch nodeDesc from returnPageNum
+	    memcpy( &nodeDesc, (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
 	    }
 	    int offset = 0 ;
 	    while( offset < nodeDesc.size ){ 
@@ -2326,16 +2350,52 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 //		printf("pageNum %d offset %d keySize%d\n",returnPageNum,offset,ded.keySize);
 		void *dataKey = malloc(ded.keySize);
 		memcpy( dataKey, (char*)page+offset+sizeof(DataEntryDesc), ded.keySize);
-		int compare = im->keyCompare( attribute, key , dataKey );
+		int compare = im->keyCompare( attribute, oldkey , dataKey );
 		free(dataKey);
 
 		if( compare == 0 ){ 
-		    offsetToKey = offset;
+			int ridNum = 0;
+			RID testRid;
+			dprintf("compare == 0\n");
+			dprintf("ridNum is %d\n ded.numOfRID is %d\n",ridNum,ded.numOfRID);
+		    //while loop, go through RID list find the position for last RID
+		    while(ridNum <= ded.numOfRID){
+				dprintf("ridNum <= ded.numOfRID\n");
+		    	//fetch the RID belonging to this key
+		    	memcpy( &testRid, (char*)page+offset+sizeof(DataEntryDesc)+ded.keySize+ridNum*sizeof(RID), sizeof(RID) );
+		    	ridNum ++;
+		    	dprintf("testRid.pageNum is %d\ntestRid.slotNum is %d\noldRid.pageNume is %d\noldRid.slotNum is %d\n",testRid.pageNum,testRid.slotNum,oldRid.pageNum,oldRid.slotNum);
+				//if pageNum and slotNum match
+		    	if(testRid.pageNum == oldRid.pageNum && testRid.slotNum == oldRid.slotNum)
+		    	{
+					dprintf("testRid.pageNum == oldRid.pageNum && testRid.slotNum == oldRid.slotNum\n");
+		    		//rid num reach numOfRID, go to preparation
+					if( ridNum  >= ded.numOfRID){
+						dprintf("ridNum  >= ded.numOfRID\n");
+						goto preparation;
+					}else{
+					//if not,fetch the next RID
+						dprintf("ridNum  < ded.numOfRID\n");
+						offsetToKey = offset;
+						offsetToRID = ridNum;
+						break;
+					}
+		    	}
+		    }
+
+		    break;
+		}else if(compare < 0){
+		    dprintf("compare < 0\n");
+			offsetToKey = offset;
 		    offsetToRID = 0;
 		    if( !overflow )
 			im->unsync = false;
 		    break;
+		}else{
+			//dprintf("compare > 0\n");
 		}
+
+		preparation:
 		offset += sizeof(DataEntryDesc) + ded.keySize + ded.numOfRID*sizeof(RID) ;
 	    }
 /*
@@ -2407,7 +2467,7 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 	}
 
 
-
+	dprintf("offsetToKey is %d\noffsetToRID is %d\nnodeDesc.size is %d\n",offsetToKey,offsetToRID,nodeDesc.size);
 
 	if( offsetToKey >= nodeDesc.size ){
 		dprintf("offsetToKey >= nodeDesc.size\n");
@@ -2423,13 +2483,22 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 		offsetToRID = 0;
 		memcpy( &nodeDesc, (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
 	}
-
+	void * testkey = malloc(PAGE_SIZE);
+	DataEntryDesc testded;
 	DataEntryDesc ded;
 	memcpy( &ded, (char*)page+offsetToKey, sizeof(DataEntryDesc) );
-
 	// Read key and compare
 	memcpy( key, (char*)page+offsetToKey+sizeof(DataEntryDesc), ded.keySize);
+	memcpy( oldkey, (char*)page+offsetToKey+sizeof(DataEntryDesc), ded.keySize);
 
+	dprintf("key is %d\n",*(int *)key);
+
+		memcpy( &testded, (char*)page+offsetToKey+28, sizeof(DataEntryDesc) );
+		// Read key and compare
+		memcpy( testkey, (char*)page+offsetToKey+sizeof(DataEntryDesc)+28,testded.keySize);
+		dprintf("testkey is %d\n",*(int *)testkey);
+
+	free(testkey);
 	int result = im->keyCompare( attribute, key , highKey );
 	if( highKeyInclusive ){ 
 		if( result > 0 ) {
@@ -2445,6 +2514,9 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 
 	// Read rid and return
 	memcpy( &rid, (char*)page+offsetToKey+sizeof(DataEntryDesc)+ded.keySize+offsetToRID*sizeof(RID), sizeof(RID) );
+	memcpy( &oldRid, (char*)page+offsetToKey+sizeof(DataEntryDesc)+ded.keySize+offsetToRID*sizeof(RID), sizeof(RID) );
+	dprintf("Before ending\noldRid.pageNume is %d\noldRid.slotNum is %d\n",oldRid.pageNum,oldRid.slotNum);
+	debugRid1 = &oldRid;
 	/*
 	im->printKey(attribute,key);
 	//printf(" RID %d %d %d %d %d %d\n",rid.pageNum,rid.slotNum, ded.numOfRID, offsetToRID,offsetToKey,pageNum);
@@ -2479,6 +2551,7 @@ RC IX_ScanIterator::close()
 {
 	free(page);
 	free(overflowPage);
+	free(oldkey);
 	free(lowKey);
 	free(highKey);
 	return SUCCESS;

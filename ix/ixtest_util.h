@@ -57,6 +57,9 @@ void assertCollectCounter(RC expected,
         unsigned &appendPageCount);
 
 void assertCloseIterator(RC expected, IX_ScanIterator &iter);
+
+void fillUpKeyRid(const unsigned count, const unsigned i, char* key, RID &rid);
+
 #endif
 
 

@@ -52,7 +52,7 @@ int testCase_6A(const string &indexFileName, const Attribute &attribute)
 
     while(ix_ScanIterator.getNextEntry(rid, &key) == success)
     {
-        cerr << "returned rid: " << rid.pageNum << " " << rid.slotNum << endl;
+        //cerr << "returned rid: " << rid.pageNum << " " << rid.slotNum << endl;
         outRidPageNumSum += rid.pageNum;
     }
 

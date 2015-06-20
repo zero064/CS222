@@ -31,7 +31,7 @@ int testCase_extra_2(const string &indexFileName, const Attribute &attribute)
     IXFileHandle ixfileHandle;
     IX_ScanIterator ix_ScanIterator;
     int compVal1 = 1234, compVal2= 4321;
-    int count = 0;
+    unsigned count = 0;
 
     //create index file(s)
     assertCreateIndexFile(success, indexManager, indexFileName);

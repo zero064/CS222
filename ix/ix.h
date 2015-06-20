@@ -6,13 +6,15 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <cstdio>
+#include <limits>
 
 #include "../rbf/rbfm.h"
 
 # define IX_EOF (-1)  // end of the index scan
 const int IXDirectorySize = PAGE_SIZE / sizeof(PageNum) ; // 1024
 typedef unsigned short int PageSize;
-
+const int ninf = std::numeric_limits<int>::min();
+RID *debugRid1;
 typedef char NodeType;
 const char Leaf = 1 , NonLeaf = 2;
 
@@ -193,13 +195,15 @@ class IX_ScanIterator : public DebugMsg{
 		IXFileHandle ixfileHandle;
 		IndexManager *im;
 		Attribute attribute;
-		void *lowKey; bool lowKeyNull , highKeyNull;
-		void *highKey;
+		void *lowKey;
+		bool lowKeyNull , highKeyNull;
+		void *highKey, *oldkey;
 		bool lowKeyInclusive, highKeyInclusive;
 		void *page, *overflowPage;
 		bool overflow;
 		int offsetToKey, offsetToRID, overflowRID;
 		PageNum currentOverflowPage, pageNum;
+		RID oldRid;
 
 };
 

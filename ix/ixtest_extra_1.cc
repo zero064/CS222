@@ -88,7 +88,7 @@ int testCase_extra_1(const string &indexFileName, const Attribute &attribute)
     //iterate
     while(ix_ScanIterator.getNextEntry(rid, &key) == success)
     {
-        cerr << "returned rid: " << rid.pageNum << " " << rid.slotNum << endl;
+        //cerr << "returned rid: " << rid.pageNum << " " << rid.slotNum << endl;
         if ( ((rid.pageNum - 1) % 26 + 1) != offset) {
             cerr << "Wrong entry output... Test failed..." << endl;
             return fail;
