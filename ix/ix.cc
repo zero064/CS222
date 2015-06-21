@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include "ix.h"
+RID *debugRid1;
 
 IndexManager* IndexManager::_index_manager = 0;
 
@@ -2009,6 +2010,7 @@ TreeOp IndexManager::deleteFromLeaf(IXFileHandle &ixfileHandle, const Attribute 
 // if eauqlity return 0
 int IndexManager::keyCompare(const Attribute &attribute, const void *keyA, const void* keyB)
 {
+	dprintf("IndexManager::keyCompare\n");
 	AttrType type = attribute.type;
 
 	int i_a , i_b;
@@ -2032,12 +2034,20 @@ int IndexManager::keyCompare(const Attribute &attribute, const void *keyA, const
 			return (int)f_a;
 			break;
 		case TypeVarChar:
-			memcpy( &i_a , keyA , sizeof(int));
-			memcpy( &i_b , keyB , sizeof(int));
-			string sa ((char*)keyA+sizeof(int),i_a);
-			string sb ((char*)keyB+sizeof(int),i_b);
-			//printf("%d %s %s\n",sa.compare(sb),sa.c_str(),sb.c_str());
-			return sa.compare(sb);
+			try{
+				memcpy( &i_a , keyA , sizeof(int));
+				memcpy( &i_b , keyB , sizeof(int));
+				dprintf("i_a is %d\ni_b is %d\n",i_a,i_b);
+				string sa ((char*)keyA+sizeof(int),i_a);
+				string sb ((char*)keyB+sizeof(int),i_b);
+				//printf("%d %s %s\n",sa.compare(sb),sa.c_str(),sb.c_str());
+				return sa.compare(sb);
+			}
+			catch(std::exception const &exc){
+				dprintf("%s\n",exc.what());
+				dprintf("In keyCompare, fail to create string\n");
+
+			}
 	}
 
 }
@@ -2201,6 +2211,7 @@ RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
 		bool		lowKeyInclusive,
 		bool        	highKeyInclusive)
 {
+	dprintf("In IX_ScanIterator::init\n");
 	if( ixfileHandle.isReadable() == -1 ) return FAILURE;
 	this->overflow = false;
 	this->ixfileHandle = ixfileHandle;
@@ -2222,8 +2233,12 @@ RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
 
 	if( lowKey == NULL ){
 		this->lowKeyNull = true;
-		this->lowKey = malloc(sizeof(float));
-		memcpy( this->lowKey , &NINF, sizeof(float));
+		this->lowKey = malloc(PAGE_SIZE);
+		if(attribute.type == TypeReal || attribute.type == TypeInt){
+			memcpy( this->lowKey , &NINF, sizeof(float));
+		}else{
+			*(int *) this->lowKey =0;
+		}
 	}else{
 	    int keySize = im->getKeySize(this->attribute,lowKey);
 	    this->lowKey = malloc( keySize );
@@ -2231,8 +2246,13 @@ RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
 	}
 	if( highKey == NULL ){
 		this->highKeyNull = true;
-		this->highKey = malloc(sizeof(float));
-		memcpy( this->highKey , &INF, sizeof(float));
+		this->highKey = malloc(PAGE_SIZE);
+		if(attribute.type == TypeReal || attribute.type == TypeInt){
+			memcpy( this->highKey , &INF, sizeof(float));
+		}else{
+			*(int *) this->highKey = PAGE_SIZE-4;
+			memset((char *)this->highKey+4,126,PAGE_SIZE-4);
+		}
 	}else{
 
 	    int keySize = im->getKeySize(this->attribute,highKey);
@@ -2476,14 +2496,15 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 			return IX_EOF;
 		}
 		pageNum = nodeDesc.next;
+		dprintf("before readPage\nreadPageCount is %d\n",ixfileHandle.readPageCount);
 		rc = ixfileHandle.readPage( nodeDesc.next, page );
+		dprintf("after readPage\nreadPageCount is %d\n",ixfileHandle.readPageCount);
 		assert( rc == SUCCESS && "something wrong in readpage in getNextEntry" );
 		// Reset all offets for new pages;
 		offsetToKey = 0;
 		offsetToRID = 0;
 		memcpy( &nodeDesc, (char*)page+PAGE_SIZE-sizeof(NodeDesc), sizeof(NodeDesc) );
 	}
-	void * testkey = malloc(PAGE_SIZE);
 	DataEntryDesc testded;
 	DataEntryDesc ded;
 	memcpy( &ded, (char*)page+offsetToKey, sizeof(DataEntryDesc) );
@@ -2495,10 +2516,9 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 
 		memcpy( &testded, (char*)page+offsetToKey+28, sizeof(DataEntryDesc) );
 		// Read key and compare
-		memcpy( testkey, (char*)page+offsetToKey+sizeof(DataEntryDesc)+28,testded.keySize);
-		dprintf("testkey is %d\n",*(int *)testkey);
 
-	free(testkey);
+
+
 	int result = im->keyCompare( attribute, key , highKey );
 	if( highKeyInclusive ){ 
 		if( result > 0 ) {
@@ -2717,6 +2737,8 @@ RC IXFileHandle::deletePage(PageNum pageNum)
 
 RC IXFileHandle::collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount)
 {
+	//printf("In IXFileHandle::collectCounterValues\n");
+	//printf("this->readPageCount is %d\n",this->readPageCount);
 	readPageCount = this->readPageCount;
 	writePageCount = this->writePageCount;
 	appendPageCount = this->appendPageCount;

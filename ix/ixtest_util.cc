@@ -119,7 +119,8 @@ void assertInitalizeScan(RC expected, IndexManager * indexManager, IXFileHandle 
 
 void assertCollectCounter(RC expected, IXFileHandle & ixfileHandle, 
         unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount){
-    RC rc = ixfileHandle.collectCounterValues(readPageCount, writePageCount, appendPageCount);
+    //printf("In assertCollectCounter\n");
+	RC rc = ixfileHandle.collectCounterValues(readPageCount, writePageCount, appendPageCount);
     if(rc != success)
     {
         cerr << "collectCounterValues() failed." << endl;

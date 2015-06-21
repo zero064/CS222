@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <cstdio>
 #include <limits>
+#include <exception>
 
 #include "../rbf/rbfm.h"
 
@@ -14,7 +15,6 @@
 const int IXDirectorySize = PAGE_SIZE / sizeof(PageNum) ; // 1024
 typedef unsigned short int PageSize;
 const int ninf = std::numeric_limits<int>::min();
-RID *debugRid1;
 typedef char NodeType;
 const char Leaf = 1 , NonLeaf = 2;
 
